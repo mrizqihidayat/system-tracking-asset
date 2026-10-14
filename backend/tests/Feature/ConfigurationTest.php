@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Env;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ConfigurationTest extends TestCase
@@ -52,12 +54,47 @@ class ConfigurationTest extends TestCase
         $this->withToken($token)->getJson('/api/user')->assertUnauthorized();
     }
 
-    public function test_qr_base_url_defaults_to_frontend_scan_path(): void
+    /**
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function qrBaseUrlProvider(): array
     {
-        if (filled(env('QR_BASE_URL'))) {
-            $this->markTestSkipped('QR_BASE_URL diisi di environment.');
+        return [
+            'kosong → frontend_url' => ['', 'http://localhost:5173', 'http://localhost:5173'],
+            'kosong → origin pertama' => ['', 'https://aset.example.com/, http://localhost:5173', 'https://aset.example.com'],
+            'diisi' => ['https://qr.example.com', 'http://localhost:5173', 'https://qr.example.com'],
+            'trailing slash dibuang' => ['https://qr.example.com//', 'http://localhost:5173', 'https://qr.example.com'],
+        ];
+    }
+
+    #[DataProvider('qrBaseUrlProvider')]
+    public function test_qr_base_url_resolution(string $qrBaseUrl, string $frontendUrl, string $expected): void
+    {
+        $config = $this->loadAppConfigWith(['QR_BASE_URL' => $qrBaseUrl, 'FRONTEND_URL' => $frontendUrl]);
+
+        $this->assertSame($expected, $config['qr_base_url']);
+        $this->assertStringNotContainsString('//scan', $config['qr_base_url'].'/scan/SHD-PRJ-001');
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     * @return array<string, mixed>
+     */
+    private function loadAppConfigWith(array $env): array
+    {
+        $original = [];
+
+        foreach ($env as $key => $value) {
+            $original[$key] = Env::get($key);
+            Env::getRepository()->set($key, $value);
         }
 
-        $this->assertSame(config('app.frontend_url').'/scan', config('app.qr_base_url'));
+        try {
+            return require config_path('app.php');
+        } finally {
+            foreach ($original as $key => $value) {
+                $value === null ? Env::getRepository()->clear($key) : Env::getRepository()->set($key, (string) $value);
+            }
+        }
     }
 }

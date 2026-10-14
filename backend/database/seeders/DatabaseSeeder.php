@@ -17,5 +17,13 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('inalum2026'),
             ]
         );
+
+        $this->call([
+            MasterDataSeeder::class,
+            AssetSeeder::class,
+            RequestSeeder::class,
+            ConsumableSeeder::class,
+            RoomStandardSeeder::class,
+        ]);
     }
 }

@@ -62,14 +62,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | FRONTEND_URL boleh berisi beberapa origin dipisah koma (semuanya diizinkan
-    | CORS); frontend_url = origin pertama. Isi QR label: {qr_base_url}/{kode aset},
-    | default {frontend_url}/scan.
+    | CORS); frontend_url = origin pertama. Isi QR label: {qr_base_url}/scan/{kode aset}
+    | (SPEC §6), qr_base_url default = frontend_url, tanpa garis miring di akhir.
     |
     */
 
     'frontend_url' => $frontendUrl,
 
-    'qr_base_url' => rtrim((string) env('QR_BASE_URL', $frontendUrl.'/scan'), '/'),
+    'qr_base_url' => rtrim(trim((string) env('QR_BASE_URL')) ?: $frontendUrl, '/'),
 
     /*
     |--------------------------------------------------------------------------
@@ -95,7 +95,7 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    'locale' => env('APP_LOCALE', 'id'),
 
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
 
