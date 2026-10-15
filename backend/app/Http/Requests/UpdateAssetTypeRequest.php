@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\AssetType;
+use App\Rules\AssetTypeCodeNotUsedElsewhere;
 use App\Rules\UniqueCaseInsensitive;
 use Illuminate\Contracts\Validation\ValidationRule;
 
@@ -21,7 +22,7 @@ class UpdateAssetTypeRequest extends StoreAssetTypeRequest
         return [
             'category_id' => ['sometimes', 'required', 'integer', 'exists:categories,id'],
             'name' => ['sometimes', 'required', 'string', 'max:100', new UniqueCaseInsensitive('asset_types', ignoreId: $ignoreId)],
-            'code' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{2,5}$/', new UniqueCaseInsensitive('asset_types', 'code', $ignoreId)],
+            'code' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{2,5}$/', new UniqueCaseInsensitive('asset_types', 'code', $ignoreId), new AssetTypeCodeNotUsedElsewhere($ignoreId)],
         ];
     }
 

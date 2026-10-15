@@ -7,6 +7,7 @@ enum LoanStatus: string
     case Dipinjam = 'Dipinjam';
     case Dikembalikan = 'Dikembalikan';
     case Dibatalkan = 'Dibatalkan';
+    case Hilang = 'Hilang';
 
     /**
      * @return list<string>

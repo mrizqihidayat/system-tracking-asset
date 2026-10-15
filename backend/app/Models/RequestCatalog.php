@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\RequestMethod;
 use Database\Factories\RequestCatalogFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
@@ -19,12 +18,16 @@ class RequestCatalog extends Model
     use HasFactory;
 
     /**
+     * Saran awal cara permintaan; request_method tetap teks bebas (staf bisa mengetik cara baru).
+     */
+    public const DEFAULT_REQUEST_METHODS = ['Memo', 'Form', 'Email', 'WhatsApp', 'Lainnya'];
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
-            'request_method' => RequestMethod::class,
             'must_return' => 'boolean',
             'lead_time_days' => 'integer',
         ];

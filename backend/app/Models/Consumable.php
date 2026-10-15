@@ -2,19 +2,21 @@
 
 namespace App\Models;
 
+use App\Enums\ConsumableStatus;
 use Database\Factories\ConsumableFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable(['name', 'category', 'unit', 'quantity', 'min_quantity', 'provider_department_id', 'catalog_id', 'room_id', 'note'])]
 class Consumable extends Model
 {
     /** @use HasFactory<ConsumableFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     /**
      * @var array<string, mixed>
@@ -32,7 +34,6 @@ class Consumable extends Model
         return [
             'quantity' => 'integer',
             'min_quantity' => 'integer',
-            'deleted_at' => 'datetime',
         ];
     }
 
@@ -66,5 +67,25 @@ class Consumable extends Model
     public function roomStandards(): HasMany
     {
         return $this->hasMany(RoomStandard::class);
+    }
+
+    public function status(): ConsumableStatus
+    {
+        return ConsumableStatus::fromQuantities($this->quantity, $this->min_quantity);
+    }
+
+    /**
+     * Filter status (rumus sama dengan status(); dipakai ulang T14 & T15).
+     *
+     * @param  Builder<Consumable>  $query
+     */
+    #[Scope]
+    protected function withStatus(Builder $query, ConsumableStatus $status): void
+    {
+        match ($status) {
+            ConsumableStatus::Habis => $query->where('quantity', '<=', 0),
+            ConsumableStatus::Menipis => $query->where('quantity', '>', 0)->whereColumn('quantity', '<=', 'min_quantity'),
+            ConsumableStatus::Aman => $query->whereColumn('quantity', '>', 'min_quantity')->where('quantity', '>', 0),
+        };
     }
 }

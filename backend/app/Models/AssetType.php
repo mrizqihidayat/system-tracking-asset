@@ -16,6 +16,18 @@ class AssetType extends Model
     use HasFactory;
 
     /**
+     * last_number: penghitung nomor urut kode aset (dikelola CodeGenerator, tidak fillable).
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'last_number' => 'integer',
+        ];
+    }
+
+    /**
      * @return BelongsTo<Category, $this>
      */
     public function category(): BelongsTo

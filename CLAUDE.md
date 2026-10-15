@@ -36,7 +36,9 @@ Dokumen acuan:
 - Jangan menjalankan `migrate:fresh`, `migrate:reset`, `db:wipe`, atau `DROP`. Jika perlu, minta pengguna menjalankannya sendiri.
 - Jangan mengubah migration yang sudah dijalankan di database (kecuali di task perombakan T4).
 - Setiap perubahan pada aset (status, kondisi, lokasi, pinjam, servis, hapus) wajib menulis `asset_events` lewat satu service yang sama.
-- Jangan menambah role/admin. Jangan hard delete data bisnis (pakai soft delete + alasan).
+- Jangan menambah role/admin. Jangan hard delete data bisnis (pakai soft delete + alasan), kecuali:
+  - **Aset**: hard delete hanya lewat `AssetService` setelah `delete-impact` + `confirm_code`, menghapus data turunan (pinjaman, riwayat, file, kode lama) dalam satu transaksi.
+  - **Barang habis pakai**: hard delete biasa.
 - Jangan hardcode URL/host; gunakan env (`APP_URL`, `FRONTEND_URL`, `QR_BASE_URL`).
 
 ## Konvensi

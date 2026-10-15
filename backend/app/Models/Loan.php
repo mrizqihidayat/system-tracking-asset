@@ -7,12 +7,14 @@ use App\Enums\DamageConfirmation;
 use App\Enums\LoanStatus;
 use Database\Factories\LoanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['asset_id', 'borrower_name', 'borrower_unit', 'purpose', 'destination_room_id', 'destination_note', 'borrow_date', 'due_date', 'condition_out', 'approval_number', 'approval_date', 'borrowed_by', 'status', 'return_date', 'return_condition', 'return_room_id', 'received_by', 'damage_confirmation', 'damage_confirmed_at', 'damage_confirmed_by', 'cancel_reason', 'note'])]
+#[Fillable(['asset_id', 'borrower_name', 'borrower_unit', 'purpose', 'destination_room_id', 'destination_note', 'borrow_date', 'due_date', 'condition_out', 'approval_number', 'approval_date', 'borrowed_by', 'status', 'return_date', 'return_condition', 'return_room_id', 'received_by', 'damage_confirmation', 'damage_confirmed_at', 'damage_confirmed_by', 'damage_confirmation_note', 'damage_confirmation_document', 'cancel_reason', 'note'])]
 class Loan extends Model
 {
     /** @use HasFactory<LoanFactory> */
@@ -97,5 +99,39 @@ class Loan extends Model
     public function events(): HasMany
     {
         return $this->hasMany(AssetEvent::class);
+    }
+
+    /**
+     * Terlambat = Dipinjam dan rencana kembali < hari ini (SPEC §7).
+     */
+    public function isOverdue(): bool
+    {
+        return $this->status === LoanStatus::Dipinjam && $this->due_date->lt(today());
+    }
+
+    /**
+     * Jatuh tempo hari ini = Dipinjam dan rencana kembali = hari ini.
+     */
+    public function isDueToday(): bool
+    {
+        return $this->status === LoanStatus::Dipinjam && $this->due_date->isSameDay(today());
+    }
+
+    /**
+     * @param  Builder<Loan>  $query
+     */
+    #[Scope]
+    protected function overdue(Builder $query): void
+    {
+        $query->where('status', LoanStatus::Dipinjam->value)->whereDate('due_date', '<', today());
+    }
+
+    /**
+     * @param  Builder<Loan>  $query
+     */
+    #[Scope]
+    protected function dueToday(Builder $query): void
+    {
+        $query->where('status', LoanStatus::Dipinjam->value)->whereDate('due_date', today());
     }
 }

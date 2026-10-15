@@ -1,0 +1,281 @@
+// ERD Sistem Informasi Aset SHD — tempel di https://dbdiagram.io
+
+Enum asset_condition {
+  Baik
+  "Rusak Ringan"
+  "Rusak Berat"
+}
+
+Enum asset_status {
+  Tersedia
+  Dipinjam
+  Perbaikan
+  Hilang
+  "Tidak Layak Pakai"
+}
+
+Enum event_type {
+  Registrasi
+  Dipinjam
+  Dikembalikan
+  Dibatalkan
+  "Pindah Lokasi"
+  "Lapor Rusak"
+  "Lapor Hilang"
+  Servis
+  "Ubah Data"
+  Ditemukan
+  "Tidak Layak Pakai"
+}
+
+Enum loan_status {
+  Dipinjam
+  Dikembalikan
+  Dibatalkan
+  Hilang [note: 'hilang saat dipinjam']
+}
+
+Enum damage_confirmation {
+  "Menunggu Konfirmasi"
+  Dikonfirmasi
+}
+
+Enum count_method {
+  QR
+  Manual
+}
+
+Enum request_status {
+  Diajukan
+  Diterima
+  Dikembalikan
+  Dibatalkan
+}
+
+Enum file_type {
+  "Foto Aset"
+  "Foto Kondisi"
+  BAST
+  Garansi
+  Lainnya
+}
+
+Table users {
+  id bigint [pk, increment]
+  name varchar(100) [not null]
+  username varchar(50) [not null, unique]
+  password varchar(255) [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table departments {
+  id bigint [pk, increment]
+  name varchar(100) [not null, unique]
+  is_internal boolean [not null, default: false, note: 'true = SHD']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table buildings {
+  id bigint [pk, increment]
+  name varchar(100) [not null, unique]
+  slug varchar(120) [not null, unique, note: 'URL frontend, otomatis dari nama, tidak berubah']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table rooms {
+  id bigint [pk, increment]
+  building_id bigint [not null, ref: > buildings.id]
+  name varchar(100) [not null]
+  slug varchar(120) [not null, note: 'URL frontend, unik per gedung, tidak berubah']
+  last_checked_at timestamp
+  last_checked_by bigint [ref: > users.id]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (building_id, name) [unique]
+    (building_id, slug) [unique]
+  }
+}
+
+Table categories {
+  id bigint [pk, increment]
+  name varchar(100) [not null, unique]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table asset_types {
+  id bigint [pk, increment]
+  category_id bigint [not null, ref: > categories.id]
+  name varchar(100) [not null, unique, note: 'Proyektor, Laptop, ...']
+  code varchar(5) [not null, unique, note: 'PRJ, LPT (otomatis, bisa diedit; tidak boleh kode bekas jenis lain)']
+  last_number int [not null, default: 0, note: 'penghitung nomor urut kode aset, tidak pernah turun']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table assets {
+  id bigint [pk, increment]
+  code varchar(20) [not null, unique, note: 'SHD-PRJ-001']
+  public_token varchar(32) [not null, unique, note: 'acak 12 karakter, link QR /aset/{token}, tidak berubah']
+  asset_type_id bigint [not null, ref: > asset_types.id]
+  name varchar(255) [not null]
+  brand varchar(100)
+  serial_number varchar(100)
+  specification text
+  source_department_id bigint [not null, ref: > departments.id]
+  room_id bigint [not null, ref: > rooms.id, note: 'lokasi asal/seharusnya']
+  pic_name varchar(150) [note: 'penanggung jawab']
+  finance_code varchar(100) [note: 'kode aset keuangan']
+  acquisition_date date
+  next_service_date date
+  condition asset_condition [not null, default: 'Baik']
+  status asset_status [not null, default: 'Tersedia']
+  note text
+  created_by bigint [not null, ref: > users.id]
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'Tanpa soft delete: Hapus aset = hard delete lewat AssetService (data turunan dihapus dulu)'
+}
+
+Table asset_code_histories {
+  id bigint [pk, increment]
+  asset_id bigint [not null, ref: > assets.id]
+  asset_type_id bigint [not null, ref: > asset_types.id, note: 'jenis aset saat kode ini dipakai']
+  code varchar(20) [not null, unique, note: 'kode lama, tetap bisa dicari']
+  replaced_at timestamp [not null]
+  replaced_by bigint [not null, ref: > users.id]
+
+  Note: 'Kode lama aset saat jenis diganti; mencegah kode jenis bekas dipakai jenis lain'
+}
+
+Table asset_files {
+  id bigint [pk, increment]
+  asset_id bigint [not null, ref: > assets.id]
+  file_type file_type [not null]
+  path varchar(500) [not null]
+  original_name varchar(255) [not null]
+  mime_type varchar(100)
+  size int
+  uploaded_by bigint [not null, ref: > users.id]
+  created_at timestamp
+}
+
+Table asset_events {
+  id bigint [pk, increment]
+  asset_id bigint [not null, ref: > assets.id]
+  event_type event_type [not null]
+  event_date timestamp [not null]
+  party varchar(150) [note: 'peminjam / vendor / SHD']
+  condition asset_condition
+  from_room_id bigint [ref: > rooms.id]
+  to_room_id bigint [ref: > rooms.id]
+  loan_id bigint [ref: > loans.id]
+  recorded_by bigint [not null, ref: > users.id]
+  note text
+  created_at timestamp
+}
+
+Table loans {
+  id bigint [pk, increment]
+  asset_id bigint [not null, ref: > assets.id]
+  borrower_name varchar(150) [not null]
+  borrower_unit varchar(100) [not null]
+  purpose varchar(255) [not null, note: 'keperluan/kegiatan']
+  destination_room_id bigint [ref: > rooms.id]
+  destination_note varchar(255) [note: 'lokasi tujuan di luar daftar ruangan']
+  borrow_date date [not null]
+  due_date date [not null]
+  condition_out asset_condition [not null, note: 'otomatis dari kondisi aset saat dipinjam']
+  approval_number varchar(100)
+  approval_date date
+  borrowed_by bigint [not null, ref: > users.id, note: 'staf pencatat']
+  status loan_status [not null, default: 'Dipinjam']
+  return_date timestamp
+  return_condition asset_condition
+  return_room_id bigint [ref: > rooms.id]
+  received_by bigint [ref: > users.id]
+  damage_confirmation damage_confirmation
+  damage_confirmed_at timestamp
+  damage_confirmed_by bigint [ref: > users.id]
+  damage_confirmation_note text [note: 'wajib saat konfirmasi']
+  damage_confirmation_document varchar(100) [note: 'no. berita acara/memo (opsional)']
+  cancel_reason text
+  note text
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'Maksimal satu loan berstatus Dipinjam per aset (partial unique index)'
+}
+
+Table request_catalog {
+  id bigint [pk, increment]
+  item_name varchar(150) [not null]
+  provider_department_id bigint [not null, ref: > departments.id]
+  request_method varchar(50) [not null, note: 'teks bebas; saran Memo | Form | Email | WhatsApp | Lainnya']
+  must_return boolean [not null, default: false]
+  lead_time_days int [not null, default: 0]
+  note text
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table supply_requests {
+  id bigint [pk, increment]
+  request_date date [not null]
+  catalog_id bigint [ref: > request_catalog.id]
+  item_name varchar(150) [not null]
+  quantity int [not null, note: '> 0']
+  purpose varchar(255) [note: 'untuk kegiatan']
+  room_id bigint [ref: > rooms.id]
+  provider_department_id bigint [not null, ref: > departments.id]
+  status request_status [not null, default: 'Diajukan']
+  received_at timestamp
+  returned_at timestamp
+  note text
+  created_by bigint [not null, ref: > users.id]
+  created_at timestamp
+  updated_at timestamp
+
+  Note: '"Belum direspons" = Diajukan yang melewati lead time (dihitung)'
+}
+
+Table room_standards {
+  id bigint [pk, increment]
+  room_id bigint [not null, ref: > rooms.id]
+  item_name varchar(150) [not null]
+  source_department_id bigint [not null, ref: > departments.id]
+  standard_quantity int [not null, note: '> 0']
+  count_method count_method [not null]
+  asset_type_id bigint [ref: > asset_types.id, note: 'wajib jika QR']
+  actual_quantity int [note: 'diisi jika Manual']
+  consumable_id bigint [ref: > consumables.id, note: 'isi dari stok SHD; ON DELETE SET NULL']
+  fulfillment_note varchar(255) [note: 'ambil dari (sumber SHD tanpa stok)']
+  catalog_id bigint [ref: > request_catalog.id, note: 'minta ke unit lain']
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'Pemenuhan: salah satu dari consumable_id, fulfillment_note, atau catalog_id'
+}
+
+Table consumables {
+  id bigint [pk, increment]
+  name varchar(150) [not null, note: 'unik tanpa beda huruf besar/kecil: unique index lower(name)']
+  category varchar(100)
+  unit varchar(20) [not null]
+  quantity int [not null, default: 0]
+  min_quantity int [not null, default: 0]
+  provider_department_id bigint [not null, ref: > departments.id, note: 'minta ke (isi ulang)']
+  catalog_id bigint [ref: > request_catalog.id]
+  room_id bigint [ref: > rooms.id, note: 'lokasi simpan']
+  note text
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'Hanya barang yang disimpan SHD. Hapus = hard delete (tanpa soft delete)'
+}

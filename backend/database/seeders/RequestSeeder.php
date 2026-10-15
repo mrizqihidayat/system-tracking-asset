@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Enums\RequestMethod;
 use App\Enums\RequestStatus;
 use App\Models\Department;
 use App\Models\RequestCatalog;
@@ -24,12 +23,12 @@ class RequestSeeder extends Seeder
 
         // item => [unit penyedia, cara, perlu kembali, lead time (hari), catatan]
         $catalog = [
-            'Tisu' => ['SGA', RequestMethod::Memo, false, 2, 'Per dus isi 24 pak'],
-            'Air Mineral Botol' => ['SGA', RequestMethod::Form, false, 1, 'Ajukan H-1 kegiatan'],
-            'ATK Isi Ulang' => ['SGA', RequestMethod::Memo, false, 3, 'Pulpen, spidol, kertas'],
-            'Kabel HDMI 10 m' => ['SIT', RequestMethod::Email, true, 1, null],
-            'Laser Pointer' => ['SIT', RequestMethod::Email, true, 1, null],
-            'Kotak P3K' => ['SSO', RequestMethod::Form, false, 5, 'Isi ulang tiap 6 bulan'],
+            'Tisu' => ['SGA', 'Memo', false, 2, 'Per dus isi 24 pak'],
+            'Air Mineral Botol' => ['SGA', 'WhatsApp', false, 1, 'Ajukan H-1 kegiatan'],
+            'ATK Isi Ulang' => ['SGA', 'Memo', false, 3, 'Pulpen, spidol, kertas'],
+            'Kabel HDMI 10 m' => ['SIT', 'Email', true, 1, null],
+            'Laser Pointer' => ['SIT', 'Email', true, 1, null],
+            'Kotak P3K' => ['SSO', 'Form', false, 5, 'Isi ulang tiap 6 bulan'],
         ];
 
         $items = [];

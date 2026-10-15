@@ -9,6 +9,44 @@ enum AssetCondition: string
     case RusakBerat = 'Rusak Berat';
 
     /**
+     * Status aset dari kondisi (SPEC §5; dipakai tambah aset, lapor rusak, terima kembali):
+     * Baik → Tersedia, Rusak Berat → Perbaikan, Rusak Ringan → pilihan staf (default Tersedia).
+     */
+    public function resolveStatus(?AssetStatus $chosen = null): AssetStatus
+    {
+        return match ($this) {
+            self::Baik => AssetStatus::Tersedia,
+            self::RusakBerat => AssetStatus::Perbaikan,
+            self::RusakRingan => $chosen === AssetStatus::Perbaikan ? AssetStatus::Perbaikan : AssetStatus::Tersedia,
+        };
+    }
+
+    /**
+     * Tingkat kerusakan: Baik (0) < Rusak Ringan (1) < Rusak Berat (2).
+     */
+    public function severity(): int
+    {
+        return match ($this) {
+            self::Baik => 0,
+            self::RusakRingan => 1,
+            self::RusakBerat => 2,
+        };
+    }
+
+    public function isWorseThan(self $other): bool
+    {
+        return $this->severity() > $other->severity();
+    }
+
+    /**
+     * Hanya Rusak Ringan yang statusnya boleh dipilih staf.
+     */
+    public function allowsStatusChoice(): bool
+    {
+        return $this === self::RusakRingan;
+    }
+
+    /**
      * @return list<string>
      */
     public static function values(): array

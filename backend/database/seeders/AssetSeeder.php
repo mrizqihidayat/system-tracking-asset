@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Enums\DamageConfirmation;
-use App\Enums\DeletionReason;
 use App\Enums\EventType;
 use App\Enums\LoanStatus;
 use App\Models\Asset;
@@ -14,6 +13,7 @@ use App\Models\Department;
 use App\Models\Loan;
 use App\Models\Room;
 use App\Models\User;
+use App\Services\AssetService;
 use App\Services\CodeGenerator;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
@@ -33,6 +33,43 @@ class AssetSeeder extends Seeder
 
         $this->seedLoans($assets);
         $this->seedServiceAndReports($assets);
+        $this->seedThroughAssetService();
+    }
+
+    /**
+     * Skenario lewat AssetService (alur aplikasi): Rusak Ringan tetap Tersedia, dan aset salah
+     * input jenis lalu diperbaiki (kode baru, kode lama tersimpan & bisa dicari).
+     */
+    private function seedThroughAssetService(): void
+    {
+        $service = app(AssetService::class);
+        $types = AssetType::pluck('id', 'name');
+        $rooms = Room::pluck('id', 'name');
+        $shd = Department::where('name', 'SHD')->value('id');
+
+        $service->create([
+            'asset_type_id' => $types['Speaker Aktif'],
+            'name' => 'Speaker Aktif Portabel Polytron',
+            'brand' => 'Polytron',
+            'source_department_id' => $shd,
+            'room_id' => $rooms['Ruang Diskusi'],
+            'pic_name' => 'Staf SHD',
+            'acquisition_date' => today()->subMonths(6),
+            'condition' => AssetCondition::RusakRingan->value,
+            'note' => 'Grill depan penyok, masih berfungsi normal',
+        ], $this->staff);
+
+        $mistyped = $service->create([
+            'asset_type_id' => $types['Proyektor'],
+            'name' => 'Layar Proyektor Tripod 84"',
+            'brand' => 'Brite',
+            'source_department_id' => $shd,
+            'room_id' => $rooms['Gudang MH'],
+            'pic_name' => 'Staf SHD',
+            'acquisition_date' => today()->subMonths(2),
+        ], $this->staff);
+
+        $service->update($mistyped, ['asset_type_id' => $types['Layar Proyektor']], $this->staff);
     }
 
     /**
@@ -148,10 +185,16 @@ class AssetSeeder extends Seeder
         $asset->update(['condition' => AssetCondition::RusakBerat, 'status' => AssetStatus::Perbaikan]);
         $this->event($asset, EventType::LaporRusak, today()->subDays(4), ['party' => 'SHD', 'condition' => AssetCondition::RusakBerat, 'note' => 'Tidak ada suara, amplifier mati']);
 
-        // Lapor hilang.
-        $asset = $assets['mic2'];
-        $asset->update(['status' => AssetStatus::Hilang]);
-        $this->event($asset, EventType::LaporHilang, today()->subDays(9), ['party' => 'SHD', 'note' => 'Tidak ditemukan setelah acara di Auditorium']);
+        // Hilang saat dipinjam: transaksi berstatus Hilang, pihak = peminjam (tanpa konfirmasi).
+        $loan = $this->borrow($assets['mic2'], 'Rudi Hartono', 'SGA', 'Gathering karyawan', today()->subDays(12), today()->subDays(10), null, 'Lapangan Kantor Pusat');
+        $loan->update([
+            'status' => LoanStatus::Hilang,
+            'return_date' => today()->subDays(9),
+            'received_by' => $this->staff->id,
+            'note' => 'Tidak ditemukan setelah acara, peminjam sudah mencari',
+        ]);
+        $loan->asset->update(['status' => AssetStatus::Hilang]);
+        $this->event($loan->asset, EventType::LaporHilang, today()->subDays(9), ['party' => $loan->borrower_name, 'loan_id' => $loan->id, 'note' => $loan->note]);
 
         // Pindah lokasi asal.
         $asset = $assets['flp2'];
@@ -159,15 +202,10 @@ class AssetSeeder extends Seeder
         $asset->update(['room_id' => Room::where('name', 'Ruang Diskusi')->value('id')]);
         $this->event($asset, EventType::PindahLokasi, today()->subDays(3), ['party' => 'SHD', 'from_room_id' => $from, 'to_room_id' => $asset->room_id]);
 
-        // Hapus (soft delete beralasan); riwayat tetap ada.
+        // Tidak layak pakai (tidak ada aksi untuk mengembalikannya; bisa dihapus permanen nanti).
         $asset = $assets['flp3'];
-        $asset->update([
-            'deletion_reason' => DeletionReason::TidakDigunakan,
-            'deletion_note' => 'Rangka patah, tidak ekonomis diperbaiki',
-            'deleted_by' => $this->staff->id,
-        ]);
-        $this->event($asset, EventType::Dihapus, today()->subDays(15), ['party' => 'SHD', 'note' => 'Tidak digunakan: rangka patah']);
-        $asset->delete();
+        $asset->update(['status' => AssetStatus::TidakLayakPakai]);
+        $this->event($asset, EventType::TidakLayakPakai, today()->subDays(15), ['party' => 'SHD', 'condition' => $asset->condition, 'note' => 'Rangka patah, tidak ekonomis diperbaiki']);
     }
 
     private function borrow(Asset $asset, string $borrower, string $unit, string $purpose, CarbonInterface $borrowDate, CarbonInterface $dueDate, ?int $roomId, ?string $destinationNote = null): Loan

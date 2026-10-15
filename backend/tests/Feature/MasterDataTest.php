@@ -7,6 +7,7 @@ use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Category;
 use App\Models\Department;
+use App\Models\RequestCatalog;
 use App\Models\Room;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,6 +39,7 @@ class MasterDataTest extends TestCase
             'asset types' => ['GET', '/api/asset-types'],
             'store asset type' => ['POST', '/api/asset-types'],
             'borrower units' => ['GET', '/api/lookups/borrower-units'],
+            'request methods' => ['GET', '/api/lookups/request-methods'],
         ];
     }
 
@@ -307,6 +309,76 @@ class MasterDataTest extends TestCase
 
         $this->getJson("/api/buildings/{$building->id}/rooms")->assertOk();
         $this->getJson('/api/buildings/gedung-ihs/rooms')->assertNotFound();
+    }
+
+    public function test_type_code_used_by_other_type_is_rejected_but_own_old_code_is_allowed(): void
+    {
+        $projector = AssetType::factory()->create(['name' => 'Proyektor', 'code' => 'PRO']);
+        Asset::factory()->for($projector)->create(['code' => 'SHD-PRJ-001']);
+        $category = Category::factory()->create();
+
+        $this->postJson('/api/asset-types', ['category_id' => $category->id, 'name' => 'Printer', 'code' => 'PRJ'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['code' => 'Kode pernah dipakai jenis lain.']);
+
+        $other = AssetType::factory()->create(['code' => 'PRT']);
+        $this->putJson("/api/asset-types/{$other->id}", ['code' => 'PRJ'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['code' => 'Kode pernah dipakai jenis lain.']);
+
+        $this->putJson("/api/asset-types/{$projector->id}", ['code' => 'PRJ'])
+            ->assertOk()
+            ->assertJsonPath('data.code', 'PRJ');
+    }
+
+    public function test_type_code_is_free_again_after_assets_are_deleted(): void
+    {
+        $old = AssetType::factory()->create(['code' => 'OLD']);
+        $asset = Asset::factory()->for($old)->create(['code' => 'SHD-FLP-003']);
+        $payload = ['category_id' => Category::factory()->create()->id, 'name' => 'Flipchart', 'code' => 'FLP'];
+
+        $this->postJson('/api/asset-types', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['code' => 'Kode pernah dipakai jenis lain.']);
+
+        $asset->delete();
+
+        $this->postJson('/api/asset-types', $payload)->assertCreated();
+    }
+
+    public function test_last_number_cannot_be_set_through_api(): void
+    {
+        $type = AssetType::factory()->create(['code' => 'PRJ']);
+
+        $this->putJson("/api/asset-types/{$type->id}", ['name' => 'Proyektor', 'last_number' => 50])->assertOk();
+
+        $this->assertSame(0, $type->fresh()->last_number);
+    }
+
+    public function test_request_methods_lookup_merges_defaults_and_used_values(): void
+    {
+        RequestCatalog::factory()->create(['request_method' => 'Telepon']);
+        RequestCatalog::factory()->create(['request_method' => 'whatsapp']);
+        RequestCatalog::factory()->create(['request_method' => 'Memo']);
+
+        $this->getJson('/api/lookups/request-methods')
+            ->assertOk()
+            ->assertExactJson(['data' => ['Memo', 'Form', 'Email', 'WhatsApp', 'Lainnya', 'Telepon']]);
+
+        $this->getJson('/api/lookups/request-methods?search=tel')
+            ->assertOk()
+            ->assertExactJson(['data' => ['Telepon']]);
+
+        $this->getJson('/api/lookups/request-methods?search=WHATS')
+            ->assertOk()
+            ->assertExactJson(['data' => ['WhatsApp']]);
+    }
+
+    public function test_request_method_accepts_free_text(): void
+    {
+        $catalog = RequestCatalog::factory()->create(['request_method' => 'Telepon Ext. 1234']);
+
+        $this->assertSame('Telepon Ext. 1234', $catalog->fresh()->request_method);
     }
 
     public function test_borrower_units_come_from_departments(): void

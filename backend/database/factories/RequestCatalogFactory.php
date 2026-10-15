@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Enums\RequestMethod;
 use App\Models\Department;
 use App\Models\RequestCatalog;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -22,7 +21,7 @@ class RequestCatalogFactory extends Factory
         return [
             'item_name' => fake()->words(2, true),
             'provider_department_id' => Department::factory(),
-            'request_method' => RequestMethod::Memo,
+            'request_method' => 'Memo',
             'must_return' => false,
             'lead_time_days' => fake()->numberBetween(1, 7),
         ];

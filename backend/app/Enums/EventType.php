@@ -13,7 +13,8 @@ enum EventType: string
     case LaporHilang = 'Lapor Hilang';
     case Servis = 'Servis';
     case UbahData = 'Ubah Data';
-    case Dihapus = 'Dihapus';
+    case TidakLayakPakai = 'Tidak Layak Pakai';
+    case Ditemukan = 'Ditemukan';
 
     /**
      * @return list<string>

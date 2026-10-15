@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\AssetTypeCodeNotUsedElsewhere;
 use App\Rules\UniqueCaseInsensitive;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -23,7 +24,7 @@ class StoreAssetTypeRequest extends FormRequest
         return [
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:100', new UniqueCaseInsensitive('asset_types', ignoreId: $this->ignoreId())],
-            'code' => ['nullable', 'string', 'regex:/^[A-Z0-9]{2,5}$/', new UniqueCaseInsensitive('asset_types', 'code', $this->ignoreId())],
+            'code' => ['nullable', 'string', 'regex:/^[A-Z0-9]{2,5}$/', new UniqueCaseInsensitive('asset_types', 'code', $this->ignoreId()), new AssetTypeCodeNotUsedElsewhere($this->ignoreId())],
         ];
     }
 
