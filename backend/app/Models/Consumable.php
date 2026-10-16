@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ConsumableStatus;
+use App\Support\Search;
 use Database\Factories\ConsumableFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -67,6 +68,25 @@ class Consumable extends Model
     public function roomStandards(): HasMany
     {
         return $this->hasMany(RoomStandard::class);
+    }
+
+    /**
+     * Filter daftar stok (SPEC §10); dipakai daftar & laporan.
+     *
+     * @param  Builder<Consumable>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    #[Scope]
+    protected function filter(Builder $query, array $filters): void
+    {
+        $query
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->withStatus(ConsumableStatus::from($status)))
+            ->when($filters['category'] ?? null, fn ($query, $category) => $query->whereRaw('lower(category) = ?', [mb_strtolower($category)]))
+            ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id))
+            ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id))
+            ->when($filters['building_id'] ?? null, fn ($query, $id) => $query->whereHas('room', fn ($room) => $room->where('building_id', $id)));
+
+        Search::apply($query, $filters['search'] ?? null, ['consumables.name', 'consumables.category']);
     }
 
     public function status(): ConsumableStatus

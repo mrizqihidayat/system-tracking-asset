@@ -44,24 +44,7 @@ class AssetController extends Controller
     {
         $filters = $request->validated();
 
-        $query = Asset::query()
-            ->with(self::RELATIONS)
-            ->when($filters['category_id'] ?? null, fn ($query, $id) => $query->whereHas('assetType', fn ($type) => $type->where('category_id', $id)))
-            ->when($filters['building_id'] ?? null, fn ($query, $id) => $query->whereHas('room', fn ($room) => $room->where('building_id', $id)))
-            ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id))
-            ->when($filters['source_department_id'] ?? null, fn ($query, $id) => $query->where('source_department_id', $id))
-            ->when($filters['condition'] ?? null, fn ($query, $condition) => $query->where('condition', $condition))
-            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status));
-
-        $this->applySearch(
-            $query,
-            $filters['search'] ?? null,
-            ['assets.name', 'assets.code', 'assets.serial_number'],
-            fn ($query, string $pattern) => $query->orWhereHas(
-                'codeHistories',
-                fn ($history) => $history->whereRaw($this->likeSql('asset_code_histories.code'), [$pattern]),
-            ),
-        );
+        $query = Asset::query()->with(self::RELATIONS)->filter($filters);
 
         $assets = $query->orderBy('code')
             ->paginate($filters['per_page'] ?? IndexAssetRequest::DEFAULT_PER_PAGE)

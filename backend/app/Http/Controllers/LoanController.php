@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\DamageConfirmation;
-use App\Enums\LoanStatus;
 use App\Http\Requests\CancelLoanRequest;
 use App\Http\Requests\ConfirmDamageRequest;
 use App\Http\Requests\IndexLoanRequest;
@@ -26,30 +24,9 @@ class LoanController extends Controller
     {
         $filters = $request->validated();
 
-        $query = Loan::query()
-            ->with($this->relations())
-            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
-            ->when($request->boolean('overdue'), fn ($query) => $query->overdue())
-            ->when($request->boolean('due_today'), fn ($query) => $query->dueToday())
-            ->when($request->boolean('pending_confirmation'), fn ($query) => $query->where('damage_confirmation', DamageConfirmation::MenungguKonfirmasi->value))
-            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('borrow_date', '>=', $from))
-            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('borrow_date', '<=', $to))
-            ->when($filters['asset_id'] ?? null, fn ($query, $assetId) => $query->where('asset_id', $assetId));
+        $query = Loan::query()->with($this->relations())->filter($filters);
 
-        $this->applySearch(
-            $query,
-            $filters['search'] ?? null,
-            ['loans.borrower_name', 'loans.borrower_unit'],
-            fn ($query, string $pattern) => $query->orWhereHas('asset', fn ($asset) => $asset->where(
-                fn ($asset) => $asset->whereRaw($this->likeSql('assets.code'), [$pattern])->orWhereRaw($this->likeSql('assets.name'), [$pattern]),
-            )),
-        );
-
-        $loans = $query
-            ->orderByRaw('case when status = ? then 0 else 1 end', [LoanStatus::Dipinjam->value])
-            ->orderByRaw('case when status = ? then due_date end asc', [LoanStatus::Dipinjam->value])
-            ->orderByDesc('borrow_date')
-            ->orderByDesc('id')
+        $loans = $query->listOrder()
             ->paginate($filters['per_page'] ?? IndexLoanRequest::DEFAULT_PER_PAGE)
             ->withQueryString();
 

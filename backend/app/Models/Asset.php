@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Enums\LoanStatus;
+use App\Support\Search;
 use Database\Factories\AssetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -175,6 +176,34 @@ class Asset extends Model
     public function activeLoan(): HasOne
     {
         return $this->hasOne(Loan::class)->where('status', LoanStatus::Dipinjam->value);
+    }
+
+    /**
+     * Filter Daftar Aset (SPEC §5); dipakai daftar & laporan. Tidak Layak Pakai tetap ikut.
+     *
+     * @param  Builder<Asset>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    #[Scope]
+    protected function filter(Builder $query, array $filters): void
+    {
+        $query
+            ->when($filters['category_id'] ?? null, fn ($query, $id) => $query->whereHas('assetType', fn ($type) => $type->where('category_id', $id)))
+            ->when($filters['building_id'] ?? null, fn ($query, $id) => $query->whereHas('room', fn ($room) => $room->where('building_id', $id)))
+            ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id))
+            ->when($filters['source_department_id'] ?? null, fn ($query, $id) => $query->where('source_department_id', $id))
+            ->when($filters['condition'] ?? null, fn ($query, $condition) => $query->where('condition', $condition))
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status));
+
+        Search::apply(
+            $query,
+            $filters['search'] ?? null,
+            ['assets.name', 'assets.code', 'assets.serial_number'],
+            fn ($query, string $pattern) => $query->orWhereHas(
+                'codeHistories',
+                fn ($history) => $history->whereRaw(Search::likeSql('asset_code_histories.code'), [$pattern]),
+            ),
+        );
     }
 
     /**

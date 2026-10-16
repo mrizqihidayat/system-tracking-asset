@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AssetCondition;
 use App\Enums\DamageConfirmation;
 use App\Enums\LoanStatus;
+use App\Support\Search;
 use Database\Factories\LoanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -115,6 +116,57 @@ class Loan extends Model
     public function isDueToday(): bool
     {
         return $this->status === LoanStatus::Dipinjam && $this->due_date->isSameDay(today());
+    }
+
+    /**
+     * Filter daftar peminjaman (SPEC §7); dipakai daftar & laporan.
+     *
+     * @param  Builder<Loan>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    #[Scope]
+    protected function filter(Builder $query, array $filters): void
+    {
+        $query
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when(self::flag($filters, 'overdue'), fn ($query) => $query->overdue())
+            ->when(self::flag($filters, 'due_today'), fn ($query) => $query->dueToday())
+            ->when(self::flag($filters, 'pending_confirmation'), fn ($query) => $query->where('damage_confirmation', DamageConfirmation::MenungguKonfirmasi->value))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('borrow_date', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('borrow_date', '<=', $to))
+            ->when($filters['asset_id'] ?? null, fn ($query, $assetId) => $query->where('asset_id', $assetId));
+
+        Search::apply(
+            $query,
+            $filters['search'] ?? null,
+            ['loans.borrower_name', 'loans.borrower_unit'],
+            fn ($query, string $pattern) => $query->orWhereHas('asset', fn ($asset) => $asset->where(
+                fn ($asset) => $asset->whereRaw(Search::likeSql('assets.code'), [$pattern])->orWhereRaw(Search::likeSql('assets.name'), [$pattern]),
+            )),
+        );
+    }
+
+    /**
+     * Urutan daftar: aktif dulu (tempo terdekat), lalu terbaru.
+     *
+     * @param  Builder<Loan>  $query
+     */
+    #[Scope]
+    protected function listOrder(Builder $query): void
+    {
+        $query
+            ->orderByRaw('case when status = ? then 0 else 1 end', [LoanStatus::Dipinjam->value])
+            ->orderByRaw('case when status = ? then due_date end asc', [LoanStatus::Dipinjam->value])
+            ->orderByDesc('borrow_date')
+            ->orderByDesc('id');
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private static function flag(array $filters, string $key): bool
+    {
+        return filter_var($filters[$key] ?? false, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**

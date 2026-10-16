@@ -21,7 +21,7 @@ flowchart TD
     F -- Kelengkapan Ruangan --> M4[[Kelengkapan Ruangan]]
     F -- Permintaan ke Unit Lain --> M5[[Permintaan]]
     F -- Stok Habis Pakai --> M6[[Stok Habis Pakai]]
-    F -- Ekspor laporan --> M7[Pilih laporan, filter, format PDF/Excel] --> M8[(Generate file)] --> F
+    F -- Ekspor laporan --> M7[Pilih laporan, filter (unduh Excel .xlsx)] --> M8[(Generate file)] --> F
     M1 & M2 & M3 & M4 & M5 & M6 --> F
     F -- Logout --> Z[(Hapus token)] --> Z1([End])
 ```

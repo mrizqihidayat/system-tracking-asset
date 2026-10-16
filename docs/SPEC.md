@@ -123,19 +123,20 @@ Kartu:
 
 Panel: peminjaman jatuh tempo/terlambat, kesiapan ruangan per gedung, permintaan terbaru beserta status, aset perlu servis, stok menipis.
 
-## 12. Ekspor laporan (PDF & Excel)
-- Laporan Aset (sesuai filter Daftar Aset)
-- Laporan Peminjaman (periode tanggal)
-- Laporan Kelengkapan Ruangan (semua ruangan / per gedung)
-- Laporan Permintaan (periode)
-- Laporan Stok Habis Pakai
+## 12. Ekspor laporan (Excel)
+Laporan **hanya dalam format Excel (.xlsx)**; tidak ada PDF untuk laporan (PDF hanya untuk label QR, §6). Filter sama persis dengan daftar di layar (scope `filter()` model yang sama); tanpa paginasi. Baris atas file memuat judul, ringkasan filter ("Tanpa filter" jika kosong), tanggal cetak, dan nama staf; header tebal, kolom berlebar tetap, tanggal bertipe tanggal, header dibekukan. Teks selalu ditulis sebagai teks (data yang diawali `=` tidak menjadi rumus).
+- **Laporan Aset**: filter Daftar Aset (§5; Tidak Layak Pakai ikut tampil). Kolom: kode, nama, kategori, jenis, merek, no. seri, sumber, gedung & ruangan asal, PIC, kondisi, status, tgl perolehan, servis berikutnya, kode aset keuangan.
+- **Laporan Peminjaman**: `from`/`to` (tanggal pinjam; opsional, kosong = "Semua periode"), `status`, `overdue`, `due_today`, `pending_confirmation`, `asset_id`, `search`. Kolom: aset, peminjam, unit, keperluan, tujuan, tgl pinjam/rencana kembali/kembali, status, terlambat, kondisi keluar/kembali, konfirmasi kerusakan, catatan.
+- **Laporan Kelengkapan Ruangan**: `building_id` (kosong = semua ruangan). Dua sheet: **Ringkasan** (per ruangan: total item, kurang, belum dicek, kesiapan "Lengkap"/"Kurang N item"/"Belum ada standar", terakhir dicek & oleh) dan **Detail** (per item: sumber, metode, standar, ada, selisih, hasil termasuk Belum dicek, ambil dari/minta ke). Ruangan tanpa standar tetap tampil di Ringkasan.
+- **Laporan Permintaan**: `from`/`to` (tanggal permintaan; opsional), `status`, `unresponded`, `provider_department_id`, `room_id`, `search`. Status memakai tampilan "Belum direspons" (§9).
+- **Laporan Stok Habis Pakai**: filter daftar stok (§10): `status`, `category`, `provider_department_id`, `building_id`, `room_id`, `search`.
 
 ## 13. Skema database
 Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 `users`, `departments`, `buildings`, `rooms`, `categories`, `asset_types`, `assets`, `asset_files`, `asset_events`, `loans`, `room_standards`, `request_catalog`, `supply_requests`, `consumables` (+ `personal_access_tokens`, `migrations`).
 
 ## 14. Kontrak API (prefix `/api`, Bearer token kecuali login)
-**Auth**: `POST /login`, `POST /logout`, `GET /user`
+**Auth**: `POST /login` (maks. 5 percobaan/menit per kombinasi username + IP; lebih → 429 "Terlalu banyak percobaan login. Coba lagi dalam N detik." + header `Retry-After`), `POST /logout`, `GET /user`
 
 **Master & lookup**: `GET/POST/PUT/DELETE /departments`, `GET/POST/PUT/DELETE /buildings`, `GET/POST /buildings/{id}/rooms`, `GET /rooms`, `PUT/DELETE /rooms/{id}`, `GET/POST/PUT/DELETE /categories`, `GET/POST/PUT/DELETE /asset-types` (hapus ditolak 422 bila masih dipakai; departemen SHD tidak dapat diubah/dihapus), `GET /lookups/borrower-units?search=`, `GET /lookups/request-methods?search=`
 
@@ -176,12 +177,13 @@ Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 
 **Dashboard**: `GET /dashboard` (semua kartu & panel §11; kartu "Ruangan belum lengkap" memakai semua ruangan/gedung sebagai penyebut, ruangan tanpa standar dianggap lengkap; "Perlu perbaikan" = aset Perbaikan + jumlah pinjaman Menunggu Konfirmasi; "Stok menipis" = Menipis + Habis)
 
-**Ekspor**: `GET /reports/{type}?format=pdf|xlsx&...filter` (type: assets, loans, rooms, requests, consumables)
+**Ekspor**: `GET /reports/{type}?...filter` (type: assets, loans, rooms, requests, consumables) → unduhan `laporan-{jenis}-{yyyymmdd}.xlsx`. Tidak ada parameter `format`; jika dikirim hanya `xlsx` yang diterima (selain itu 422). Type tidak dikenal → 404; filter tidak valid → 422.
 
 Kode status: 200/201, 401, 404, 422 (validasi/aturan bisnis), 413 (file terlalu besar).
 
 ## 15. Non-fungsional
 - Token Sanctum 480 menit, simpan di `localStorage`, 401 → login.
+- Login dibatasi 5 percobaan per menit per kombinasi username (tanpa beda huruf besar/kecil) + IP (rate limiter `login`); setiap percobaan dihitung, termasuk yang berhasil. Frontend menampilkan pesan 429 dari server. Halaman publik QR dibatasi 30/menit per IP (§6). `GET /` menjawab `{"app": ..., "status": "ok"}` untuk cek hidup.
 - RLS aktif di semua tabel Supabase.
 - Semua URL & penyimpanan dari env: `APP_URL`, `FRONTEND_URL`, `QR_BASE_URL`, `FILESYSTEM_DISK`; frontend `VITE_API_URL`.
 - `.env.example` lengkap tanpa kredensial; README berisi langkah deploy.

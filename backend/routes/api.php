@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ReportType;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetEventController;
 use App\Http\Controllers\AssetFileController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LookupController;
 use App\Http\Controllers\PublicAssetController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RequestCatalogController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\RoomReadinessController;
@@ -22,7 +24,7 @@ use App\Http\Controllers\RoomStandardController;
 use App\Http\Controllers\SupplyRequestController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 // Halaman publik QR: tanpa auth, read-only, rate limit per IP (SPEC §6)
 Route::get('/public/assets/{token}', [PublicAssetController::class, 'show'])->middleware('throttle:public-assets');
@@ -32,6 +34,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'me']);
 
     Route::get('/dashboard', DashboardController::class);
+
+    // Ekspor laporan Excel (SPEC §12): hanya .xlsx
+    Route::get('/reports/{type}', [ReportController::class, 'show'])->whereIn('type', ReportType::values());
 
     // Master & lookup (SPEC §14)
     Route::apiResource('departments', DepartmentController::class)->only(['index', 'store', 'update', 'destroy']);

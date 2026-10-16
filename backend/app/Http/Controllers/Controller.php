@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Search;
 use Closure;
 use Illuminate\Contracts\Database\Query\Builder;
 
 abstract class Controller
 {
     /**
-     * Filter "mengandung" tanpa membedakan huruf besar/kecil (PostgreSQL & SQLite) pada satu atau
-     * beberapa kolom (OR). $orWhere(query, pattern) untuk kondisi OR tambahan, mis. whereHas relasi.
+     * Filter "mengandung" tanpa membedakan huruf besar/kecil (lihat Search::apply()).
      *
      * @template TBuilder of Builder
      *
@@ -19,27 +19,11 @@ abstract class Controller
      */
     protected function applySearch(Builder $query, mixed $search, string|array $columns = 'name', ?Closure $orWhere = null): Builder
     {
-        $search = is_string($search) ? trim($search) : '';
-
-        if ($search === '') {
-            return $query;
-        }
-
-        $pattern = '%'.addcslashes(mb_strtolower($search), '%_\\').'%';
-
-        return $query->where(function ($query) use ($columns, $pattern, $orWhere) {
-            foreach ((array) $columns as $column) {
-                $query->orWhereRaw($this->likeSql($column), [$pattern]);
-            }
-
-            if ($orWhere !== null) {
-                $orWhere($query, $pattern);
-            }
-        });
+        return Search::apply($query, $search, $columns, $orWhere);
     }
 
     protected function likeSql(string $column): string
     {
-        return "lower({$column}) like ? escape '\\'";
+        return Search::likeSql($column);
     }
 }

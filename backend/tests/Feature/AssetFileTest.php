@@ -6,6 +6,7 @@ use App\Enums\FileType;
 use App\Models\Asset;
 use App\Models\AssetFile;
 use App\Models\User;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -29,7 +30,7 @@ class AssetFileTest extends TestCase
         $this->asset = Asset::factory()->create();
     }
 
-    private function disk(): \Illuminate\Contracts\Filesystem\Filesystem
+    private function disk(): Filesystem
     {
         return Storage::disk(config('filesystems.asset_disk'));
     }

@@ -22,19 +22,9 @@ class SupplyRequestController extends Controller
     {
         $filters = $request->validated();
 
-        $query = SupplyRequest::query()
-            ->with(SupplyRequestResource::RELATIONS)
-            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('supply_requests.status', $status))
-            ->when($request->boolean('unresponded'), fn ($query) => $query->unresponded())
-            ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id))
-            ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id))
-            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('request_date', '>=', $from))
-            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('request_date', '<=', $to));
+        $query = SupplyRequest::query()->with(SupplyRequestResource::RELATIONS)->filter($filters);
 
-        $this->applySearch($query, $filters['search'] ?? null, ['supply_requests.item_name', 'supply_requests.purpose']);
-
-        $requests = $query->orderByDesc('request_date')
-            ->orderByDesc('id')
+        $requests = $query->listOrder()
             ->paginate($filters['per_page'] ?? IndexSupplyRequestRequest::DEFAULT_PER_PAGE)
             ->withQueryString();
 

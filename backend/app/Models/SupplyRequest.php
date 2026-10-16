@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\RequestStatus;
+use App\Support\Search;
 use Database\Factories\SupplyRequestFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -91,6 +92,37 @@ class SupplyRequest extends Model
         $due = $this->responseDueDate();
 
         return $this->status === RequestStatus::Diajukan && $due !== null && today()->greaterThan($due);
+    }
+
+    /**
+     * Filter daftar permintaan (SPEC §9); dipakai daftar & laporan.
+     *
+     * @param  Builder<SupplyRequest>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    #[Scope]
+    protected function filter(Builder $query, array $filters): void
+    {
+        $query
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('supply_requests.status', $status))
+            ->when(filter_var($filters['unresponded'] ?? false, FILTER_VALIDATE_BOOLEAN), fn ($query) => $query->unresponded())
+            ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id))
+            ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('request_date', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('request_date', '<=', $to));
+
+        Search::apply($query, $filters['search'] ?? null, ['supply_requests.item_name', 'supply_requests.purpose']);
+    }
+
+    /**
+     * Terbaru dulu.
+     *
+     * @param  Builder<SupplyRequest>  $query
+     */
+    #[Scope]
+    protected function listOrder(Builder $query): void
+    {
+        $query->orderByDesc('request_date')->orderByDesc('id');
     }
 
     /**

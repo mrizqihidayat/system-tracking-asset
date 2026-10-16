@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\ConsumableStatus;
 use App\Http\Requests\IndexConsumableRequest;
 use App\Http\Requests\StoreConsumableRequest;
 use App\Http\Requests\UpdateConsumableQuantityRequest;
@@ -23,15 +22,7 @@ class ConsumableController extends Controller
     {
         $filters = $request->validated();
 
-        $query = Consumable::query()
-            ->with(self::RELATIONS)
-            ->when($filters['status'] ?? null, fn ($query, $status) => $query->withStatus(ConsumableStatus::from($status)))
-            ->when($filters['category'] ?? null, fn ($query, $category) => $query->whereRaw('lower(category) = ?', [mb_strtolower($category)]))
-            ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id))
-            ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id))
-            ->when($filters['building_id'] ?? null, fn ($query, $id) => $query->whereHas('room', fn ($room) => $room->where('building_id', $id)));
-
-        $this->applySearch($query, $filters['search'] ?? null, ['consumables.name', 'consumables.category']);
+        $query = Consumable::query()->with(self::RELATIONS)->filter($filters);
 
         $consumables = $query->orderBy('name')
             ->paginate($filters['per_page'] ?? IndexConsumableRequest::DEFAULT_PER_PAGE)

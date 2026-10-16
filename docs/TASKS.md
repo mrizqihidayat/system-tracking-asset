@@ -35,8 +35,8 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - [x] **T15 Dashboard [Inti]** — semua kartu & panel SPEC §11 dalam satu endpoint (query efisien).
   Catatan T13: "Ruangan belum lengkap" & panel kesiapan pakai `RoomReadinessService::readiness()` + `summarize()` (`is_complete` = tidak ada baris Kurang; Belum dicek tidak dihitung).
 - [x] **T16 Upload file aset [Lengkap]** — upload/daftar/hapus foto & dokumen, validasi tipe & 5 MB.
-- [ ] **T17 Ekspor laporan [Lengkap]** — 5 laporan, PDF & Excel.
-- [ ] **T18 Test backend [Inti]** — Feature test sqlite in-memory untuk aturan aset, peminjaman, kelengkapan, permintaan, stok, 401.
+- [x] **T17 Ekspor laporan [Lengkap]** — 5 laporan, hanya Excel (.xlsx); PDF hanya untuk label QR (T10).
+- [x] **T18 Test backend [Inti]** — Feature test sqlite in-memory untuk aturan aset, peminjaman, kelengkapan, permintaan, stok, 401.
   Kriteria: `php artisan test` lulus.
 
 ## Minggu 3 (27 Okt–2 Nov) — Frontend
@@ -51,7 +51,7 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - [ ] **T24 Kelengkapan ruangan [Inti]** — pilih gedung → ruangan, checklist, simpan hasil cek, atur standar (diisi manual, tanpa salin), tombol isi dari stok & buat permintaan.
   Catatan T13: Hasil `Belum dicek` (Selisih kosong) untuk baris Manual yang belum diisi; ringkasan ruangan menampilkan "Kurang N item"/"Lengkap" + jumlah Belum dicek terpisah (`unchecked_items`). Tombol isi dari stok dari `can_fill_from_stock`; Ada baris Manual hanya lewat `POST /rooms/{id}/check`.
 - [ ] **T25 Permintaan & stok habis pakai [Inti]** — katalog, riwayat permintaan + status; tabel stok + ubah jumlah cepat.
-- [ ] **T26 Dashboard & ekspor [Inti/Lengkap]** — dashboard [Inti], tombol ekspor laporan [Lengkap].
+- [ ] **T26 Dashboard & ekspor [Inti/Lengkap]** — dashboard [Inti], tombol "Ekspor Excel" [Lengkap] di halaman Aset, Peminjaman, Kelengkapan ruangan, Permintaan, dan Stok: kirim filter yang sedang aktif ke `GET /reports/{type}` (tanpa parameter format), ambil sebagai blob lewat axios (Bearer token), lalu unduh dengan nama dari `Content-Disposition`.
 
 ## Penyelesaian (3–4 Nov)
 - [ ] **T27 QA & demo** — skenario: login → tambah aset → cetak label → scan → pinjam → terima kembali rusak → konfirmasi → servis → cek ruangan kurang → buat permintaan → stok menipis → ekspor.
@@ -61,7 +61,7 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - [ ] **T29 Lisensi Digital** — sesuai SPEC §16.
 
 ## Catatan / temuan di luar scope
-- (T4) `tests/Feature/ExampleTest.php` gagal karena view `welcome` tidak ada (proyek API-only); hapus/ganti saat T18.
+- (T4→T18) `ExampleTest` bawaan (Feature & Unit) dihapus; `GET /` kini JSON `{app, status: ok}` (`HealthTest`).
 - (T4) RLS diaktifkan oleh migration `enable_rls_on_all_tables` hanya untuk tabel yang ada saat itu; tabel baru di task berikutnya wajib `ENABLE ROW LEVEL SECURITY` di migration-nya sendiri.
 - (T4) CHECK constraint bisnis dan RLS hanya dibuat di PostgreSQL; di test sqlite hanya enum (CHECK) dan partial unique index loan aktif yang berlaku.
 - (T6→A4) QR berisi `{qr_base_url}/aset/{public_token}` lewat `Asset::publicUrl()` (bukan id/kode). `qr_base_url` = `QR_BASE_URL` (default `frontend_url`, tanpa `/` di akhir).
@@ -83,7 +83,7 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - (T8) Route aset memakai `whereNumber('asset')` agar `/assets/scan/{code}` dan `/assets/labels` (T10) tidak bentrok.
 - (T9) Event baru `Ditemukan` (migration `2026_10_15_000001`, CHECK `asset_events.event_type`). Rollback ditolak jika sudah ada riwayat `Ditemukan`.
 - (T9) Kunci aksi `lapor` diganti `catat_kerusakan` / `catat_kehilangan`; tambah `tandai_ditemukan` (khusus Hilang). Validasi pilihan status Rusak Ringan di trait `ValidatesStatusChoice`.
-- (T10) Library: `barryvdh/laravel-dompdf` ^3 (PDF, dipakai lagi di T17) dan `chillerlan/php-qrcode` ^5 (QR PNG lewat GD). README/deploy (T28): server wajib ekstensi PHP `gd`, `dom`, `mbstring`. Label memakai font inti Helvetica (tanpa embed, file kecil); laporan T17 yang butuh karakter non-ASCII pakai DejaVu Sans.
+- (T10) Library: `barryvdh/laravel-dompdf` ^3 (PDF label QR; laporan T17 TIDAK memakai PDF) dan `chillerlan/php-qrcode` ^5 (QR PNG lewat GD). README/deploy (T28): server wajib ekstensi PHP `gd`, `dom`, `mbstring`. Label memakai font inti Helvetica (tanpa embed, file kecil).
 - (T10) Composer di jaringan lambat: `COMPOSER_IPRESOLVE=4 COMPOSER_PROCESS_TIMEOUT=1800 composer install`.
 - (T11) Status transaksi baru `Hilang` + kolom `damage_confirmation_note`/`damage_confirmation_document` (migration `2026_10_15_000002`; rollback ditolak jika ada transaksi Hilang).
 - (T11) Catatan peminjaman: tabel `loans` hanya punya satu kolom `note`, dipakai untuk catatan pengembalian/kehilangan; catatan saat pinjam cukup lewat `purpose` & `destination_note`.
@@ -102,7 +102,12 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - (T14) Transisi status: Diajukan→Diterima|Dibatalkan; Diterima→Dikembalikan (hanya jika katalog `must_return`)|Dibatalkan. Dengan katalog, nama item & unit penyedia diisi dari katalog.
 - (T14) "Belum direspons" = `Diajukan` dan hari ini > `request_date + lead_time_days` katalog (`SupplyRequest::isUnresponded()` + scope `unresponded`; T15 pakai ulang). Permintaan tanpa katalog tidak pernah dihitung. Resource: `is_unresponded`, `display_status`, `response_due_date`.
 - (T14) `GET /supply-requests/suggestions` mengelompokkan per unit penyedia; item berisi `source` (`kekurangan_ruangan`|`stok`), `quantity`, `catalog_id`, `room`, `room_standard_id`, `consumable_id`, `has_open_request`. Stok: jumlah = max(minimum − stok, 1). T26 (frontend) memakai ini untuk mengisi form Buat permintaan.
-- (T14) `ExampleTest` bawaan gagal (view `welcome` tidak ada, tidak terkait T14); hapus/ganti test itu di task terpisah.
 - (T15) `GET /api/dashboard` (`DashboardService`): `cards` {total_assets, active_loans, needs_repair, incomplete_rooms, needs_service, low_stock} + `panels` {loans_due, room_readiness, recent_requests, assets_need_service, low_stock}. Jumlah query tetap (diuji); panel dibatasi 10 baris (permintaan terbaru 5), jumlah lengkap ada di kartu.
 - (T15) Keputusan pengguna: `needs_repair` = aset status Perbaikan + sub-angka pinjaman Menunggu Konfirmasi; `needs_service` = `Asset::needsService()` (lewat/≤14 hari, kecuali Hilang & Tidak Layak Pakai; Dipinjam/Perbaikan tetap dihitung); `incomplete_rooms` penyebut = semua ruangan & gedung, ruangan tanpa standar dianggap lengkap; `low_stock` = Menipis + Habis (rincian terpisah, panel Habis dulu).
 - (T16) `AssetFileService` = satu-satunya jalur tulis/hapus file aset (juga dipakai `AssetService::delete()`). Slot (Foto Aset/Foto Kondisi/BAST/Garansi) diganti dalam satu transaksi dengan lock aset, tanpa unique index DB; `Lainnya` menumpuk. Upload/hapus file tidak menulis `asset_events` (keputusan pengguna). Ukuran > 5 MB → 413 (juga saat ditolak PHP/`PostTooLargeException`); `upload_max_filesize`/`post_max_size` server deploy minimal 6M/8M (T28).
+- (T17) Keputusan pengguna: laporan hanya Excel. Library `openspout/openspout` ^4 (streaming, tanpa PhpSpreadsheet); server wajib ekstensi PHP `zip` & `xmlwriter` (selain `gd`, `dom`, `mbstring`) — catat di README/deploy T28. Teks ditulis lewat `StringCell` (bukan `Cell::fromValue`) agar nilai berawalan `=` tidak menjadi rumus.
+- (T17) Filter daftar dipindah ke scope model `Asset|Loan|Consumable|SupplyRequest::filter()` (+ `Loan|SupplyRequest::listOrder()`) dan pencarian ke `App\Support\Search`; daftar di layar dan laporan memakai kode yang sama. `ReportService` membangun data, `XlsxReportWriter` menulis file (baris dibaca lazy per 500).
+- (T17) `GET /reports/rooms` punya dua sheet (Ringkasan, Detail). Periode `from`/`to` laporan Peminjaman & Permintaan opsional (kosong = "Semua periode").
+- (T18) Test baru: `AuthTest` (login/logout/token + throttle login), `ApiAccessTest` (SEMUA rute `api/*` selain `POST /login` & `GET /public/assets/{token}` wajib `auth:sanctum` dan 401 tanpa token), `ApiErrorShapeTest` (404/405/422 selalu JSON, pesan Indonesia, semua rute ber-id numerik → 404 "Data tidak ditemukan."), `AssetLifecycleTest` (registrasi → pinjam → kembali rusak → konfirmasi → servis → pindah → lapor → tidak layak pakai → hapus, konsisten ke riwayat/kelengkapan/dashboard), `HealthTest`, `Unit/ArchitectureRulesTest` (event aset hanya ditulis `AssetEventService`; hapus aset/riwayat hanya `AssetService`; tanpa `migrate:fresh`/`db:wipe`/`DROP` & URL hardcode di `app/`). Rute API baru wajib masuk grup `auth:sanctum` (kecuali ditambahkan sengaja ke daftar putih di `ApiAccessTest`).
+- (T18) Keputusan pengguna: `POST /login` dibatasi 5 percobaan/menit per kombinasi username (tanpa beda huruf besar/kecil) + IP (rate limiter `login`, `AppServiceProvider`); lebih → 429 "Terlalu banyak percobaan login. Coba lagi dalam N detik." + `Retry-After`. Setiap percobaan dihitung (termasuk yang berhasil). SPEC §14 & §15 diperbarui. Frontend (T19/T20) cukup menampilkan `message` dari respons 429.
+- (T18) Verifikasi: `php artisan test` (299 lulus), `--order-by=random` (beberapa seed, lulus), `pint --test` lulus. Tidak ada driver coverage (xdebug/pcov) di mesin dev, jadi tanpa angka coverage.
