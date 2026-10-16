@@ -399,4 +399,106 @@ class MasterDataTest extends TestCase
             ->assertOk()
             ->assertExactJson(['data' => ['SIT']]);
     }
+
+    public function test_department_update_and_delete(): void
+    {
+        $unit = Department::factory()->create(['name' => 'SGA']);
+        Department::factory()->create(['name' => 'SIT']);
+
+        $this->putJson("/api/departments/{$unit->id}", ['name' => 'sit'])->assertUnprocessable()->assertJsonValidationErrors('name');
+        $this->putJson("/api/departments/{$unit->id}", ['name' => 'SGA Baru'])->assertOk()->assertJsonPath('data.name', 'SGA Baru');
+        $this->putJson("/api/departments/{$unit->id}", ['name' => 'SGA Baru'])->assertOk();
+
+        $this->deleteJson("/api/departments/{$unit->id}")->assertOk();
+        $this->assertModelMissing($unit);
+    }
+
+    public function test_internal_department_cannot_be_changed_or_deleted(): void
+    {
+        $shd = Department::factory()->internal()->create(['name' => 'SHD']);
+
+        $this->putJson("/api/departments/{$shd->id}", ['name' => 'Lain'])->assertUnprocessable();
+        $this->deleteJson("/api/departments/{$shd->id}")->assertUnprocessable();
+        $this->assertModelExists($shd);
+    }
+
+    public function test_used_department_cannot_be_deleted(): void
+    {
+        $unit = Department::factory()->create();
+        RequestCatalog::factory()->create(['provider_department_id' => $unit->id]);
+
+        $this->deleteJson("/api/departments/{$unit->id}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('id');
+        $this->assertModelExists($unit);
+    }
+
+    public function test_building_update_and_delete_rules(): void
+    {
+        $building = Building::factory()->create(['name' => 'IHS']);
+        $room = Room::factory()->create(['building_id' => $building->id]);
+
+        $this->putJson("/api/buildings/{$building->id}", ['name' => 'IHS Baru'])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'IHS Baru');
+
+        $this->deleteJson("/api/buildings/{$building->id}")->assertUnprocessable();
+
+        $room->delete();
+        $this->deleteJson("/api/buildings/{$building->id}")->assertOk();
+        $this->assertModelMissing($building);
+    }
+
+    public function test_room_update_keeps_slug_and_name_is_unique_per_building(): void
+    {
+        $building = Building::factory()->create();
+        $room = Room::factory()->create(['building_id' => $building->id, 'name' => 'Ruang A']);
+        Room::factory()->create(['building_id' => $building->id, 'name' => 'Ruang B']);
+        $slug = $room->slug;
+
+        $this->putJson("/api/rooms/{$room->id}", ['name' => 'ruang b'])->assertUnprocessable();
+        $this->putJson("/api/rooms/{$room->id}", ['name' => 'Ruang C'])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Ruang C')
+            ->assertJsonPath('data.slug', $slug);
+    }
+
+    public function test_room_in_use_cannot_be_deleted(): void
+    {
+        $room = Room::factory()->create();
+        Asset::factory()->create(['room_id' => $room->id]);
+
+        $this->deleteJson("/api/rooms/{$room->id}")->assertUnprocessable()->assertJsonValidationErrors('id');
+        $this->assertModelExists($room);
+
+        $empty = Room::factory()->create();
+        $this->deleteJson("/api/rooms/{$empty->id}")->assertOk();
+        $this->assertModelMissing($empty);
+    }
+
+    public function test_category_update_and_delete_rules(): void
+    {
+        $category = Category::factory()->create(['name' => 'Elektronik']);
+        $type = AssetType::factory()->create(['category_id' => $category->id]);
+
+        $this->putJson("/api/categories/{$category->id}", ['name' => 'Elektronik 2'])->assertOk();
+        $this->deleteJson("/api/categories/{$category->id}")->assertUnprocessable();
+
+        $type->delete();
+        $this->deleteJson("/api/categories/{$category->id}")->assertOk();
+        $this->assertModelMissing($category);
+    }
+
+    public function test_asset_type_delete_rules(): void
+    {
+        $type = AssetType::factory()->create();
+        Asset::factory()->create(['asset_type_id' => $type->id]);
+
+        $this->deleteJson("/api/asset-types/{$type->id}")->assertUnprocessable();
+        $this->assertModelExists($type);
+
+        $unused = AssetType::factory()->create();
+        $this->deleteJson("/api/asset-types/{$unused->id}")->assertOk();
+        $this->assertModelMissing($unused);
+    }
 }

@@ -163,15 +163,13 @@ flowchart TD
     B --> C{Pilih aksi}
 
     C -- Atur standar --> S1[Pilih / tambah gedung] --> S2[Pilih / tambah ruangan]
-    S2 --> S3{Salin dari ruangan lain?}
-    S3 -- Ya --> S4[Pilih ruangan sumber] --> S5[(Salin standar)] --> S6
-    S3 -- Tidak --> S6[Input perlengkapan, sumber, jumlah standar, cara hitung QR/Manual, pemenuhan: stok SHD / ambil dari / minta ke]
+    S2 --> S6[Input perlengkapan, sumber, jumlah standar, cara hitung QR/Manual, pemenuhan: stok SHD / ambil dari / minta ke]
     S6 --> S7[(Simpan standar)] --> B
 
     C -- Cek ruangan --> K1[Pilih gedung & ruangan] --> K2[Checklist: standar, ada, selisih]
     K2 --> K3[(Jumlah ada QR dihitung otomatis)]
     K3 --> K4[Staf input jumlah ada untuk item Manual]
-    K4 --> K5[(Simpan hasil cek + waktu & staf)]
+    K4 --> K5[(Simpan hasil cek + waktu & staf; item Manual kosong = Belum dicek, bukan kurang)]
     K5 --> K6{Ada kekurangan?}
     K6 -- Tidak --> B
     K6 -- Ya --> K7{Cara pemenuhan}

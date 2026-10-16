@@ -40,7 +40,11 @@ Satu jenis pengguna: **Staf/Admin Aset SHD**, tanpa role. Akun dibuat lewat seed
 - **Perlu servis**: `next_service_date` sudah lewat atau ≤ 14 hari lagi (tampil di dashboard).
 - **Hapus aset** (istilah UI; tanpa daftar "aset dihapuskan"): **hard delete permanen** untuk semua status, termasuk aset yang punya riwayat pinjam atau sedang Dipinjam. Dalam satu transaksi (lock aset) dihapus: pinjaman (termasuk yang aktif), riwayat, file (termasuk file di storage, setelah commit), kode lama, lalu asetnya; FK `loans`/`asset_events` tetap RESTRICT sehingga penghapusan hanya lewat `AssetService`. Sebelum menghapus, frontend memanggil `GET /assets/{id}/delete-impact` (jumlah pinjaman, pinjaman aktif + peminjam & unit, jumlah riwayat & file, standar ruangan terpengaruh, `requires_confirm_code`) untuk popup. Jika aset punya riwayat pinjam/sedang dipinjam, `DELETE` wajib `confirm_code` = kode aset (tidak membedakan huruf besar/kecil), jika tidak cocok 422 "Kode konfirmasi tidak cocok.". Riwayat aset yang dihapus hilang permanen dan tidak muncul di laporan (keputusan pengguna). Nomor urut kodenya tidak dipakai ulang.
 - **Catat tidak layak pakai** (`POST /assets/{id}/report` `type=tidak_layak_pakai`, catatan wajib): hanya dari `Tersedia`/`Perbaikan`; `Dipinjam` ditolak ("Selesaikan lewat peminjaman."). Status → `Tidak Layak Pakai`, kondisi tetap, riwayat "Tidak Layak Pakai". Aset ini tidak bisa dipinjam, diservis, dicatat kerusakan/kehilangan, atau ditandai ditemukan; tidak dihitung "Ada" di kelengkapan ruangan; tidak ada aksi untuk mengembalikannya (hanya Pindah lokasi dan Hapus aset). Tetap tampil di Daftar Aset (filter status).
-- **Foto & dokumen**: upload `Foto Aset`, `Foto Kondisi`, `BAST`, `Garansi`, `Lainnya` (gambar/PDF, maks 5 MB). Penyimpanan via Laravel Storage (lokal saat dev, Supabase Storage/S3 saat deploy, cukup ganti env).
+- **Foto & dokumen**: jenis `Foto Aset`, `Foto Kondisi`, `BAST`, `Garansi`, `Lainnya`; tipe JPG/PNG/WebP/PDF (dicek dari isi file), maks 5 MB per file (lebih besar → 413 "Ukuran file maksimal 5 MB."). Penyimpanan via Laravel Storage (disk `ASSET_DISK`: lokal saat dev, Supabase Storage/S3 saat deploy, cukup ganti env), path `assets/{asset_id}/{uuid}.{ext}`.
+  - `Foto Aset`, `Foto Kondisi`, `BAST`, `Garansi`: **satu slot per aset**. Unggah ke jenis yang sudah terisi **mengganti** file lama dalam satu transaksi (baris aset dikunci); file lama dihapus dari storage setelah commit. Tidak ada riwayat file (Foto Kondisi hanya yang terakhir).
+  - `Lainnya`: boleh banyak file (menumpuk, tanpa batas jumlah), nama file asli disimpan dan ditampilkan.
+  - Hapus file satuan tersedia untuk semua jenis. Upload/hapus file **tidak** dicatat di riwayat aset. Halaman publik QR tidak menampilkan file.
+  - File dibuka lewat `GET /asset-files/{id}/download` (stream lewat backend, butuh Bearer token; inline, `?download=1` untuk unduh); frontend mengambilnya sebagai blob.
 - **Riwayat aset** (satu tabel gabungan): Registrasi, Dipinjam, Dikembalikan, Dibatalkan, Pindah Lokasi, Lapor Rusak, Lapor Hilang, Ditemukan, Tidak Layak Pakai, Servis, Ubah Data. Kolom: tanggal, kegiatan, pihak, kondisi, dicatat oleh, catatan.
 - **Daftar Aset**: filter kategori, gedung, ruangan, sumber, kondisi, status, pencarian nama/kode. Kolom minimal: Kode, Nama, Kategori, Lokasi (ruangan + gedung), Sumber, Kondisi, Status.
 
@@ -73,21 +77,21 @@ Satu jenis pengguna: **Staf/Admin Aset SHD**, tanpa role. Akun dibuat lewat seed
 - Halaman: form catat peminjaman + tabel sedang dipinjam (Aset, Peminjam, Tempo) dengan tombol terima kembali + riwayat.
 
 ## 8. Kelengkapan Ruangan
-- **Atur standar**: pilih gedung → ruangan (keduanya bisa ditambah), lalu input daftar standar per ruangan. Bisa **salin standar dari ruangan lain** lalu disesuaikan.
+- **Atur standar**: pilih gedung → ruangan (keduanya bisa ditambah), lalu input daftar standar per ruangan. Standar **diisi manual per ruangan** (tidak ada fitur salin dari ruangan lain). Ubah standar (`PUT`) hanya mengubah definisi; hapus standar = hard delete biasa (tanpa alasan).
 - **Baris standar**: nama perlengkapan, sumber (departemen), jumlah standar, cara hitung, keterangan pemenuhan.
   - `QR`: pilih jenis aset; jumlah "Ada" otomatis = aset jenis itu dengan lokasi asal di ruangan tersebut, status bukan `Dipinjam`/`Perbaikan`/`Hilang`/`Tidak Layak Pakai`.
-  - `Manual`: jumlah "Ada" diinput staf saat cek.
+  - `Manual`: jumlah "Ada" diinput staf saat cek (hanya lewat Simpan hasil cek). Selama `actual_quantity` kosong, baris berstatus **Belum dicek**: Selisih tidak dihitung, Hasil = `Belum dicek`, dan **tidak dihitung kurang** (ringkasan kesiapan, dashboard, saran permintaan). Mengisi 0 dengan sengaja tetap Hasil = `Kurang` (standar > 0).
   - **Keterangan pemenuhan**, salah satu:
     - **Dari stok SHD**: ditautkan ke item Stok Habis Pakai (misal "ATK peserta" ↔ stok "Pulpen"). Muncul tombol **Isi dari stok**.
-    - Form standar (T13): pemenuhan "Dari stok SHD" memakai kolom ketik-dengan-saran untuk memilih item stok; satu stok boleh ditautkan ke banyak ruangan. Pemenuhan hanya **satu** dari: stok SHD, ambil dari, atau minta ke unit lain. Validasi: stok SHD (dan "ambil dari") hanya boleh jika sumber standar = SHD. Jika item stok dihapus, tautannya lepas otomatis dan standar tetap ada.
+    - Form standar (T13): pemenuhan "Dari stok SHD" memakai kolom ketik-dengan-saran untuk memilih item stok; satu stok boleh ditautkan ke banyak ruangan. Pemenuhan hanya **satu** dari: stok SHD, ambil dari, atau minta ke unit lain. Validasi: stok SHD (dan "ambil dari") hanya boleh jika sumber standar = SHD; stok SHD hanya untuk baris **Manual** (baris QR ditolak); "minta ke" hanya jika sumber = unit lain. Jika item stok dihapus, tautannya lepas otomatis dan standar tetap ada.
     - **Ambil dari** (sumber SHD tanpa stok): teks bebas, misal "Gudang Gedung IHS".
     - **Minta ke unit lain** (sumber unit lain, misal tisu dari Dept A): mengacu ke katalog permintaan. Barang ini tidak disimpan SHD, hanya tercatat di Kelengkapan Ruangan.
   - **Keputusan (T4)**: database hanya menjamin paling banyak satu jenis pemenuhan per baris (`CHECK num_nonnulls(consumable_id, fulfillment_note, catalog_id) <= 1`, boleh kosong). Konsistensi sumber vs jenis pemenuhan (sumber SHD → stok SHD/ambil dari; sumber unit lain → minta ke unit lain) divalidasi di FormRequest pada T13.
-- **Isi dari stok**: jumlah yang diisi = min(kekurangan, stok tersedia). Stok berkurang dan jumlah "Ada" ruangan bertambah dalam satu transaksi. Jika stok tidak cukup, sisa tetap tercatat kurang. Contoh: kurang 5, stok 3 → ruangan +3 (masih kurang 2), stok jadi 0.
+- **Isi dari stok** (baris Manual yang sudah dicek dan kurang): jumlah yang diisi = min(kekurangan, stok tersedia). Stok berkurang dan jumlah "Ada" ruangan bertambah dalam satu transaksi. Jika stok tidak cukup, sisa tetap tercatat kurang. Contoh: kurang 5, stok 3 → ruangan +3 (masih kurang 2), stok jadi 0.
 - **Cek ruangan**: staf mengisi jumlah Ada untuk baris Manual lalu **Simpan hasil cek** → ruangan menyimpan waktu & staf pengecek terakhir (hanya hasil terakhir).
-- **Tabel checklist**: Perlengkapan, Sumber, Standar, Ada, Selisih, Hasil (`Sesuai`/`Kurang`), Ambil dari / Minta ke.
+- **Tabel checklist**: Perlengkapan, Sumber, Standar, Ada, Selisih, Hasil (`Sesuai`/`Kurang`/`Belum dicek`), Ambil dari / Minta ke.
 - Ruangan kurang menampilkan pesan kekurangan beserta aksi per baris: **Isi dari stok** (item stok SHD) atau **Buat permintaan** (item unit lain, form terisi otomatis).
-- Daftar ruangan dikelompokkan per gedung dengan ringkasan "Kurang N item" / "Lengkap".
+- Daftar ruangan dikelompokkan per gedung dengan ringkasan "Kurang N item" / "Lengkap", ditambah jumlah item "Belum dicek" yang ditampilkan terpisah (Lengkap = tidak ada baris Kurang).
 - **URL halaman (frontend)**: `/kelengkapan-ruangan` otomatis redirect ke gedung & ruangan pertama, lalu `/kelengkapan-ruangan/{slug-gedung}/{slug-ruangan}` (mis. `/kelengkapan-ruangan/gedung-ihs/ruang-kelas-1`). Frontend mencocokkan slug ke id dari data gedung & ruangan yang sudah dimuat; **API tetap memakai id**. Slug gedung unik, slug ruangan unik per gedung, dibuat otomatis dari nama (bentrok → `-2`) dan **tidak berubah** saat nama diganti.
 
 ## 9. Permintaan ke Unit Lain
@@ -95,7 +99,7 @@ Satu jenis pengguna: **Staf/Admin Aset SHD**, tanpa role. Akun dibuat lewat seed
 - **Riwayat permintaan** (proses permintaan tetap di luar sistem, staf hanya mencatat): tanggal, item, jumlah, untuk kegiatan, ruangan terkait (opsional), unit penyedia, status, catatan.
 - **Status**: `Diajukan` → `Diterima` → `Dikembalikan` (hanya jika perlu dikembalikan); atau `Dibatalkan`. Tampilan **"Belum direspons"** = `Diajukan` yang melewati lead time (dihitung, bukan disimpan).
 - **Daftar saran permintaan** (pengingat, dikelompokkan per unit penyedia):
-  - kekurangan kelengkapan ruangan yang pemenuhannya "minta ke unit lain";
+  - kekurangan kelengkapan ruangan yang pemenuhannya "minta ke unit lain" (baris Belum dicek tidak termasuk);
   - stok habis pakai yang Menipis/Habis, ke unit di kolom "minta ke".
   Dari saran, staf bisa langsung **Buat permintaan** (form terisi otomatis).
 
@@ -113,7 +117,7 @@ Kartu:
 - Total aset tercatat (rincian milik SHD · dari unit lain), **tidak menghitung** aset `Tidak Layak Pakai`; jumlah Tidak Layak Pakai ditampilkan terpisah bila perlu
 - Sedang dipinjam (jatuh tempo hari ini, terlambat)
 - Perlu perbaikan (menunggu konfirmasi peminjam)
-- Ruangan belum lengkap (dari N ruangan di M gedung)
+- Ruangan belum lengkap (dari N ruangan di M gedung; hanya baris Kurang, Belum dicek tidak dihitung)
 - Perlu servis (lewat/mendekati tanggal)
 - Stok habis pakai menipis
 
@@ -133,7 +137,7 @@ Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 ## 14. Kontrak API (prefix `/api`, Bearer token kecuali login)
 **Auth**: `POST /login`, `POST /logout`, `GET /user`
 
-**Master & lookup**: `GET/POST /departments`, `GET/POST /buildings`, `GET/POST /buildings/{id}/rooms`, `GET /rooms`, `GET/POST /categories`, `GET/POST/PUT /asset-types`, `GET /lookups/borrower-units?search=`, `GET /lookups/request-methods?search=`
+**Master & lookup**: `GET/POST/PUT/DELETE /departments`, `GET/POST/PUT/DELETE /buildings`, `GET/POST /buildings/{id}/rooms`, `GET /rooms`, `PUT/DELETE /rooms/{id}`, `GET/POST/PUT/DELETE /categories`, `GET/POST/PUT/DELETE /asset-types` (hapus ditolak 422 bila masih dipakai; departemen SHD tidak dapat diubah/dihapus), `GET /lookups/borrower-units?search=`, `GET /lookups/request-methods?search=`
 
 **Publik (tanpa token, rate limit)**: `GET /public/assets/{token}` — data halaman QR (§6)
 
@@ -154,19 +158,23 @@ Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 | POST | /assets/{id}/services | Catat servis: `service_date`, `vendor`, `condition`, `status` jika Rusak Ringan, `next_service_date`, `note` |
 | DELETE | /assets/{id} | Hapus aset permanen (semua status) beserta data turunan; `confirm_code` = kode aset wajib jika punya riwayat pinjam |
 | GET | /assets/{id}/events | Riwayat aset, terbaru dulu |
-| GET/POST | /assets/{id}/files | Daftar/upload file |
-| DELETE | /asset-files/{id} | Hapus file |
+| GET | /assets/{id}/files | Daftar file (`file_type` opsional): slot sesuai urutan jenis, lalu Lainnya terbaru dulu |
+| POST | /assets/{id}/files | Upload (`multipart`: `file_type`, `file`); slot terisi diganti (`meta.replaced`), Lainnya menumpuk; 413 jika > 5 MB |
+| DELETE | /asset-files/{id} | Hapus file (semua jenis) |
+| GET | /asset-files/{id}/download | Stream file (inline; `?download=1` unduh), 404 jika file fisik tidak ada |
 | GET | /assets/scan/{value} | Data scan (kode / kode lama / token) + `meta.actions` + `meta.matched_by` |
 | GET | /assets/{id}/label | PDF label satu aset (`?download=1` untuk unduh) |
 | POST | /assets/labels | PDF label banyak aset (`ids[]`, maks. 120; `?download=1`) |
 
 **Peminjaman**: `GET /loans` (`status`, `overdue`, `due_today`, `pending_confirmation`, `from`/`to` tanggal pinjam, `asset_id`, `search` peminjam/unit/kode/nama aset; aktif urut tempo terdekat), `POST /loans`, `GET /loans/{id}`, `PATCH /loans/{id}/return` (`result` kembali|hilang, `return_date`, `return_condition`, `status` jika Rusak Ringan, `return_room_id`, `note`), `PATCH /loans/{id}/cancel` (`cancel_reason`), `PATCH /loans/{id}/confirm-damage` (`damage_confirmation_note`, `damage_confirmation_document`)
 
-**Kelengkapan**: `GET /room-readiness` (per gedung), `GET /rooms/{id}/checklist`, `POST /rooms/{id}/standards`, `PUT /room-standards/{id}`, `DELETE /room-standards/{id}`, `POST /rooms/{id}/standards/copy` (from_room_id), `POST /rooms/{id}/check` (simpan hasil cek), `POST /room-standards/{id}/fill-from-stock` (isi dari stok SHD)
+**Kelengkapan**: `GET /room-readiness` (per gedung), `GET /rooms/{id}/checklist`, `POST /rooms/{id}/standards`, `PUT /room-standards/{id}`, `DELETE /room-standards/{id}`, `POST /rooms/{id}/check` (simpan hasil cek), `POST /room-standards/{id}/fill-from-stock` (isi dari stok SHD)
 
-**Permintaan**: `GET/POST/PUT/DELETE /request-catalog`, `GET/POST /supply-requests`, `PUT /supply-requests/{id}`, `PATCH /supply-requests/{id}/status`, `GET /supply-requests/suggestions`
+**Permintaan**: `GET/POST/PUT/DELETE /request-catalog`, `GET/POST /supply-requests`, `PUT /supply-requests/{id}`, `PATCH /supply-requests/{id}/status`, `GET /supply-requests/suggestions` (`GET /supply-requests` filter: `status`, `unresponded`, `provider_department_id`, `room_id`, `from`/`to`, `search`; edit hanya saat Diajukan; katalog tidak bisa dihapus bila dipakai)
 
 **Stok habis pakai**: `GET /consumables` (`status`, `category`, `provider_department_id`, `building_id`, `room_id`, `search`), `POST /consumables`, `GET /consumables/{id}` (+ `meta.used_in_rooms`), `GET /consumables/{id}/usage`, `PUT /consumables/{id}` (tanpa `quantity`), `PATCH /consumables/{id}/quantity` (`quantity` atau `adjustment`), `DELETE /consumables/{id}` (permanen, `detached_rooms`)
+
+**Dashboard**: `GET /dashboard` (semua kartu & panel §11; kartu "Ruangan belum lengkap" memakai semua ruangan/gedung sebagai penyebut, ruangan tanpa standar dianggap lengkap; "Perlu perbaikan" = aset Perbaikan + jumlah pinjaman Menunggu Konfirmasi; "Stok menipis" = Menipis + Habis)
 
 **Ekspor**: `GET /reports/{type}?format=pdf|xlsx&...filter` (type: assets, loans, rooms, requests, consumables)
 

@@ -1,12 +1,8 @@
 <?php
 
 /*
-|--------------------------------------------------------------------------
-| Pesan validasi (Bahasa Indonesia, singkat)
-|--------------------------------------------------------------------------
-|
-| Aturan yang belum ada di sini jatuh ke fallback "en" bawaan Laravel.
-|
+Pesan validasi (Bahasa Indonesia, singkat)
+Aturan yang belum ada di sini jatuh ke fallback "en" bawaan Laravel.
 */
 
 return [
@@ -131,5 +127,13 @@ return [
         'provider_department_id' => 'minta ke',
         'catalog_id' => 'katalog',
         'adjustment' => 'penyesuaian',
+        'file' => 'file',
+        'file_type' => 'jenis file',
+        'item_name' => 'nama item',
+        'request_method' => 'cara permintaan',
+        'must_return' => 'perlu dikembalikan',
+        'lead_time_days' => 'lead time',
+        'request_date' => 'tanggal permintaan',
+        'unresponded' => 'belum direspons',
     ],
 ];

@@ -7,13 +7,14 @@ use App\Http\Requests\UpdateAssetTypeRequest;
 use App\Http\Resources\AssetTypeResource;
 use App\Models\AssetType;
 use App\Services\CodeGenerator;
+use App\Services\MasterDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class AssetTypeController extends Controller
 {
-    public function __construct(private CodeGenerator $codes) {}
+    public function __construct(private CodeGenerator $codes, private MasterDataService $master) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -49,5 +50,13 @@ class AssetTypeController extends Controller
         $assetType->update($request->validated());
 
         return AssetTypeResource::make($assetType->load('category'));
+    }
+
+    public function destroy(AssetType $assetType): JsonResponse
+    {
+        $name = $assetType->name;
+        $this->master->deleteAssetType($assetType);
+
+        return response()->json(['message' => "Jenis aset {$name} dihapus."]);
     }
 }

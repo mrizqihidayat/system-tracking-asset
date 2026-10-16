@@ -19,7 +19,6 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -51,6 +50,7 @@ class AssetService
     public function __construct(
         private CodeGenerator $codes,
         private AssetEventService $events,
+        private AssetFileService $files,
     ) {}
 
     /**
@@ -213,9 +213,7 @@ class AssetService
             Loan::query()->where('asset_id', $asset->id)->delete();
             $asset->delete();
 
-            if ($paths !== []) {
-                DB::afterCommit(fn () => Storage::disk(config('filesystems.asset_disk'))->delete($paths));
-            }
+            $this->files->deleteFromStorageAfterCommit($paths);
         });
     }
 

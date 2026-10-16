@@ -1,0 +1,188 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\AssetStatus;
+use App\Enums\ChecklistResult;
+use App\Enums\CountMethod;
+use App\Models\Asset;
+use App\Models\Building;
+use App\Models\Room;
+use App\Models\RoomStandard;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * Kelengkapan ruangan (SPEC §8): checklist, simpan hasil cek, isi dari stok, ringkasan kesiapan.
+ * summarize() dipakai ulang T14 (saran permintaan) & T15 (dashboard): Belum dicek bukan kekurangan.
+ */
+class RoomReadinessService
+{
+    /**
+     * Status aset yang tidak dihitung "Ada" pada baris QR.
+     */
+    public const EXCLUDED_STATUSES = [
+        AssetStatus::Dipinjam,
+        AssetStatus::Perbaikan,
+        AssetStatus::Hilang,
+        AssetStatus::TidakLayakPakai,
+    ];
+
+    public const RELATIONS = ['sourceDepartment', 'assetType', 'consumable', 'catalog.providerDepartment'];
+
+    public function __construct(private ConsumableService $consumables) {}
+
+    /**
+     * @return Collection<int, RoomStandard>
+     */
+    public function checklist(Room $room): Collection
+    {
+        return $this->fillQrCounts($room->standards()->with(self::RELATIONS)->orderBy('id')->get());
+    }
+
+    /**
+     * Isi jumlah "Ada" baris QR dengan satu query (dikelompokkan per ruangan & jenis aset).
+     *
+     * @param  Collection<int, RoomStandard>  $standards
+     * @return Collection<int, RoomStandard>
+     */
+    public function fillQrCounts(Collection $standards): Collection
+    {
+        $qr = $standards->filter(fn (RoomStandard $s) => $s->count_method === CountMethod::Qr);
+
+        if ($qr->isEmpty()) {
+            return $standards;
+        }
+
+        $counts = Asset::query()
+            ->whereIn('room_id', $qr->pluck('room_id')->unique()->values())
+            ->whereIn('asset_type_id', $qr->pluck('asset_type_id')->filter()->unique()->values())
+            ->whereNotIn('status', array_map(fn (AssetStatus $s) => $s->value, self::EXCLUDED_STATUSES))
+            ->groupBy('room_id', 'asset_type_id')
+            ->select('room_id', 'asset_type_id', DB::raw('count(*) as total'))
+            ->toBase()
+            ->get()
+            ->mapWithKeys(fn ($row) => ["{$row->room_id}:{$row->asset_type_id}" => (int) $row->total]);
+
+        foreach ($qr as $standard) {
+            $standard->qrPresentQuantity = $counts["{$standard->room_id}:{$standard->asset_type_id}"] ?? 0;
+        }
+
+        return $standards;
+    }
+
+    /**
+     * @param  iterable<RoomStandard>  $standards
+     * @return array{total_items: int, shortage_items: int, unchecked_items: int, is_complete: bool}
+     */
+    public function summarize(iterable $standards): array
+    {
+        $total = $shortage = $unchecked = 0;
+
+        foreach ($standards as $standard) {
+            $total++;
+            match ($standard->checklistResult()) {
+                ChecklistResult::Kurang => $shortage++,
+                ChecklistResult::BelumDicek => $unchecked++,
+                ChecklistResult::Sesuai => null,
+            };
+        }
+
+        return [
+            'total_items' => $total,
+            'shortage_items' => $shortage,
+            'unchecked_items' => $unchecked,
+            'is_complete' => $shortage === 0,
+        ];
+    }
+
+    /**
+     * Gedung → ruangan beserta standar (jumlah QR sudah diisi), untuk ringkasan kesiapan.
+     *
+     * @return Collection<int, Building>
+     */
+    public function readiness(): Collection
+    {
+        $buildings = Building::query()
+            ->with(['rooms' => fn ($q) => $q->orderBy('name')->with(['standards', 'lastCheckedBy'])])
+            ->orderBy('name')
+            ->get();
+
+        $this->fillQrCounts(new Collection($buildings->flatMap(fn (Building $b) => $b->rooms->flatMap->standards)->all()));
+
+        return $buildings;
+    }
+
+    /**
+     * Simpan hasil cek: jumlah Ada baris Manual + waktu & staf pengecek (hanya hasil terakhir).
+     *
+     * @param  list<array{id: int, actual_quantity: int}>  $rows
+     */
+    public function saveCheck(Room $room, array $rows, User $user): Room
+    {
+        return DB::transaction(function () use ($room, $rows, $user) {
+            $room = Room::query()->whereKey($room->getKey())->lockForUpdate()->firstOrFail();
+            $standards = $room->standards()->whereKey(array_column($rows, 'id'))->lockForUpdate()->get()->keyBy('id');
+
+            foreach ($rows as $row) {
+                $standard = $standards->get($row['id']);
+
+                if (! $standard || $standard->count_method !== CountMethod::Manual) {
+                    throw ValidationException::withMessages(['items' => 'Hanya baris Manual ruangan ini yang bisa diisi.']);
+                }
+
+                $standard->update(['actual_quantity' => $row['actual_quantity']]);
+            }
+
+            $room->update(['last_checked_at' => now(), 'last_checked_by' => $user->id]);
+
+            return $room;
+        });
+    }
+
+    /**
+     * Isi dari stok SHD: jumlah = min(kekurangan, stok). Stok berkurang & Ada bertambah dalam satu transaksi;
+     * sisa kekurangan tetap tercatat.
+     *
+     * @return array{standard: RoomStandard, filled: int, remaining_shortage: int, stock_remaining: int}
+     */
+    public function fillFromStock(RoomStandard $standard): array
+    {
+        return DB::transaction(function () use ($standard) {
+            $standard = RoomStandard::query()->whereKey($standard->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($standard->count_method !== CountMethod::Manual || ! $standard->consumable_id) {
+                throw ValidationException::withMessages(['standard' => 'Baris ini tidak ditautkan ke stok SHD.']);
+            }
+
+            $shortage = $standard->shortage();
+
+            if ($shortage === null) {
+                throw ValidationException::withMessages(['standard' => 'Simpan hasil cek ruangan dulu.']);
+            }
+
+            if ($shortage === 0) {
+                throw ValidationException::withMessages(['standard' => 'Jumlah sudah sesuai standar.']);
+            }
+
+            $consumable = $standard->consumable()->lockForUpdate()->firstOrFail();
+            $filled = min($shortage, $consumable->quantity);
+
+            if ($filled <= 0) {
+                throw ValidationException::withMessages(['standard' => "Stok {$consumable->name} habis."]);
+            }
+
+            $consumable = $this->consumables->adjust($consumable, -$filled);
+            $standard->update(['actual_quantity' => $standard->actual_quantity + $filled]);
+
+            return [
+                'standard' => $standard,
+                'filled' => $filled,
+                'remaining_shortage' => $shortage - $filled,
+                'stock_remaining' => $consumable->quantity,
+            ];
+        });
+    }
+}

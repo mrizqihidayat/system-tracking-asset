@@ -6,12 +6,16 @@ use App\Http\Requests\StoreRoomRequest;
 use App\Http\Resources\RoomResource;
 use App\Models\Building;
 use App\Models\Room;
+use App\Http\Requests\UpdateRoomRequest;
+use App\Services\MasterDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class RoomController extends Controller
 {
+    public function __construct(private MasterDataService $master) {}
+
     /**
      * Semua ruangan (untuk combobox), urut gedung lalu ruangan; filter building_id & search.
      */
@@ -45,5 +49,23 @@ class RoomController extends Controller
         $room = $building->rooms()->create($request->validated())->load('building');
 
         return RoomResource::make($room)->response()->setStatusCode(201);
+    }
+
+    /**
+     * Hanya nama; slug tetap (URL frontend stabil).
+     */
+    public function update(UpdateRoomRequest $request, Room $room): RoomResource
+    {
+        $room->update($request->validated());
+
+        return RoomResource::make($room->load('building'));
+    }
+
+    public function destroy(Room $room): JsonResponse
+    {
+        $name = $room->name;
+        $this->master->deleteRoom($room);
+
+        return response()->json(['message' => "Ruangan {$name} dihapus."]);
     }
 }

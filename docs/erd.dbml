@@ -253,7 +253,7 @@ Table room_standards {
   standard_quantity int [not null, note: '> 0']
   count_method count_method [not null]
   asset_type_id bigint [ref: > asset_types.id, note: 'wajib jika QR']
-  actual_quantity int [note: 'diisi jika Manual']
+  actual_quantity int [note: 'diisi jika Manual; null = Belum dicek (bukan kurang)']
   consumable_id bigint [ref: > consumables.id, note: 'isi dari stok SHD; ON DELETE SET NULL']
   fulfillment_note varchar(255) [note: 'ambil dari (sumber SHD tanpa stok)']
   catalog_id bigint [ref: > request_catalog.id, note: 'minta ke unit lain']

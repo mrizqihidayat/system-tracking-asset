@@ -7,6 +7,8 @@ use App\Enums\AssetStatus;
 use App\Enums\LoanStatus;
 use Database\Factories\AssetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +19,8 @@ use Illuminate\Support\Str;
 #[Fillable(['code', 'asset_type_id', 'name', 'brand', 'serial_number', 'specification', 'source_department_id', 'room_id', 'pic_name', 'finance_code', 'acquisition_date', 'next_service_date', 'condition', 'status', 'note', 'created_by'])]
 class Asset extends Model
 {
+    public const SERVICE_WARNING_DAYS = 14;
+
     /** @use HasFactory<AssetFactory> */
     use HasFactory;
 
@@ -171,5 +175,19 @@ class Asset extends Model
     public function activeLoan(): HasOne
     {
         return $this->hasOne(Loan::class)->where('status', LoanStatus::Dipinjam->value);
+    }
+
+    /**
+     * Perlu servis (SPEC §5): tanggal servis berikutnya sudah lewat atau ≤ 14 hari lagi.
+     * Aset Hilang / Tidak Layak Pakai tidak dihitung (tidak bisa diservis); Dipinjam & Perbaikan tetap.
+     *
+     * @param  Builder<Asset>  $query
+     */
+    #[Scope]
+    protected function needsService(Builder $query): void
+    {
+        $query->whereNotNull('next_service_date')
+            ->whereDate('next_service_date', '<=', today()->addDays(self::SERVICE_WARNING_DAYS))
+            ->whereNotIn('status', [AssetStatus::Hilang->value, AssetStatus::TidakLayakPakai->value]);
     }
 }

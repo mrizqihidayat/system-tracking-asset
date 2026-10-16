@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ChecklistResult;
 use App\Enums\CountMethod;
 use Database\Factories\RoomStandardFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -14,6 +15,34 @@ class RoomStandard extends Model
 {
     /** @use HasFactory<RoomStandardFactory> */
     use HasFactory;
+
+    /**
+     * Jumlah "Ada" baris QR, diisi RoomReadinessService::fillQrCounts() (bukan kolom tabel).
+     */
+    public ?int $qrPresentQuantity = null;
+
+    /**
+     * Jumlah "Ada": QR dari hitungan aset, Manual dari actual_quantity (null = Belum dicek).
+     */
+    public function presentQuantity(): ?int
+    {
+        return $this->count_method === CountMethod::Qr ? (int) $this->qrPresentQuantity : $this->actual_quantity;
+    }
+
+    public function checklistResult(): ChecklistResult
+    {
+        return ChecklistResult::fromQuantities($this->standard_quantity, $this->presentQuantity());
+    }
+
+    /**
+     * Kekurangan (≥ 0); null jika Belum dicek.
+     */
+    public function shortage(): ?int
+    {
+        $present = $this->presentQuantity();
+
+        return $present === null ? null : max(0, $this->standard_quantity - $present);
+    }
 
     /**
      * @return array<string, string>
