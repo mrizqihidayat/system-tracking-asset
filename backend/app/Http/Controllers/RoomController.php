@@ -61,6 +61,14 @@ class RoomController extends Controller
         return RoomResource::make($room->load('building'));
     }
 
+    /**
+     * Pemakaian sebelum hapus (popup Data Master): rincian, total, can_delete.
+     */
+    public function usage(Room $room): JsonResponse
+    {
+        return response()->json(['data' => $this->master->usage($room)]);
+    }
+
     public function destroy(Room $room): JsonResponse
     {
         $name = $room->name;

@@ -16,6 +16,18 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class AssetResource extends JsonResource
 {
+    private bool $withRoomStandard = false;
+
+    /**
+     * Sertakan `room_standard` (satu query per aset, jadi hanya untuk detail, bukan daftar).
+     */
+    public function withRoomStandard(): static
+    {
+        $this->withRoomStandard = true;
+
+        return $this;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -54,6 +66,15 @@ class AssetResource extends JsonResource
                 'code' => $history->code,
                 'replaced_at' => $history->replaced_at->toIso8601String(),
             ])),
+            'room_standard' => $this->when($this->withRoomStandard && $this->relationLoaded('room'), function () {
+                $standard = $this->roomStandard();
+
+                return [
+                    'is_standard' => $standard !== null,
+                    'item_name' => $standard?->item_name,
+                    'quantity' => $standard?->standard_quantity,
+                ];
+            }),
             'pic_name' => $this->pic_name,
             'finance_code' => $this->finance_code,
             'acquisition_date' => $this->acquisition_date?->toDateString(),

@@ -5,6 +5,7 @@ use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetEventController;
 use App\Http\Controllers\AssetFileController;
 use App\Http\Controllers\AssetLabelController;
+use App\Http\Controllers\AssetQrController;
 use App\Http\Controllers\AssetScanController;
 use App\Http\Controllers\AssetTypeController;
 use App\Http\Controllers\AuthController;
@@ -39,6 +40,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/{type}', [ReportController::class, 'show'])->whereIn('type', ReportType::values());
 
     // Master & lookup (SPEC §14)
+    Route::get('/departments/{department}/usage', [DepartmentController::class, 'usage'])->whereNumber('department');
+    Route::get('/buildings/{building}/usage', [BuildingController::class, 'usage'])->whereNumber('building');
+    Route::get('/rooms/{room}/usage', [RoomController::class, 'usage'])->whereNumber('room');
+    Route::get('/categories/{category}/usage', [CategoryController::class, 'usage'])->whereNumber('category');
+    Route::get('/asset-types/{assetType}/usage', [AssetTypeController::class, 'usage'])->whereNumber('assetType');
     Route::apiResource('departments', DepartmentController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('buildings', BuildingController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('/buildings/{building}/rooms', [RoomController::class, 'indexForBuilding']);
@@ -73,6 +79,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Scan & label QR (SPEC §6)
     Route::get('/assets/scan/{value}', [AssetScanController::class, 'show']);
+    Route::get('/assets/{asset}/qr', [AssetQrController::class, 'show'])->whereNumber('asset');
     Route::get('/assets/{asset}/label', [AssetLabelController::class, 'show'])->whereNumber('asset');
     Route::post('/assets/labels', [AssetLabelController::class, 'store']);
 

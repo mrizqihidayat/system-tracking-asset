@@ -39,6 +39,14 @@ class BuildingController extends Controller
         return BuildingResource::make($building->loadCount('rooms'));
     }
 
+    /**
+     * Pemakaian sebelum hapus (popup Data Master): rincian, total, can_delete.
+     */
+    public function usage(Building $building): JsonResponse
+    {
+        return response()->json(['data' => $this->master->usage($building)]);
+    }
+
     public function destroy(Building $building): JsonResponse
     {
         $name = $building->name;

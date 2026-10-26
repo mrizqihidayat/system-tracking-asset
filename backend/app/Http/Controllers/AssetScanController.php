@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\AssetStatus;
 use App\Http\Resources\AssetResource;
 use App\Models\Asset;
 use App\Models\AssetCodeHistory;
@@ -31,15 +30,9 @@ class AssetScanController extends Controller
             return response()->json(['message' => 'Aset tidak ditemukan.'], 404);
         }
 
-        $actions = $asset->status->allowedActions();
-
-        if ($asset->status === AssetStatus::Dipinjam) {
-            $actions[] = 'batalkan';
-        }
-
         return AssetResource::make($asset->load(self::RELATIONS))->additional(['meta' => [
             'matched_by' => $matchedBy,
-            'actions' => $actions,
+            'actions' => $asset->availableActions(),
         ]]);
     }
 

@@ -28,7 +28,8 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // Frontend (origin lain) membaca nama file unduhan laporan/label dari header ini.
+    'exposed_headers' => ['Content-Disposition'],
 
     'max_age' => 0,
 

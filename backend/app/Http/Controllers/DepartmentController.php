@@ -53,6 +53,14 @@ class DepartmentController extends Controller
         return DepartmentResource::make($department);
     }
 
+    /**
+     * Pemakaian sebelum hapus (popup Data Master): rincian, total, can_delete.
+     */
+    public function usage(Department $department): JsonResponse
+    {
+        return response()->json(['data' => $this->master->usage($department)]);
+    }
+
     public function destroy(Department $department): JsonResponse
     {
         $name = $department->name;

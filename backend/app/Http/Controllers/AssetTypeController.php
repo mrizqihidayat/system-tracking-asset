@@ -52,6 +52,14 @@ class AssetTypeController extends Controller
         return AssetTypeResource::make($assetType->load('category'));
     }
 
+    /**
+     * Pemakaian sebelum hapus (popup Data Master): rincian, total, can_delete.
+     */
+    public function usage(AssetType $assetType): JsonResponse
+    {
+        return response()->json(['data' => $this->master->usage($assetType)]);
+    }
+
     public function destroy(AssetType $assetType): JsonResponse
     {
         $name = $assetType->name;

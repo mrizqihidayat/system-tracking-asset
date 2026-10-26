@@ -47,6 +47,7 @@ Satu jenis pengguna: **Staf/Admin Aset SHD**, tanpa role. Akun dibuat lewat seed
   - File dibuka lewat `GET /asset-files/{id}/download` (stream lewat backend, butuh Bearer token; inline, `?download=1` untuk unduh); frontend mengambilnya sebagai blob.
 - **Riwayat aset** (satu tabel gabungan): Registrasi, Dipinjam, Dikembalikan, Dibatalkan, Pindah Lokasi, Lapor Rusak, Lapor Hilang, Ditemukan, Tidak Layak Pakai, Servis, Ubah Data. Kolom: tanggal, kegiatan, pihak, kondisi, dicatat oleh, catatan.
 - **Daftar Aset**: filter kategori, gedung, ruangan, sumber, kondisi, status, pencarian nama/kode. Kolom minimal: Kode, Nama, Kategori, Lokasi (ruangan + gedung), Sumber, Kondisi, Status.
+- **Rute frontend**: halaman staf (butuh login) `/daftar-aset`, `/daftar-aset/baru`, `/daftar-aset/:id`, `/daftar-aset/:id/ubah`. Rute `/aset/{public_token}` khusus halaman publik QR (§6), tanpa login.
 
 ## 6. Scan QR & Label
 - QR berisi link halaman publik `{QR_BASE_URL}/aset/{public_token}` (env; bukan id/kode). QR PNG, error correction M.
@@ -138,7 +139,7 @@ Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 ## 14. Kontrak API (prefix `/api`, Bearer token kecuali login)
 **Auth**: `POST /login` (maks. 5 percobaan/menit per kombinasi username + IP; lebih → 429 "Terlalu banyak percobaan login. Coba lagi dalam N detik." + header `Retry-After`), `POST /logout`, `GET /user`
 
-**Master & lookup**: `GET/POST/PUT/DELETE /departments`, `GET/POST/PUT/DELETE /buildings`, `GET/POST /buildings/{id}/rooms`, `GET /rooms`, `PUT/DELETE /rooms/{id}`, `GET/POST/PUT/DELETE /categories`, `GET/POST/PUT/DELETE /asset-types` (hapus ditolak 422 bila masih dipakai; departemen SHD tidak dapat diubah/dihapus), `GET /lookups/borrower-units?search=`, `GET /lookups/request-methods?search=`
+**Master & lookup**: `GET/POST/PUT/DELETE /departments`, `GET/POST/PUT/DELETE /buildings`, `GET/POST /buildings/{id}/rooms`, `GET /rooms`, `PUT/DELETE /rooms/{id}`, `GET/POST/PUT/DELETE /categories`, `GET/POST/PUT/DELETE /asset-types` (hapus ditolak 422 bila masih dipakai; departemen SHD tidak dapat diubah/dihapus), `GET /{departments|buildings|rooms|categories|asset-types}/{id}/usage` (pemakaian sebelum hapus untuk halaman Data Master: `items` [{label, count}] hanya yang > 0, `total`, `can_delete`, `reason` — daftar tabel sama dengan aturan hapus), `GET /lookups/borrower-units?search=`, `GET /lookups/request-methods?search=`
 
 **Publik (tanpa token, rate limit)**: `GET /public/assets/{token}` — data halaman QR (§6)
 
@@ -149,7 +150,8 @@ Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 |---|---|---|
 | GET | /assets | Daftar + filter (`category_id`, `building_id`, `room_id`, `source_department_id`, `condition`, `status`, `search` nama/kode/S-N/kode lama) + paginasi (`per_page` ≤ 100); Tidak Layak Pakai ikut tampil |
 | POST | /assets | Tambah (kode otomatis, status dari kondisi, riwayat Registrasi) |
-| GET | /assets/{id} | Detail + peminjaman aktif + lokasi saat ini + kode lama |
+| GET | /assets/{id} | Detail + peminjaman aktif + lokasi saat ini + kode lama + `room_standard` (`is_standard`, `item_name`, `quantity`: baris standar QR di ruangan asal untuk jenis aset ini; hanya di detail, tidak di daftar) + `meta.actions` (aksi sesuai status, sama seperti scan) |
+| GET | /assets/{id}/qr | Gambar PNG QR (isi = URL publik `{QR_BASE_URL}/aset/{public_token}`, ECC M), butuh Bearer token; frontend mengambilnya sebagai blob |
 | GET | /assets/{id}/delete-impact | Dampak hapus: `loans_count`, `active_loan`, `events_count`, `files_count`, `affected_room_standards`, `requires_confirm_code` |
 | GET | /assets/{id}/code-preview?asset_type_id= | Pratinjau kode baru jika jenis diganti |
 | PUT | /assets/{id} | Ubah data (pindah lokasi tercatat; ganti jenis → kode baru, `meta.code_changed`; status/kondisi/kode tidak bisa diubah) |

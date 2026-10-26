@@ -14,6 +14,16 @@ use chillerlan\QRCode\QROptions;
 class QrCodeService
 {
     /**
+     * Byte PNG mentah QR (untuk respons HTTP image/png).
+     */
+    public function png(string $content): string
+    {
+        $uri = $this->pngDataUri($content);
+
+        return base64_decode(substr($uri, strlen('data:image/png;base64,')));
+    }
+
+    /**
      * PNG QR sebagai data URI (data:image/png;base64,...). ECC M: tahan goresan ringan pada label.
      */
     public function pngDataUri(string $content): string

@@ -64,7 +64,9 @@ class AssetController extends Controller
 
     public function show(Asset $asset): AssetResource
     {
-        return AssetResource::make($asset->load([...self::RELATIONS, 'codeHistories']));
+        return AssetResource::make($asset->load([...self::RELATIONS, 'codeHistories']))
+            ->withRoomStandard()
+            ->additional(['meta' => ['actions' => $asset->availableActions()]]);
     }
 
     /**

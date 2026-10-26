@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
+use App\Enums\CountMethod;
 use App\Enums\LoanStatus;
 use App\Support\Search;
 use Database\Factories\AssetFactory;
@@ -69,6 +70,33 @@ class Asset extends Model
         }
 
         return ['on_loan' => true, 'room' => $loan->destinationRoom, 'note' => $loan->destination_note];
+    }
+
+    /**
+     * Aksi yang tersedia untuk status saat ini (+ `batalkan` jika Dipinjam); dipakai scan dan detail.
+     *
+     * @return list<string>
+     */
+    public function availableActions(): array
+    {
+        $actions = $this->status->allowedActions();
+
+        if ($this->status === AssetStatus::Dipinjam) {
+            $actions[] = 'batalkan';
+        }
+
+        return $actions;
+    }
+
+    /**
+     * Baris standar (hitung via QR) di ruangan asal yang memakai jenis aset ini; null jika tidak termasuk standar.
+     */
+    public function roomStandard(): ?RoomStandard
+    {
+        return $this->room->standards()
+            ->where('count_method', CountMethod::Qr->value)
+            ->where('asset_type_id', $this->asset_type_id)
+            ->first();
     }
 
     /**

@@ -39,6 +39,14 @@ class CategoryController extends Controller
         return CategoryResource::make($category->loadCount('assetTypes'));
     }
 
+    /**
+     * Pemakaian sebelum hapus (popup Data Master): rincian, total, can_delete.
+     */
+    public function usage(Category $category): JsonResponse
+    {
+        return response()->json(['data' => $this->master->usage($category)]);
+    }
+
     public function destroy(Category $category): JsonResponse
     {
         $name = $category->name;

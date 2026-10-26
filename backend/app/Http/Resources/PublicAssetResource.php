@@ -2,10 +2,7 @@
 
 namespace App\Http\Resources;
 
-use App\Enums\CountMethod;
 use App\Models\Asset;
-use App\Models\Room;
-use App\Models\RoomStandard;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -24,7 +21,7 @@ class PublicAssetResource extends JsonResource
     public function toArray(Request $request): array
     {
         $location = $this->currentLocation();
-        $standard = $this->roomStandard();
+        $standard = $this->resource->roomStandard();
 
         return [
             'code' => $this->code,
@@ -55,19 +52,5 @@ class PublicAssetResource extends JsonResource
             ],
             'actions' => $this->status->allowedActions(),
         ];
-    }
-
-    /**
-     * Baris standar QR di ruangan asal yang memakai jenis aset ini.
-     */
-    private function roomStandard(): ?RoomStandard
-    {
-        /** @var Room $room */
-        $room = $this->room;
-
-        return $room->standards()
-            ->where('count_method', CountMethod::Qr->value)
-            ->where('asset_type_id', $this->asset_type_id)
-            ->first();
     }
 }
