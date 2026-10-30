@@ -74,7 +74,7 @@ class AssetLifecycleTest extends TestCase
 
     private function dashboard(): array
     {
-        return $this->getJson('/api/dashboard')->assertOk()->json('data.cards');
+        return $this->getJson('/api/dashboard/cards')->assertOk()->json('data');
     }
 
     public function test_full_asset_lifecycle_keeps_every_module_consistent(): void

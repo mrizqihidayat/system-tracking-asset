@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\PaginatesList;
 use App\Http\Requests\CancelLoanRequest;
 use App\Http\Requests\ConfirmDamageRequest;
 use App\Http\Requests\IndexLoanRequest;
@@ -15,6 +16,8 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class LoanController extends Controller
 {
+    use PaginatesList;
+
     public function __construct(private LoanService $loans) {}
 
     /**
@@ -26,9 +29,9 @@ class LoanController extends Controller
 
         $query = Loan::query()->with($this->relations())->filter($filters);
 
-        $loans = $query->listOrder()
-            ->paginate($filters['per_page'] ?? IndexLoanRequest::DEFAULT_PER_PAGE)
-            ->withQueryString();
+        $loans = $this->paginateList(
+            $query, $filters, IndexLoanRequest::SORTABLE, fn ($query) => $query->listOrder(), IndexLoanRequest::DEFAULT_PER_PAGE,
+        );
 
         return LoanResource::collection($loans);
     }

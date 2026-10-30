@@ -9,6 +9,7 @@ use App\Models\RequestCatalog;
 use App\Models\RoomStandard;
 use App\Models\SupplyRequest;
 use App\Models\User;
+use App\Support\AppCache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -120,6 +121,14 @@ class SupplyRequestService
      * @return list<array{provider_department: array{id: int, name: string}, items: list<array<string, mixed>>}>
      */
     public function suggestions(): array
+    {
+        return AppCache::remember(AppCache::GROUP_OPS, 'supply-suggestions', fn () => $this->buildSuggestions());
+    }
+
+    /**
+     * @return list<array{provider_department: array{id: int, name: string}, items: list<array<string, mixed>>}>
+     */
+    private function buildSuggestions(): array
     {
         $open = SupplyRequest::query()->where('status', RequestStatus::Diajukan->value)->get();
 

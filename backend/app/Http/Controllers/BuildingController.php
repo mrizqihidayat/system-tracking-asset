@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\CachesMasterList;
 use App\Http\Requests\StoreBuildingRequest;
 use App\Http\Requests\UpdateBuildingRequest;
 use App\Http\Resources\BuildingResource;
@@ -9,20 +10,21 @@ use App\Models\Building;
 use App\Services\MasterDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class BuildingController extends Controller
 {
+    use CachesMasterList;
+
     public function __construct(private MasterDataService $master) {}
 
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request): JsonResponse
     {
-        $buildings = $this->applySearch(Building::query(), $request->query('search'))
-            ->withCount('rooms')
-            ->orderBy('name')
-            ->get();
-
-        return BuildingResource::collection($buildings);
+        return $this->masterList($request, 'buildings', fn () => BuildingResource::collection(
+            $this->applySearch(Building::query(), $request->query('search'))
+                ->withCount('rooms')
+                ->orderBy('name')
+                ->get()
+        )->resolve($request));
     }
 
     public function store(StoreBuildingRequest $request): JsonResponse

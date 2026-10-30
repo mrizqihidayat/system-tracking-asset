@@ -3,13 +3,19 @@
 namespace App\Http\Requests;
 
 use App\Enums\ConsumableStatus;
+use App\Http\Requests\Concerns\ValidatesListQuery;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class IndexConsumableRequest extends FormRequest
 {
+    use ValidatesListQuery;
+
     public const DEFAULT_PER_PAGE = 15;
+
+    /** Kunci sort => kolom (sort=kunci naik, sort=-kunci turun). */
+    public const SORTABLE = ['name' => 'consumables.name', 'category' => 'consumables.category', 'quantity' => 'consumables.quantity'];
 
     public function authorize(): bool
     {
@@ -27,8 +33,7 @@ class IndexConsumableRequest extends FormRequest
             'provider_department_id' => ['nullable', 'integer'],
             'building_id' => ['nullable', 'integer'],
             'room_id' => ['nullable', 'integer'],
-            'search' => ['nullable', 'string', 'max:100'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            ...$this->listRules(),
         ];
     }
 }

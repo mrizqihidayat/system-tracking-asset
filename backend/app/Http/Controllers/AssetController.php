@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
+use App\Http\Controllers\Concerns\PaginatesList;
 use App\Http\Requests\DeleteAssetRequest;
 use App\Http\Requests\IndexAssetRequest;
 use App\Http\Requests\MarkAssetFoundRequest;
@@ -23,6 +24,8 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class AssetController extends Controller
 {
+    use PaginatesList;
+
     /**
      * Relasi untuk daftar & detail (lokasi asal + lokasi peminjaman saat ini).
      */
@@ -46,9 +49,9 @@ class AssetController extends Controller
 
         $query = Asset::query()->with(self::RELATIONS)->filter($filters);
 
-        $assets = $query->orderBy('code')
-            ->paginate($filters['per_page'] ?? IndexAssetRequest::DEFAULT_PER_PAGE)
-            ->withQueryString();
+        $assets = $this->paginateList(
+            $query, $filters, IndexAssetRequest::SORTABLE, fn ($query) => $query->orderBy('code'), IndexAssetRequest::DEFAULT_PER_PAGE,
+        );
 
         return AssetResource::collection($assets);
     }

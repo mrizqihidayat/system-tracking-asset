@@ -34,7 +34,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
 
-    Route::get('/dashboard', DashboardController::class);
+    // Dashboard per kelompok widget (SPEC §11), masing-masing di-cache
+    Route::get('/dashboard/cards', [DashboardController::class, 'cards']);
+    Route::get('/dashboard/room-readiness', [DashboardController::class, 'roomReadiness']);
+    Route::get('/dashboard/panels', [DashboardController::class, 'panels']);
 
     // Ekspor laporan Excel (SPEC §12): hanya .xlsx
     Route::get('/reports/{type}', [ReportController::class, 'show'])->whereIn('type', ReportType::values());

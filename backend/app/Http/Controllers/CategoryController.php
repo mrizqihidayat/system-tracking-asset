@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\CachesMasterList;
 use App\Http\Requests\StoreCategoryRequest;
 use App\Http\Requests\UpdateCategoryRequest;
 use App\Http\Resources\CategoryResource;
@@ -9,20 +10,21 @@ use App\Models\Category;
 use App\Services\MasterDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class CategoryController extends Controller
 {
+    use CachesMasterList;
+
     public function __construct(private MasterDataService $master) {}
 
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request): JsonResponse
     {
-        $categories = $this->applySearch(Category::query(), $request->query('search'))
-            ->withCount('assetTypes')
-            ->orderBy('name')
-            ->get();
-
-        return CategoryResource::collection($categories);
+        return $this->masterList($request, 'categories', fn () => CategoryResource::collection(
+            $this->applySearch(Category::query(), $request->query('search'))
+                ->withCount('assetTypes')
+                ->orderBy('name')
+                ->get()
+        )->resolve($request));
     }
 
     public function store(StoreCategoryRequest $request): JsonResponse

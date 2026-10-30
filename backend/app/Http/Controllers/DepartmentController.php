@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\CachesMasterList;
 use App\Http\Requests\StoreDepartmentRequest;
 use App\Http\Requests\UpdateDepartmentRequest;
 use App\Http\Resources\DepartmentResource;
@@ -9,21 +10,22 @@ use App\Models\Department;
 use App\Services\MasterDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\ValidationException;
 
 class DepartmentController extends Controller
 {
+    use CachesMasterList;
+
     public function __construct(private MasterDataService $master) {}
 
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request): JsonResponse
     {
-        $departments = $this->applySearch(Department::query(), $request->query('search'))
-            ->orderByDesc('is_internal')
-            ->orderBy('name')
-            ->get();
-
-        return DepartmentResource::collection($departments);
+        return $this->masterList($request, 'departments', fn () => DepartmentResource::collection(
+            $this->applySearch(Department::query(), $request->query('search'))
+                ->orderByDesc('is_internal')
+                ->orderBy('name')
+                ->get()
+        )->resolve($request));
     }
 
     /**

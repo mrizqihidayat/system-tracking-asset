@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Observers\CacheInvalidationObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -22,6 +23,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Cache dashboard & data master dikosongkan saat model terkait berubah.
+        foreach (array_keys(CacheInvalidationObserver::GROUPS) as $model) {
+            $model::observe(CacheInvalidationObserver::class);
+        }
+
         // Halaman publik QR (tanpa login): batasi per IP.
         RateLimiter::for('public-assets', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
 

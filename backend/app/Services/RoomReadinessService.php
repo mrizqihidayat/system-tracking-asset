@@ -10,6 +10,7 @@ use App\Models\Building;
 use App\Models\Room;
 use App\Models\RoomStandard;
 use App\Models\User;
+use App\Support\AppCache;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -113,6 +114,38 @@ class RoomReadinessService
         $this->fillQrCounts(new Collection($buildings->flatMap(fn (Building $b) => $b->rooms->flatMap->standards)->all()));
 
         return $buildings;
+    }
+
+    /**
+     * Ringkasan kesiapan per gedung → ruangan (array, di-cache grup ops); dipakai halaman kelengkapan
+     * dan dashboard. Ruangan tanpa standar = lengkap.
+     *
+     * @return list<array{id: int, name: string, slug: string, rooms_count: int, incomplete_rooms_count: int, rooms: list<array<string, mixed>>}>
+     */
+    public function summary(): array
+    {
+        return AppCache::remember(AppCache::GROUP_OPS, 'room-readiness', fn () => $this->readiness()
+            ->map(function (Building $building) {
+                $rooms = $building->rooms->map(fn (Room $room) => [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                    'slug' => $room->slug,
+                    'last_checked_at' => $room->last_checked_at?->toIso8601String(),
+                    'last_checked_by' => $room->lastCheckedBy?->name,
+                    ...$this->summarize($room->standards),
+                ]);
+
+                return [
+                    'id' => $building->id,
+                    'name' => $building->name,
+                    'slug' => $building->slug,
+                    'rooms_count' => $rooms->count(),
+                    'incomplete_rooms_count' => $rooms->where('is_complete', false)->count(),
+                    'rooms' => $rooms->values()->all(),
+                ];
+            })
+            ->values()
+            ->all());
     }
 
     /**

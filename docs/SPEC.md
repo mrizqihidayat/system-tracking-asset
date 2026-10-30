@@ -143,7 +143,9 @@ Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 
 **Publik (tanpa token, rate limit)**: `GET /public/assets/{token}` — data halaman QR (§6)
 
-**Dashboard**: `GET /dashboard`
+**Dashboard**: `GET /dashboard/cards`, `GET /dashboard/room-readiness`, `GET /dashboard/panels`
+
+**Daftar (umum)**: endpoint daftar bisnis (`/assets`, `/loans`, `/consumables`, `/supply-requests`) memakai bentuk paginator Laravel (`data`, `links`, `meta`) dengan `page`, `per_page` (≤ 100), `search`, dan `sort` (`kolom` naik / `-kolom` turun; aset `code|name|status|condition|next_service_date`, peminjaman `borrow_date|due_date|borrower_name|status`, stok `name|category|quantity`, permintaan `request_date|item_name|quantity|status`; kolom lain → 422). Tanpa `sort` = urutan bawaan. Data master (`/departments`, `/buildings`, `/rooms`, `/categories`, `/asset-types`, `/request-catalog`) tetap `{data: [...]}` tanpa paginasi (untuk combobox) dan di-cache di server; dashboard, kesiapan ruangan, dan saran permintaan juga di-cache dan dikosongkan otomatis saat data terkait berubah.
 
 **Aset**
 | Method | Endpoint | Fungsi |
@@ -160,7 +162,7 @@ Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 | POST | /assets/{id}/found | Tandai ditemukan (khusus Hilang): `condition`, `status` jika Rusak Ringan, `note`, `party` |
 | POST | /assets/{id}/services | Catat servis: `service_date`, `vendor`, `condition`, `status` jika Rusak Ringan, `next_service_date`, `note` |
 | DELETE | /assets/{id} | Hapus aset permanen (semua status) beserta data turunan; `confirm_code` = kode aset wajib jika punya riwayat pinjam |
-| GET | /assets/{id}/events | Riwayat aset, terbaru dulu |
+| GET | /assets/{id}/events | Riwayat aset, terbaru dulu (paginasi, `per_page` bawaan 20) |
 | GET | /assets/{id}/files | Daftar file (`file_type` opsional): slot sesuai urutan jenis, lalu Lainnya terbaru dulu |
 | POST | /assets/{id}/files | Upload (`multipart`: `file_type`, `file`); slot terisi diganti (`meta.replaced`), Lainnya menumpuk; 413 jika > 5 MB |
 | DELETE | /asset-files/{id} | Hapus file (semua jenis) |
@@ -177,7 +179,7 @@ Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 
 **Stok habis pakai**: `GET /consumables` (`status`, `category`, `provider_department_id`, `building_id`, `room_id`, `search`), `POST /consumables`, `GET /consumables/{id}` (+ `meta.used_in_rooms`), `GET /consumables/{id}/usage`, `PUT /consumables/{id}` (tanpa `quantity`), `PATCH /consumables/{id}/quantity` (`quantity` atau `adjustment`), `DELETE /consumables/{id}` (permanen, `detached_rooms`)
 
-**Dashboard**: `GET /dashboard` (semua kartu & panel §11; kartu "Ruangan belum lengkap" memakai semua ruangan/gedung sebagai penyebut, ruangan tanpa standar dianggap lengkap; "Perlu perbaikan" = aset Perbaikan + jumlah pinjaman Menunggu Konfirmasi; "Stok menipis" = Menipis + Habis)
+**Dashboard**: `GET /dashboard/cards` (semua kartu), `GET /dashboard/room-readiness` (panel kesiapan per gedung), `GET /dashboard/panels` (jatuh tempo, permintaan terbaru, perlu servis, stok menipis) (§11; kartu "Ruangan belum lengkap" memakai semua ruangan/gedung sebagai penyebut, ruangan tanpa standar dianggap lengkap; "Perlu perbaikan" = aset Perbaikan + jumlah pinjaman Menunggu Konfirmasi; "Stok menipis" = Menipis + Habis)
 
 **Ekspor**: `GET /reports/{type}?...filter` (type: assets, loans, rooms, requests, consumables) → unduhan `laporan-{jenis}-{yyyymmdd}.xlsx`. Tidak ada parameter `format`; jika dikirim hanya `xlsx` yang diterima (selain itu 422). Type tidak dikenal → 404; filter tidak valid → 422.
 

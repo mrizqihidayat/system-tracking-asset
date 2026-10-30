@@ -50,16 +50,29 @@ class DashboardTest extends TestCase
         ]);
     }
 
+    private const ENDPOINTS = ['/api/dashboard/cards', '/api/dashboard/room-readiness', '/api/dashboard/panels'];
+
+    /**
+     * Gabungan tiga endpoint dashboard dalam bentuk { cards, panels } (room_readiness masuk panels).
+     */
     private function dashboard(): array
     {
-        return $this->getJson('/api/dashboard')->assertOk()->json('data');
+        return [
+            'cards' => $this->getJson('/api/dashboard/cards')->assertOk()->json('data'),
+            'panels' => [
+                'room_readiness' => $this->getJson('/api/dashboard/room-readiness')->assertOk()->json('data'),
+                ...$this->getJson('/api/dashboard/panels')->assertOk()->json('data'),
+            ],
+        ];
     }
 
     public function test_requires_token(): void
     {
         $this->app['auth']->forgetGuards();
 
-        $this->getJson('/api/dashboard')->assertUnauthorized();
+        foreach (self::ENDPOINTS as $endpoint) {
+            $this->getJson($endpoint)->assertUnauthorized();
+        }
     }
 
     public function test_empty_dashboard_has_all_cards_and_panels(): void
@@ -67,7 +80,7 @@ class DashboardTest extends TestCase
         $data = $this->dashboard();
 
         $this->assertSame(['total_assets', 'active_loans', 'needs_repair', 'incomplete_rooms', 'needs_service', 'low_stock'], array_keys($data['cards']));
-        $this->assertSame(['loans_due', 'room_readiness', 'recent_requests', 'assets_need_service', 'low_stock'], array_keys($data['panels']));
+        $this->assertSame(['room_readiness', 'loans_due', 'recent_requests', 'assets_need_service', 'low_stock'], array_keys($data['panels']));
         $this->assertSame(['total' => 0, 'owned_by_shd' => 0, 'from_other_units' => 0, 'not_feasible' => 0], $data['cards']['total_assets']);
         $this->assertSame(1, $data['cards']['incomplete_rooms']['total_rooms']);
         $this->assertSame(0, $data['cards']['incomplete_rooms']['incomplete']);
@@ -229,7 +242,9 @@ class DashboardTest extends TestCase
         $count = function (): int {
             DB::flushQueryLog();
             DB::enableQueryLog();
-            $this->getJson('/api/dashboard')->assertOk();
+            foreach (self::ENDPOINTS as $endpoint) {
+                $this->getJson($endpoint)->assertOk();
+            }
 
             return count(DB::getQueryLog());
         };

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\RequestStatus;
+use App\Http\Controllers\Concerns\PaginatesList;
 use App\Http\Requests\IndexSupplyRequestRequest;
 use App\Http\Requests\StoreSupplyRequestRequest;
 use App\Http\Requests\UpdateSupplyRequestRequest;
@@ -16,6 +17,8 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class SupplyRequestController extends Controller
 {
+    use PaginatesList;
+
     public function __construct(private SupplyRequestService $requests) {}
 
     public function index(IndexSupplyRequestRequest $request): AnonymousResourceCollection
@@ -24,9 +27,9 @@ class SupplyRequestController extends Controller
 
         $query = SupplyRequest::query()->with(SupplyRequestResource::RELATIONS)->filter($filters);
 
-        $requests = $query->listOrder()
-            ->paginate($filters['per_page'] ?? IndexSupplyRequestRequest::DEFAULT_PER_PAGE)
-            ->withQueryString();
+        $requests = $this->paginateList(
+            $query, $filters, IndexSupplyRequestRequest::SORTABLE, fn ($query) => $query->listOrder(), IndexSupplyRequestRequest::DEFAULT_PER_PAGE,
+        );
 
         return SupplyRequestResource::collection($requests);
     }

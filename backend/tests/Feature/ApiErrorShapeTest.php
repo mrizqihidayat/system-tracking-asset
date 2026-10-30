@@ -55,7 +55,7 @@ class ApiErrorShapeTest extends TestCase
         $this->getJson('/api/tidak-ada')->assertNotFound()->assertJsonPath('message', 'Data tidak ditemukan.');
         $this->getJson('/api/reports/semua')->assertNotFound();
         $this->patchJson('/api/assets', [])->assertStatus(405)->assertJsonStructure(['message']);
-        $this->deleteJson('/api/dashboard')->assertStatus(405)->assertJsonStructure(['message']);
+        $this->deleteJson('/api/dashboard/cards')->assertStatus(405)->assertJsonStructure(['message']);
     }
 
     public function test_validation_errors_have_message_and_errors_in_indonesian(): void

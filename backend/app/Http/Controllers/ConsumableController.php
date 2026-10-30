@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\PaginatesList;
 use App\Http\Requests\IndexConsumableRequest;
 use App\Http\Requests\StoreConsumableRequest;
 use App\Http\Requests\UpdateConsumableQuantityRequest;
@@ -14,6 +15,8 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ConsumableController extends Controller
 {
+    use PaginatesList;
+
     private const RELATIONS = ['providerDepartment', 'catalog', 'room.building'];
 
     public function __construct(private ConsumableService $consumables) {}
@@ -24,9 +27,9 @@ class ConsumableController extends Controller
 
         $query = Consumable::query()->with(self::RELATIONS)->filter($filters);
 
-        $consumables = $query->orderBy('name')
-            ->paginate($filters['per_page'] ?? IndexConsumableRequest::DEFAULT_PER_PAGE)
-            ->withQueryString();
+        $consumables = $this->paginateList(
+            $query, $filters, IndexConsumableRequest::SORTABLE, fn ($query) => $query->orderBy('name'), IndexConsumableRequest::DEFAULT_PER_PAGE,
+        );
 
         return ConsumableResource::collection($consumables);
     }

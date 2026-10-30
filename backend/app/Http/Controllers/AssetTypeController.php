@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\CachesMasterList;
 use App\Http\Requests\StoreAssetTypeRequest;
 use App\Http\Requests\UpdateAssetTypeRequest;
 use App\Http\Resources\AssetTypeResource;
@@ -10,23 +11,25 @@ use App\Services\CodeGenerator;
 use App\Services\MasterDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class AssetTypeController extends Controller
 {
+    use CachesMasterList;
+
     public function __construct(private CodeGenerator $codes, private MasterDataService $master) {}
 
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request): JsonResponse
     {
         $request->validate(['category_id' => ['nullable', 'integer']]);
+        $categoryId = $request->integer('category_id');
 
-        $assetTypes = $this->applySearch(AssetType::query(), $request->query('search'))
-            ->with('category')
-            ->when($request->query('category_id'), fn ($query, $categoryId) => $query->where('category_id', $categoryId))
-            ->orderBy('name')
-            ->get();
-
-        return AssetTypeResource::collection($assetTypes);
+        return $this->masterList($request, "asset-types:{$categoryId}", fn () => AssetTypeResource::collection(
+            $this->applySearch(AssetType::query(), $request->query('search'))
+                ->with('category')
+                ->when($categoryId, fn ($query) => $query->where('category_id', $categoryId))
+                ->orderBy('name')
+                ->get()
+        )->resolve($request));
     }
 
     /**

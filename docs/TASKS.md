@@ -68,6 +68,8 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
   Kriteria: semua halaman responsif (390 / 768 / 1440 px) tanpa teks status/kode patah baris di desktop; `npm run build` & `npm run lint` lulus; tidak ada perubahan perilaku, API, atau backend.
 - [ ] **T26d Saran aset di form peminjaman [Lengkap]** — kolom "Aset dipinjam" menampilkan saran aset berstatus Tersedia saat mengetik (≥ 2 huruf, `GET /assets?search=&status=Tersedia`, maks. 8): kode, nama, lokasi; klik/Enter memilih, panah atas/bawah, Esc menutup. Cari & Scan QR tetap.
   Kriteria: hanya frontend (`pages/loans/AssetPicker.tsx`); `npm run build` & `npm run lint` lulus.
+- [x] **T26e Performa backend [Lengkap]** — index FK/filter/urutan (migration baru), parameter daftar seragam (`page`/`per_page`/`search`/`sort` lewat `ValidatesListQuery` + `PaginatesList`), cache berversi (`AppCache`, grup master & ops) dengan invalidasi `CacheInvalidationObserver` setelah commit, dashboard dipecah 3 endpoint, riwayat aset dipaginasi.
+  Kriteria: `php artisan test` lulus (termasuk `ListPerformanceTest`); bentuk respons daftar tetap paginator Laravel.
 
 ## Penyelesaian (3–4 Nov)
 - [ ] **T27 QA & demo** — skenario: login → tambah aset → cetak label → scan → pinjam → terima kembali rusak → konfirmasi → servis → cek ruangan kurang → buat permintaan → stok menipis → ekspor.
@@ -77,6 +79,11 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - [ ] **T29 Lisensi Digital** — sesuai SPEC §16.
 
 ## Catatan / temuan di luar scope
+- (T26e) Migration `2026_10_30_000001_add_performance_indexes` belum dijalankan di Supabase: jalankan `php artisan migrate` (hanya menambah index).
+- (T26e) Cache memakai `CACHE_STORE` (lokal `file`). Saat deploy pilih `redis`/`file`; store `database` tetap jalan tetapi setiap baca cache = satu query ke Supabase.
+- (T26e) Invalidasi cache lewat event model; perubahan lewat query builder massal (`Model::query()->update()`) tidak memicu observer. Saat ini semua mass update diikuti simpan/hapus model yang diamati; kode baru perlu menjaga hal yang sama (TTL 10 mnt/1 jam jadi jaring pengaman).
+- (T26e) Belum dikerjakan: index trigram (`pg_trgm`) untuk pencarian `like '%x%'` (data masih kecil, tidak jalan di sqlite test); Sanctum menulis `last_used_at` di setiap request (satu query tulis tambahan).
+- (T26e) `GET /dashboard` lama dihapus (diganti 3 endpoint); aman karena versi HP adalah web responsif yang sama, bukan aplikasi terpisah.
 - (T4→T18) `ExampleTest` bawaan (Feature & Unit) dihapus; `GET /` kini JSON `{app, status: ok}` (`HealthTest`).
 - (T4) RLS diaktifkan oleh migration `enable_rls_on_all_tables` hanya untuk tabel yang ada saat itu; tabel baru di task berikutnya wajib `ENABLE ROW LEVEL SECURITY` di migration-nya sendiri.
 - (T4) CHECK constraint bisnis dan RLS hanya dibuat di PostgreSQL; di test sqlite hanya enum (CHECK) dan partial unique index loan aktif yang berlaku.

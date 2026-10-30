@@ -9,17 +9,19 @@ use App\Http\Resources\ConsumableResource;
 use App\Http\Resources\LoanResource;
 use App\Http\Resources\SupplyRequestResource;
 use App\Models\Asset;
-use App\Models\Building;
 use App\Models\Consumable;
 use App\Models\Loan;
-use App\Models\Room;
 use App\Models\SupplyRequest;
+use App\Support\AppCache;
+use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 /**
- * Dashboard (SPEC §11): semua kartu & panel dalam satu payload dengan jumlah query tetap
- * (count/group, tanpa N+1). Aturan memakai ulang scope & service task sebelumnya.
+ * Dashboard (SPEC §11), dipecah per kelompok widget agar bisa dimuat paralel: kartu, kesiapan ruangan,
+ * dan panel daftar. Tiap kelompok di-cache (grup ops, dikosongkan observer saat data berubah); kunci
+ * memuat tanggal hari ini karena jatuh tempo/terlambat/perlu servis bergantung tanggal.
+ * Jumlah query tetap (count/group, tanpa N+1). Aturan memakai ulang scope & service task sebelumnya.
  */
 class DashboardService
 {
@@ -30,33 +32,75 @@ class DashboardService
     public function __construct(private RoomReadinessService $readiness) {}
 
     /**
-     * @return array{cards: array<string, mixed>, panels: array<string, mixed>}
+     * @return array<string, mixed>
      */
-    public function data(Request $request): array
+    public function cards(): array
     {
-        $buildings = $this->readiness->readiness();
-        $rooms = $this->roomSummaries($buildings);
+        return $this->remember('cards', fn () => [
+            'total_assets' => $this->totalAssets(),
+            'active_loans' => $this->activeLoans(),
+            'needs_repair' => [
+                'assets_in_repair' => Asset::query()->where('status', AssetStatus::Perbaikan->value)->count(),
+                'loans_pending_confirmation' => Loan::query()->where('damage_confirmation', DamageConfirmation::MenungguKonfirmasi->value)->count(),
+            ],
+            'incomplete_rooms' => $this->incompleteRooms($this->readiness->summary()),
+            'needs_service' => $this->needsService(),
+            'low_stock' => $this->lowStockCounts(),
+        ]);
+    }
 
-        return [
-            'cards' => [
-                'total_assets' => $this->totalAssets(),
-                'active_loans' => $this->activeLoans(),
-                'needs_repair' => [
-                    'assets_in_repair' => Asset::query()->where('status', AssetStatus::Perbaikan->value)->count(),
-                    'loans_pending_confirmation' => Loan::query()->where('damage_confirmation', DamageConfirmation::MenungguKonfirmasi->value)->count(),
-                ],
-                'incomplete_rooms' => $this->incompleteRooms($buildings, $rooms),
-                'needs_service' => $this->needsService(),
-                'low_stock' => $this->lowStockCounts(),
-            ],
-            'panels' => [
-                'loans_due' => LoanResource::collection($this->loansDue())->resolve($request),
-                'room_readiness' => $this->roomReadinessPanel($buildings, $rooms),
-                'recent_requests' => SupplyRequestResource::collection($this->recentRequests())->resolve($request),
-                'assets_need_service' => $this->assetsNeedService(),
-                'low_stock' => ConsumableResource::collection($this->lowStock())->resolve($request),
-            ],
-        ];
+    /**
+     * Panel kesiapan ruangan per gedung (dari ringkasan kesiapan yang di-cache).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function roomReadiness(): array
+    {
+        return array_map(function (array $building) {
+            $rooms = collect($building['rooms']);
+            $incomplete = $rooms->where('is_complete', false);
+
+            return [
+                'id' => $building['id'],
+                'name' => $building['name'],
+                'slug' => $building['slug'],
+                'rooms_count' => $rooms->count(),
+                'rooms_without_standards' => $rooms->where('total_items', 0)->count(),
+                'incomplete_rooms_count' => $incomplete->count(),
+                'shortage_items' => $rooms->sum('shortage_items'),
+                'unchecked_items' => $rooms->sum('unchecked_items'),
+                'is_complete' => $incomplete->isEmpty(),
+                'incomplete_rooms' => $incomplete->map(fn (array $room) => [
+                    'id' => $room['id'],
+                    'name' => $room['name'],
+                    'slug' => $room['slug'],
+                    'shortage_items' => $room['shortage_items'],
+                    'unchecked_items' => $room['unchecked_items'],
+                ])->values()->all(),
+            ];
+        }, $this->readiness->summary());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function panels(Request $request): array
+    {
+        return $this->remember('panels', fn () => [
+            'loans_due' => LoanResource::collection($this->loansDue())->resolve($request),
+            'recent_requests' => SupplyRequestResource::collection($this->recentRequests())->resolve($request),
+            'assets_need_service' => $this->assetsNeedService(),
+            'low_stock' => ConsumableResource::collection($this->lowStock())->resolve($request),
+        ]);
+    }
+
+    /**
+     * @param  Closure(): array<string, mixed>  $callback
+     * @return array<string, mixed>
+     */
+    private function remember(string $key, Closure $callback): array
+    {
+        return AppCache::remember(AppCache::GROUP_OPS, "dashboard:{$key}:".today()->toDateString(), $callback);
     }
 
     /**
@@ -100,66 +144,19 @@ class DashboardService
     }
 
     /**
-     * Ringkasan per ruangan (id ruangan => ringkasan); ruangan tanpa standar = lengkap (tidak ada kekurangan).
-     *
-     * @param  Collection<int, Building>  $buildings
-     * @return Collection<int, array{total_items: int, shortage_items: int, unchecked_items: int, is_complete: bool}>
-     */
-    private function roomSummaries(Collection $buildings): Collection
-    {
-        return $buildings
-            ->flatMap(fn (Building $building) => $building->rooms)
-            ->mapWithKeys(fn (Room $room) => [$room->id => $this->readiness->summarize($room->standards)]);
-    }
-
-    /**
-     * @param  Collection<int, Building>  $buildings
-     * @param  Collection<int, array<string, mixed>>  $rooms
+     * @param  list<array<string, mixed>>  $buildings  ringkasan kesiapan (RoomReadinessService::summary())
      * @return array{incomplete: int, total_rooms: int, total_buildings: int, incomplete_buildings: int}
      */
-    private function incompleteRooms(Collection $buildings, Collection $rooms): array
+    private function incompleteRooms(array $buildings): array
     {
-        $incompleteBuildings = $buildings->filter(
-            fn (Building $building) => $building->rooms->contains(fn (Room $room) => ! $rooms[$room->id]['is_complete'])
-        )->count();
+        $rooms = collect($buildings)->flatMap(fn (array $building) => $building['rooms']);
 
         return [
             'incomplete' => $rooms->where('is_complete', false)->count(),
             'total_rooms' => $rooms->count(),
-            'total_buildings' => $buildings->count(),
-            'incomplete_buildings' => $incompleteBuildings,
+            'total_buildings' => count($buildings),
+            'incomplete_buildings' => collect($buildings)->where('incomplete_rooms_count', '>', 0)->count(),
         ];
-    }
-
-    /**
-     * @param  Collection<int, Building>  $buildings
-     * @param  Collection<int, array<string, mixed>>  $rooms
-     * @return list<array<string, mixed>>
-     */
-    private function roomReadinessPanel(Collection $buildings, Collection $rooms): array
-    {
-        return $buildings->map(function (Building $building) use ($rooms) {
-            $summaries = $building->rooms->map(fn (Room $room) => ['room' => $room] + $rooms[$room->id]);
-
-            return [
-                'id' => $building->id,
-                'name' => $building->name,
-                'slug' => $building->slug,
-                'rooms_count' => $summaries->count(),
-                'rooms_without_standards' => $summaries->where('total_items', 0)->count(),
-                'incomplete_rooms_count' => $summaries->where('is_complete', false)->count(),
-                'shortage_items' => $summaries->sum('shortage_items'),
-                'unchecked_items' => $summaries->sum('unchecked_items'),
-                'is_complete' => $summaries->every(fn (array $row) => $row['is_complete']),
-                'incomplete_rooms' => $summaries->where('is_complete', false)->map(fn (array $row) => [
-                    'id' => $row['room']->id,
-                    'name' => $row['room']->name,
-                    'slug' => $row['room']->slug,
-                    'shortage_items' => $row['shortage_items'],
-                    'unchecked_items' => $row['unchecked_items'],
-                ])->values()->all(),
-            ];
-        })->values()->all();
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\CachesMasterList;
 use App\Http\Requests\IndexRequestCatalogRequest;
 use App\Http\Requests\StoreRequestCatalogRequest;
 use App\Http\Requests\UpdateRequestCatalogRequest;
@@ -9,25 +10,25 @@ use App\Http\Resources\RequestCatalogResource;
 use App\Models\RequestCatalog;
 use App\Services\SupplyRequestService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class RequestCatalogController extends Controller
 {
+    use CachesMasterList;
+
     public function __construct(private SupplyRequestService $requests) {}
 
-    public function index(IndexRequestCatalogRequest $request): AnonymousResourceCollection
+    public function index(IndexRequestCatalogRequest $request): JsonResponse
     {
         $filters = $request->validated();
+        $departmentId = (int) ($filters['provider_department_id'] ?? 0);
 
-        $query = RequestCatalog::query()
-            ->with('providerDepartment')
-            ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id));
-
-        $items = $this->applySearch($query, $filters['search'] ?? null, 'item_name')
-            ->orderBy('item_name')
-            ->get();
-
-        return RequestCatalogResource::collection($items);
+        return $this->masterList($request, "request-catalog:{$departmentId}", fn () => RequestCatalogResource::collection(
+            $this->applySearch(RequestCatalog::query(), $filters['search'] ?? null, 'item_name')
+                ->with('providerDepartment')
+                ->when($departmentId, fn ($query) => $query->where('provider_department_id', $departmentId))
+                ->orderBy('item_name')
+                ->get()
+        )->resolve($request));
     }
 
     public function store(StoreRequestCatalogRequest $request): JsonResponse
