@@ -3,6 +3,8 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Brand } from '../../components/layout/AppLayout'
 import { AssetCode, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
+import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
+import { skeletonWidth } from '../../components/ui/skeleton-width'
 import { api, errorMessage } from '../../lib/api'
 import { getToken } from '../../lib/auth'
 import { formatDate } from '../../lib/format'
@@ -71,7 +73,14 @@ export default function PublicAssetPage() {
 
       <main className="mx-auto max-w-lg space-y-4 px-4 py-5">
         {error && <p role="alert" className="mt-6 text-center text-slate-600">{error}</p>}
-        {!error && !asset && <p className="mt-6 text-center text-sm text-slate-500">Memuat…</p>}
+        {!error && !asset && (
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5" aria-busy="true">
+            <LoadingLabel />
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-6 w-3/4" />
+            {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className={`h-4 ${skeletonWidth(i)}`} />)}
+          </section>
+        )}
         {asset && (
           <>
             <section className="rounded-xl border border-slate-200 bg-white p-5">

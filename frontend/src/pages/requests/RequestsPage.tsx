@@ -1,5 +1,6 @@
 import { EllipsisVertical, Plus } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { Badge } from '../../components/ui/Badge'
@@ -12,8 +13,13 @@ import { PageHeader, Panel } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { formatDate } from '../../lib/format'
-import type { Paginated } from '../../types/api'
-import type { RequestCatalog, RequestPrefill, RequestStatus, SuggestionGroup, SupplyRequest } from '../../types/supply'
+import { invalidate } from '../../lib/queries/invalidate'
+import { listConfigs } from '../../lib/queries/list-configs'
+import { useSuggestions, useSupplyRequests } from '../../lib/queries/lists'
+import { useRequestCatalog } from '../../lib/queries/master'
+import { useErrorToast } from '../../lib/useErrorToast'
+import { useListParams } from '../../lib/useListParams'
+import type { RequestCatalog, RequestPrefill, RequestStatus, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import CatalogFormModal from './CatalogFormModal'
 import RequestFormModal from './RequestFormModal'
@@ -75,11 +81,16 @@ function StatusModal({ request, status, onClose, onDone }: {
 
 export default function RequestsPage() {
   const toast = useToast()
+  const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
-  const [catalog, setCatalog] = useState<RequestCatalog[]>([])
-  const [history, setHistory] = useState<Paginated<SupplyRequest> | null>(null)
-  const [suggestions, setSuggestions] = useState<SuggestionGroup[]>([])
-  const [loading, setLoading] = useState(true)
+  const list = useListParams(listConfigs.supplyRequests)
+  const catalogQuery = useRequestCatalog()
+  const historyQuery = useSupplyRequests(list.params)
+  const suggestionsQuery = useSuggestions()
+  useErrorToast(catalogQuery.error, historyQuery.error, suggestionsQuery.error)
+  const catalog = catalogQuery.data
+  const history = historyQuery.data
+  const suggestions = suggestionsQuery.data ?? []
   // Dari Kelengkapan Ruangan: /permintaan?room_id=&catalog_id=&quantity= → buka form terisi otomatis.
   const [modal, setModal] = useState<ModalState>(() => {
     if (!params.has('room_id') && !params.has('catalog_id')) return null
@@ -91,43 +102,29 @@ export default function RequestsPage() {
     }
   })
   const [deleting, setDeleting] = useState<RequestCatalog | null>(null)
-  const [status, setStatus] = useState('')
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const status = list.get('status')
+  const search = list.searchText
 
-  const loadCatalog = useCallback(
-    () => api.get<{ data: RequestCatalog[] }>('/request-catalog').then((r) => setCatalog(r.data.data)),
-    [],
-  )
-
-  const load = useCallback(() => {
-    const query: Record<string, unknown> = { page, per_page: 10 }
-    if (status === 'Belum direspons') query.unresponded = 1
-    else if (status) query.status = status
-    if (search.trim()) query.search = search.trim()
-    return Promise.all([
-      loadCatalog(),
-      api.get<Paginated<SupplyRequest>>('/supply-requests', { params: query }).then((r) => setHistory(r.data)),
-      api.get<{ data: SuggestionGroup[] }>('/supply-requests/suggestions').then((r) => setSuggestions(r.data.data)),
-    ])
-      .catch((e) => toast.error(errorMessage(e)))
-      .finally(() => setLoading(false))
-  }, [loadCatalog, page, status, search, toast])
-
+  // Query sudah dipakai untuk isian awal modal → bersihkan dari URL (filter tabel tetap).
   useEffect(() => {
-    const t = setTimeout(load, 250) // jeda singkat agar ketikan pencarian tidak memicu request berlebih
-    return () => clearTimeout(t)
-  }, [load])
-
-  // Query sudah dipakai untuk isian awal modal → bersihkan dari URL.
-  useEffect(() => {
-    if (params.has('room_id') || params.has('catalog_id')) setParams({}, { replace: true })
+    if (!params.has('room_id') && !params.has('catalog_id')) return
+    setParams(
+      (p) => {
+        ;['room_id', 'catalog_id', 'quantity'].forEach((k) => p.delete(k))
+        return p
+      },
+      { replace: true },
+    )
   }, [params, setParams])
 
   const closeModal = () => setModal(null)
   const done = () => {
     closeModal()
-    load()
+    invalidate.supplyRequests(queryClient)
+  }
+  const catalogDone = () => {
+    closeModal()
+    invalidate.catalog(queryClient)
   }
 
   const removeCatalog = async () => {
@@ -136,7 +133,7 @@ export default function RequestsPage() {
       await api.delete(`/request-catalog/${deleting.id}`)
       toast.success(`"${deleting.item_name}" dihapus dari katalog.`)
       setDeleting(null)
-      load()
+      invalidate.catalog(queryClient)
     } catch (e) {
       toast.error(errorMessage(e))
     }
@@ -167,10 +164,11 @@ export default function RequestsPage() {
   ]
 
   const historyColumns: Column<SupplyRequest>[] = [
-    { header: 'Tanggal', cell: (r) => <span className="whitespace-nowrap">{formatDate(r.request_date)}</span> },
+    { header: 'Tanggal', sortKey: 'request_date', cell: (r) => <span className="whitespace-nowrap">{formatDate(r.request_date)}</span> },
     {
       header: 'Item',
       mobile: 'title',
+      sortKey: 'item_name',
       cell: (r) => (
         <>
           <span className="font-medium">{r.item_name}</span>
@@ -178,7 +176,7 @@ export default function RequestsPage() {
         </>
       ),
     },
-    { header: 'Jumlah', cell: (r) => <span className="tabular-nums">{r.quantity}</span> },
+    { header: 'Jumlah', sortKey: 'quantity', cell: (r) => <span className="tabular-nums">{r.quantity}</span> },
     {
       header: 'Untuk kegiatan',
       cell: (r) => (
@@ -282,7 +280,7 @@ export default function RequestsPage() {
         title="Katalog perlengkapan dari unit lain"
         action={<Button variant="secondary" onClick={() => setModal({ kind: 'catalog', item: null })}><Plus size={16} /> Tambah item</Button>}
       >
-        <DataTable columns={catalogColumns} rows={catalog} rowKey={(c) => c.id} loading={loading} emptyText="Katalog masih kosong." />
+        <DataTable columns={catalogColumns} rows={catalog} rowKey={(c) => c.id} loading={catalogQuery.isPending} emptyText="Katalog masih kosong." />
       </Card>
 
       <Card title="Riwayat permintaan">
@@ -290,20 +288,14 @@ export default function RequestsPage() {
           <Input
             className="sm:max-w-xs"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => list.setSearchText(e.target.value)}
             placeholder="Cari item atau kegiatan"
             aria-label="Cari permintaan"
           />
           <Select
             className="sm:w-auto"
             value={status}
-            onChange={(e) => {
-              setStatus(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => list.setFilter('status', e.target.value)}
             aria-label="Status"
           >
             <option value="">Semua status</option>
@@ -314,18 +306,21 @@ export default function RequestsPage() {
           columns={historyColumns}
           rows={history?.data ?? []}
           rowKey={(r) => r.id}
-          loading={loading}
+          loading={historyQuery.isPending}
+          fetching={historyQuery.isPlaceholderData}
           emptyText="Belum ada permintaan."
           meta={history?.meta}
           unit="permintaan"
-          onPageChange={setPage}
+          onPageChange={list.setPage}
+          sort={list.sort}
+          onSortChange={list.setSort}
         />
       </Card>
 
       {modal?.kind === 'request' && (
         <RequestFormModal catalog={catalog} request={modal.request} prefill={modal.prefill} onClose={closeModal} onDone={done} />
       )}
-      {modal?.kind === 'catalog' && <CatalogFormModal item={modal.item} onClose={closeModal} onDone={done} />}
+      {modal?.kind === 'catalog' && <CatalogFormModal item={modal.item} onClose={closeModal} onDone={catalogDone} />}
       {modal?.kind === 'status' && <StatusModal request={modal.request} status={modal.status} onClose={closeModal} onDone={done} />}
 
       <ConfirmDialog

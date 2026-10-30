@@ -1,10 +1,12 @@
 import {
   Boxes, ClipboardCheck, FileKey, HandHelping, LayoutDashboard, LogOut, Menu, PackageOpen, Send, Settings, X,
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import icon from '../../assets/icon.png'
 import { api } from '../../lib/api'
+import { prefetchRoute } from '../../lib/queries/prefetch'
 import { clearSession, getUser } from '../../lib/auth'
 
 // Isi modul mengikuti SPEC §3. Scan QR dibuka dari tombol di Dashboard (keputusan pengguna), tidak di menu.
@@ -39,6 +41,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 export default function AppLayout() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const user = getUser()
 
@@ -73,7 +76,15 @@ export default function AppLayout() {
 
         <nav className="flex-1 space-y-1 overflow-y-auto">
           {menu.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)} className={itemClass}>
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              onClick={() => setOpen(false)}
+              onMouseEnter={() => prefetchRoute(queryClient, to)}
+              onFocus={() => prefetchRoute(queryClient, to)}
+              className={itemClass}
+            >
               <Icon size={18} className="shrink-0" />
               <span>{label}</span>
             </NavLink>
@@ -87,7 +98,13 @@ export default function AppLayout() {
           </div>
 
           <p className="px-3 pb-1 pt-5 text-xs font-semibold text-[#b5cadb]">Pengaturan</p>
-          <NavLink to="/pengaturan/data-master" onClick={() => setOpen(false)} className={itemClass}>
+          <NavLink
+            to="/pengaturan/data-master"
+            onClick={() => setOpen(false)}
+            onMouseEnter={() => prefetchRoute(queryClient, '/pengaturan/data-master')}
+            onFocus={() => prefetchRoute(queryClient, '/pengaturan/data-master')}
+            className={itemClass}
+          >
             <Settings size={18} className="shrink-0" />
             <span>Data Master</span>
           </NavLink>

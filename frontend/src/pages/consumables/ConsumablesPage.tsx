@@ -1,5 +1,6 @@
 import { EllipsisVertical, Minus, Plus } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import ExportButton from '../../components/ExportButton'
 import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -10,12 +11,22 @@ import DropdownMenu from '../../components/ui/DropdownMenu'
 import { FormField, Input, Select } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
+import { invalidate } from '../../lib/queries/invalidate'
+import { queryKeys } from '../../lib/queries/keys'
+import { listConfigs } from '../../lib/queries/list-configs'
+import { useConsumables } from '../../lib/queries/lists'
+import { useErrorToast } from '../../lib/useErrorToast'
+import { useListParams } from '../../lib/useListParams'
 import type { Paginated } from '../../types/api'
-import type { ConsumableItem, ConsumableUsage } from '../../types/supply'
+import type { ConsumableItem, ConsumableStatus, ConsumableUsage } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import ConsumableFormModal from './ConsumableFormModal'
 
 const statusColor = { Aman: 'green', Menipis: 'amber', Habis: 'red' } as const
+
+/** Rumus sama dengan backend (ConsumableStatus): Habis = 0, Menipis ≤ minimum, selain itu Aman. */
+const stockStatus = (quantity: number, min: number): ConsumableStatus =>
+  quantity <= 0 ? 'Habis' : quantity <= min ? 'Menipis' : 'Aman'
 
 type ModalState = { kind: 'form'; item: ConsumableItem | null } | { kind: 'quantity'; item: ConsumableItem } | null
 
@@ -40,42 +51,45 @@ function QuantityModal({ item, onClose, onDone }: { item: ConsumableItem; onClos
 
 export default function ConsumablesPage() {
   const toast = useToast()
-  const [result, setResult] = useState<Paginated<ConsumableItem> | null>(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [modal, setModal] = useState<ModalState>(null)
-  const [busyId, setBusyId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState<{ item: ConsumableItem; usage: ConsumableUsage[] } | null>(null)
-  const [status, setStatus] = useState('')
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const list = useListParams(listConfigs.consumables)
+  const consumables = useConsumables(list.params)
+  useErrorToast(consumables.error)
+  const result = consumables.data
+  const status = list.get('status')
+  const search = list.searchText
+  const listKey = queryKeys.consumables.list(list.params)
 
-  const load = useCallback(() => {
-    const params: Record<string, unknown> = { page, per_page: 20 }
-    if (status) params.status = status
-    if (search.trim()) params.search = search.trim()
-    return api
-      .get<Paginated<ConsumableItem>>('/consumables', { params })
-      .then((r) => setResult(r.data))
-      .catch((e) => toast.error(errorMessage(e)))
-      .finally(() => setLoading(false))
-  }, [page, status, search, toast])
+  const load = () => invalidate.consumables(queryClient)
 
-  useEffect(() => {
-    const t = setTimeout(load, 250) // jeda singkat agar ketikan pencarian tidak memicu request berlebih
-    return () => clearTimeout(t)
-  }, [load])
-
-  const adjust = async (item: ConsumableItem, adjustment: number) => {
-    setBusyId(item.id)
-    try {
-      const r = await api.patch<{ data: ConsumableItem }>(`/consumables/${item.id}/quantity`, { adjustment })
-      setResult((cur) => cur && { ...cur, data: cur.data.map((c) => (c.id === item.id ? r.data.data : c)) })
-    } catch (e) {
+  // +/- jumlah: optimistic (angka & status langsung berubah), dikembalikan jika server menolak.
+  const adjustMutation = useMutation({
+    mutationFn: ({ item, adjustment }: { item: ConsumableItem; adjustment: number }) =>
+      api.patch<{ data: ConsumableItem }>(`/consumables/${item.id}/quantity`, { adjustment }),
+    onMutate: async ({ item, adjustment }) => {
+      await queryClient.cancelQueries({ queryKey: listKey })
+      const previous = queryClient.getQueryData<Paginated<ConsumableItem>>(listKey)
+      queryClient.setQueryData<Paginated<ConsumableItem>>(listKey, (cur) =>
+        cur && {
+          ...cur,
+          data: cur.data.map((c) => {
+            if (c.id !== item.id) return c
+            const quantity = Math.max(0, c.quantity + adjustment)
+            return { ...c, quantity, status: stockStatus(quantity, c.min_quantity) }
+          }),
+        },
+      )
+      return { previous }
+    },
+    onError: (e, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(listKey, context.previous)
       toast.error(errorMessage(e))
-    } finally {
-      setBusyId(null)
-    }
-  }
+    },
+    onSettled: () => load(),
+  })
+  const adjust = (item: ConsumableItem, adjustment: number) => adjustMutation.mutate({ item, adjustment })
 
   const askDelete = async (item: ConsumableItem) => {
     try {
@@ -108,6 +122,7 @@ export default function ConsumablesPage() {
       header: 'Nama',
       headerClassName: 'text-center',
       mobile: 'title',
+      sortKey: 'name',
       cell: (c) => (
         <>
           <span className="font-medium">{c.name}</span>
@@ -115,16 +130,17 @@ export default function ConsumablesPage() {
         </>
       ),
     },
-    { header: 'Kategori', className: 'text-center', cell: (c) => c.category ?? '-' },
+    { header: 'Kategori', className: 'text-center', sortKey: 'category', cell: (c) => c.category ?? '-' },
     {
       header: 'Jumlah',
       className: 'text-center',
+      sortKey: 'quantity',
       cell: (c) => (
         <div className="flex items-center gap-1 md:justify-center">
           <button
             type="button"
             aria-label={`Kurangi ${c.name}`}
-            disabled={busyId === c.id || c.quantity === 0}
+            disabled={c.quantity === 0}
             onClick={() => adjust(c, -1)}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
           >
@@ -141,7 +157,6 @@ export default function ConsumablesPage() {
           <button
             type="button"
             aria-label={`Tambah ${c.name}`}
-            disabled={busyId === c.id}
             onClick={() => adjust(c, 1)}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
           >
@@ -194,20 +209,14 @@ export default function ConsumablesPage() {
         <Input
           className="sm:max-w-xs"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(1)
-          }}
+          onChange={(e) => list.setSearchText(e.target.value)}
           placeholder="Cari nama barang"
           aria-label="Cari barang"
         />
         <Select
           className="sm:w-auto"
           value={status}
-          onChange={(e) => {
-            setStatus(e.target.value)
-            setPage(1)
-          }}
+          onChange={(e) => list.setFilter('status', e.target.value)}
           aria-label="Status"
         >
           <option value="">Semua status</option>
@@ -221,11 +230,14 @@ export default function ConsumablesPage() {
         columns={columns}
         rows={result?.data ?? []}
         rowKey={(c) => c.id}
-        loading={loading}
+        loading={consumables.isPending}
+        fetching={consumables.isPlaceholderData}
         emptyText="Belum ada barang habis pakai."
         meta={result?.meta}
         unit="barang"
-        onPageChange={setPage}
+        onPageChange={list.setPage}
+        sort={list.sort}
+        onSortChange={list.setSort}
       />
 
       {modal?.kind === 'form' && <ConsumableFormModal item={modal.item} onClose={() => setModal(null)} onDone={done} />}

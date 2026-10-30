@@ -1,3 +1,5 @@
+import { queryClient } from './query-client'
+
 const TOKEN_KEY = 'asset_token'
 const USER_KEY = 'asset_user'
 
@@ -36,4 +38,5 @@ export function clearSession() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
   verified = false
+  queryClient.clear() // data staf tidak tertinggal di cache untuk sesi berikutnya
 }

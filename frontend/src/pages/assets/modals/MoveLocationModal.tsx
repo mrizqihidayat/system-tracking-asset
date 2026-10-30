@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import EntityCombobox from '../../../components/ui/EntityCombobox'
 import { FormField, Textarea } from '../../../components/ui/FormField'
 import { useToast } from '../../../components/ui/toast-context'
 import { api, errorMessage } from '../../../lib/api'
-import { createBuilding, createRoom, fetchBuildings, fetchRooms } from '../../../lib/lookups'
-import type { Asset, Building, Room } from '../../../types/asset'
+import { createBuilding, createRoom } from '../../../lib/lookups'
+import { useBuildings, useRooms } from '../../../lib/queries/master'
+import { useErrorToast } from '../../../lib/useErrorToast'
+import type { Asset } from '../../../types/asset'
 import ActionModal from './ActionModal'
 
 interface Props {
@@ -15,20 +17,13 @@ interface Props {
 
 export default function MoveLocationModal({ asset, onClose, onDone }: Props) {
   const toast = useToast()
-  const [buildings, setBuildings] = useState<Building[]>([])
-  const [rooms, setRooms] = useState<Room[]>([])
   const [buildingId, setBuildingId] = useState<number | null>(asset.room?.building_id ?? null)
   const [roomId, setRoomId] = useState<number | null>(null)
   const [note, setNote] = useState('')
 
-  useEffect(() => {
-    fetchBuildings().then(setBuildings).catch((e) => toast.error(errorMessage(e)))
-  }, [toast])
-
-  useEffect(() => {
-    if (!buildingId) return
-    fetchRooms(buildingId).then(setRooms).catch((e) => toast.error(errorMessage(e)))
-  }, [buildingId, toast])
+  const { data: buildings, error: buildingsError } = useBuildings()
+  const { data: rooms, error: roomsError } = useRooms(buildingId, true)
+  useErrorToast(buildingsError, roomsError)
 
   const guarded = async <T,>(fn: () => Promise<T>) => {
     try {
@@ -42,13 +37,11 @@ export default function MoveLocationModal({ asset, onClose, onDone }: Props) {
   const addBuilding = (name: string) =>
     guarded(async () => {
       const b = await createBuilding(name)
-      setBuildings((l) => [...l, b])
       return { id: b.id, label: b.name }
     })
   const addRoom = (name: string) =>
     guarded(async () => {
       const r = await createRoom(buildingId!, name)
-      setRooms((l) => [...l, r])
       return { id: r.id, label: r.name }
     })
 

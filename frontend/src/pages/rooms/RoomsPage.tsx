@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { Badge } from '../../components/ui/Badge'
@@ -7,12 +8,17 @@ import Button from '../../components/ui/Button'
 import { buttonClass } from '../../components/ui/button-class'
 import { controlClass } from '../../components/ui/control-class'
 import DataTable, { type Column } from '../../components/ui/DataTable'
-import { Muted, PageHeader } from '../../components/ui/Page'
+import { PageHeader } from '../../components/ui/Page'
+import { LoadingLabel, Skeleton, TableSkeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { formatDateTime } from '../../lib/format'
 import { createBuilding, createRoom } from '../../lib/lookups'
-import type { Checklist, ChecklistResult, ReadinessBuilding, RoomStandard } from '../../types/room'
+import { invalidate } from '../../lib/queries/invalidate'
+import { queryKeys } from '../../lib/queries/keys'
+import { useChecklist, useReadiness } from '../../lib/queries/lists'
+import { useErrorToast } from '../../lib/useErrorToast'
+import type { Checklist, ChecklistResult, RoomStandard } from '../../types/room'
 import NameModal from './NameModal'
 import StandardsModal from './StandardsModal'
 
@@ -39,54 +45,36 @@ export default function RoomsPage() {
   const { building: buildingSlug, room: roomSlug } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
-  const [buildings, setBuildings] = useState<ReadinessBuilding[] | null>(null)
-  const [checklist, setChecklist] = useState<Checklist | null>(null)
+  const queryClient = useQueryClient()
+  const readiness = useReadiness()
+  const buildings = readiness.data ?? null
   const [actual, setActual] = useState<Record<number, string>>({})
+  const [actualFrom, setActualFrom] = useState<Checklist | null>(null)
   const [saving, setSaving] = useState(false)
   const [filling, setFilling] = useState<number | null>(null)
   const [modal, setModal] = useState<'standards' | 'building' | 'room' | null>(null)
-
-  const loadReadiness = useCallback(
-    () =>
-      api
-        .get<{ data: ReadinessBuilding[] }>('/room-readiness')
-        .then((res) => setBuildings(res.data.data))
-        .catch((e) => toast.error(errorMessage(e))),
-    [toast],
-  )
-
-  useEffect(() => {
-    loadReadiness()
-  }, [loadReadiness])
 
   // Slug URL → id dari data yang sudah dimuat (API tetap memakai id).
   const building = buildings?.find((b) => b.slug === buildingSlug)
   const room = building?.rooms.find((r) => r.slug === roomSlug)
   const roomId = room?.id
 
-  const loadChecklist = useCallback(
-    (id: number | undefined) => {
-      if (!id) return Promise.resolve()
-      return api
-        .get<Checklist>(`/rooms/${id}/checklist`)
-        .then((res) => {
-          setChecklist(res.data)
-          setActual(
-            Object.fromEntries(
-              res.data.data.filter((s) => s.count_method === 'Manual').map((s) => [s.id, s.present_quantity?.toString() ?? '']),
-            ),
-          )
-        })
-        .catch((e) => toast.error(errorMessage(e)))
-    },
-    [toast],
-  )
+  const checklistQuery = useChecklist(roomId)
+  const checklist = checklistQuery.data ?? null
+  useErrorToast(readiness.error, checklistQuery.error)
 
-  useEffect(() => {
-    loadChecklist(roomId)
-  }, [loadChecklist, roomId])
+  // Data checklist baru (ruangan lain / setelah simpan) → isi ulang kolom Ada baris Manual.
+  if (checklist && checklist !== actualFrom) {
+    setActualFrom(checklist)
+    setActual(
+      Object.fromEntries(
+        checklist.data.filter((s) => s.count_method === 'Manual').map((s) => [s.id, s.present_quantity?.toString() ?? '']),
+      ),
+    )
+  }
 
-  const reloadAll = () => Promise.all([loadChecklist(roomId), loadReadiness()])
+  const reloadAll = () => invalidate.rooms(queryClient)
+  const reloadReadiness = () => queryClient.invalidateQueries({ queryKey: queryKeys.rooms.readiness() })
 
   // Checklist ruangan lain yang masih tampil dianggap belum dimuat.
   const checklistReady = checklist !== null && checklist.meta.room.id === roomId
@@ -105,7 +93,21 @@ export default function RoomsPage() {
     [checklist, checklistReady, actual],
   )
 
-  if (!buildings) return <Muted>Memuat…</Muted>
+  if (!buildings) {
+    return (
+      <div className="space-y-5" aria-busy="true">
+        <LoadingLabel />
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-4 w-80 max-w-full" />
+        </div>
+        <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-5">
+          {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-10 w-28 rounded-full" />)}
+        </div>
+        <TableSkeleton columns={6} />
+      </div>
+    )
+  }
 
   // /kelengkapan-ruangan atau slug tidak cocok → gedung & ruangan pertama.
   if (!building || (!room && building.rooms.length > 0)) {
@@ -360,7 +362,7 @@ export default function RoomsPage() {
           onClose={() => setModal(null)}
           onSubmit={async (name) => {
             const b = await createBuilding(name)
-            await loadReadiness()
+            await reloadReadiness()
             setModal(null)
             navigate(`${BASE}/${b.slug}`)
           }}
@@ -373,7 +375,7 @@ export default function RoomsPage() {
           onClose={() => setModal(null)}
           onSubmit={async (name) => {
             const r = await createRoom(building.id, name)
-            await loadReadiness()
+            await reloadReadiness()
             setModal(null)
             navigate(`${BASE}/${building.slug}/${r.slug}`)
           }}

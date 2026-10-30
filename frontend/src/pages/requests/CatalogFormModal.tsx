@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Combobox from '../../components/ui/Combobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
-import { fetchDepartments } from '../../lib/lookups'
-import type { Department } from '../../types/asset'
+import { useDepartments, useRequestMethods } from '../../lib/queries/master'
 import type { RequestCatalog } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 
@@ -17,19 +16,14 @@ interface Props {
 /** Tambah/ubah item katalog perlengkapan dari unit lain (SPEC §9). */
 export default function CatalogFormModal({ item, onClose, onDone }: Props) {
   const toast = useToast()
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [methods, setMethods] = useState<string[]>([])
+  const departments = useDepartments().data.filter((d) => !d.is_internal)
+  const { data: methods } = useRequestMethods()
   const [name, setName] = useState(item?.item_name ?? '')
   const [providerId, setProviderId] = useState<number | null>(item?.provider_department?.id ?? null)
   const [method, setMethod] = useState(item?.request_method ?? '')
   const [mustReturn, setMustReturn] = useState(item?.must_return ?? false)
   const [leadTime, setLeadTime] = useState(String(item?.lead_time_days ?? 3))
   const [note, setNote] = useState(item?.note ?? '')
-
-  useEffect(() => {
-    fetchDepartments().then((d) => setDepartments(d.filter((x) => !x.is_internal))).catch(() => undefined)
-    api.get<{ data: string[] }>('/lookups/request-methods').then((r) => setMethods(r.data.data)).catch(() => undefined)
-  }, [])
 
   const submit = async () => {
     const payload = {

@@ -1,4 +1,5 @@
 import { TriangleAlert } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AssetCode } from '../../components/ui/Badge'
@@ -6,16 +7,17 @@ import Button from '../../components/ui/Button'
 import { buttonClass } from '../../components/ui/button-class'
 import EntityCombobox from '../../components/ui/EntityCombobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
-import { Muted, PageHeader } from '../../components/ui/Page'
+import { PageHeader } from '../../components/ui/Page'
+import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import AssetFilesManager from './AssetFilesManager'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
-import {
-  createBuilding, createDepartment, createRoom, fetchAssetTypes, fetchBuildings, fetchDepartments, fetchRooms,
-} from '../../lib/lookups'
-import {
-  CONDITIONS, type Asset, type AssetType, type Building, type CodePreview, type Condition, type Department, type Room,
-} from '../../types/asset'
+import { createBuilding, createDepartment, createRoom } from '../../lib/lookups'
+import { invalidate } from '../../lib/queries/invalidate'
+import { assetQueries } from '../../lib/queries/lists'
+import { useAssetTypes, useBuildings, useDepartments, useRooms } from '../../lib/queries/master'
+import { useErrorToast } from '../../lib/useErrorToast'
+import { CONDITIONS, type Asset, type CodePreview, type Condition } from '../../types/asset'
 
 interface FormState {
   asset_type_id: number | null
@@ -58,6 +60,7 @@ export default function AssetFormPage() {
   const editing = id !== undefined
   const navigate = useNavigate()
   const toast = useToast()
+  const queryClient = useQueryClient()
 
   const [form, setForm] = useState<FormState>(empty)
   const [original, setOriginal] = useState<Asset | null>(null)
@@ -65,29 +68,21 @@ export default function AssetFormPage() {
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const [types, setTypes] = useState<AssetType[]>([])
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [buildings, setBuildings] = useState<Building[]>([])
-  const [rooms, setRooms] = useState<Room[]>([])
+  const { data: types, error: typesError } = useAssetTypes()
+  const { data: departments, error: departmentsError } = useDepartments()
+  const { data: buildings, error: buildingsError } = useBuildings()
+  const { data: rooms, error: roomsError } = useRooms(form.building_id, true)
+  useErrorToast(typesError, departmentsError, buildingsError, roomsError)
   const [preview, setPreview] = useState<{ typeId: number; data: CodePreview } | null>(null)
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
 
   useEffect(() => {
-    Promise.all([fetchAssetTypes(), fetchDepartments(), fetchBuildings()])
-      .then(([t, d, b]) => {
-        setTypes(t)
-        setDepartments(d)
-        setBuildings(b)
-      })
-      .catch((e) => toast.error(errorMessage(e)))
-  }, [toast])
-
-  useEffect(() => {
     if (!editing) return
-    api
-      .get<{ data: Asset }>(`/assets/${id}`)
-      .then(({ data: { data: a } }) => {
+    // Dari cache detail bila masih segar (mis. baru membuka halaman detail), selain itu dari API.
+    queryClient
+      .fetchQuery(assetQueries.detail(id))
+      .then(({ data: a }) => {
         setOriginal(a)
         setForm({
           asset_type_id: a.asset_type?.id ?? null,
@@ -112,14 +107,7 @@ export default function AssetFormPage() {
         navigate('/daftar-aset', { replace: true })
       })
       .finally(() => setLoading(false))
-  }, [editing, id, navigate, toast])
-
-  useEffect(() => {
-    if (!form.building_id) return
-    fetchRooms(form.building_id)
-      .then(setRooms)
-      .catch((e) => toast.error(errorMessage(e)))
-  }, [form.building_id, toast])
+  }, [editing, id, navigate, queryClient, toast])
 
   // Peringatan kode baru (hanya saat jenis diganti pada form Ubah).
   const originalTypeId = original?.asset_type?.id ?? null
@@ -158,19 +146,16 @@ export default function AssetFormPage() {
   const addDepartment = (name: string) =>
     guarded(async () => {
       const d = await createDepartment(name)
-      setDepartments((list) => [...list, d])
       return { id: d.id, label: d.name }
     })
   const addBuilding = (name: string) =>
     guarded(async () => {
       const b = await createBuilding(name)
-      setBuildings((list) => [...list, b])
       return { id: b.id, label: b.name }
     })
   const addRoom = (name: string) =>
     guarded(async () => {
       const r = await createRoom(form.building_id!, name)
-      setRooms((list) => [...list, r])
       return { id: r.id, label: r.name }
     })
 
@@ -209,6 +194,7 @@ export default function AssetFormPage() {
         : await api.post<{ data: Asset }>('/assets', payload)
       const asset = res.data.data
       toast.success(editing ? `Data ${asset.code} disimpan.` : `Aset ${asset.code} ditambahkan.`)
+      invalidate.assets(queryClient)
       navigate(`/daftar-aset/${asset.id}`)
     } catch (e) {
       setErrors(fieldErrors(e))
@@ -218,7 +204,22 @@ export default function AssetFormPage() {
     }
   }
 
-  if (loading) return <Muted>Memuat…</Muted>
+  if (loading) {
+    return (
+      <div className="space-y-5" aria-busy="true">
+        <LoadingLabel />
+        <Skeleton className="h-7 w-48" />
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="space-y-1.5">
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-3xl space-y-5">

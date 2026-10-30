@@ -70,6 +70,9 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
   Kriteria: hanya frontend (`pages/loans/AssetPicker.tsx`); `npm run build` & `npm run lint` lulus.
 - [x] **T26e Performa backend [Lengkap]** — index FK/filter/urutan (migration baru), parameter daftar seragam (`page`/`per_page`/`search`/`sort` lewat `ValidatesListQuery` + `PaginatesList`), cache berversi (`AppCache`, grup master & ops) dengan invalidasi `CacheInvalidationObserver` setelah commit, dashboard dipecah 3 endpoint, riwayat aset dipaginasi.
   Kriteria: `php artisan test` lulus (termasuk `ListPerformanceTest`); bentuk respons daftar tetap paginator Laravel.
+- [x] **T26f Performa frontend [Lengkap]** — React Query (cache, `keepPreviousData`, prefetch hover), hook per resource + query key terpusat, tabel generik (paginasi/search debounce/filter/sort lewat server, sinkron URL), data master staleTime 10 menit, invalidasi setelah mutasi, skeleton menggantikan teks "Memuat…".
+  Kriteria: `npm run build` & `npm run lint` lulus; tampilan tidak berubah selain skeleton & perilaku tabel.
+  Selesai: `lib/query-client.ts` (staleTime 60 dtk, tanpa refetch saat fokus, 4xx tidak diulang), `lib/queries/` (`keys.ts` query key, `master.ts` hook data master staleTime 10 mnt, `lists.ts` daftar/detail, `dashboard.ts`, `invalidate.ts` kelompok invalidasi, `prefetch.ts` hover sidebar & baris aset, `list-configs.ts`), `lib/useListParams.ts` (state tabel di URL, debounce 300 ms), `DataTable` (sort header, skeleton, redup saat ganti halaman, `onRowHover`), `components/ui/Skeleton.tsx`. Semua halaman staf memakai pola ini; tabel "Sedang dipinjam" kini dipaginasi server (sebelumnya terpotong di 100); riwayat aset "Tampilkan riwayat lebih lama"; +/− stok optimistic. Cache dikosongkan saat logout/401. Halaman publik QR & ScanCode tetap fetch biasa (hanya skeleton).
 
 ## Penyelesaian (3–4 Nov)
 - [ ] **T27 QA & demo** — skenario: login → tambah aset → cetak label → scan → pinjam → terima kembali rusak → konfirmasi → servis → cek ruangan kurang → buat permintaan → stok menipis → ekspor.
@@ -83,6 +86,7 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - (T26e) Cache memakai `CACHE_STORE` (lokal `file`). Saat deploy pilih `redis`/`file`; store `database` tetap jalan tetapi setiap baca cache = satu query ke Supabase.
 - (T26e) Invalidasi cache lewat event model; perubahan lewat query builder massal (`Model::query()->update()`) tidak memicu observer. Saat ini semua mass update diikuti simpan/hapus model yang diamati; kode baru perlu menjaga hal yang sama (TTL 10 mnt/1 jam jadi jaring pengaman).
 - (T26e) Belum dikerjakan: index trigram (`pg_trgm`) untuk pencarian `like '%x%'` (data masih kecil, tidak jalan di sqlite test); Sanctum menulis `last_used_at` di setiap request (satu query tulis tambahan).
+- (T26f) Peringatan build chunk > 500 kB sudah ada sebelum T26f (commit b8174e9: 671 kB / 217 kB gzip; setelah T26f: 719 kB / 231 kB gzip). Bukan error; lazy loading per route bisa dipertimbangkan nanti.
 - (T26e) `GET /dashboard` lama dihapus (diganti 3 endpoint); aman karena versi HP adalah web responsif yang sama, bukan aplikasi terpisah.
 - (T4→T18) `ExampleTest` bawaan (Feature & Unit) dihapus; `GET /` kini JSON `{app, status: ok}` (`HealthTest`).
 - (T4) RLS diaktifkan oleh migration `enable_rls_on_all_tables` hanya untuk tabel yang ada saat itu; tabel baru di task berikutnya wajib `ENABLE ROW LEVEL SECURITY` di migration-nya sendiri.

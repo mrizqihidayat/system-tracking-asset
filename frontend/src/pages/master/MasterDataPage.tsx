@@ -1,12 +1,15 @@
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCallback, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AssetCode, Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { PageHeader } from '../../components/ui/Page'
-import { useToast } from '../../components/ui/toast-context'
-import { errorMessage } from '../../lib/api'
-import { fetchAssetTypes, fetchBuildings, fetchCategories, fetchDepartments, fetchRooms } from '../../lib/lookups'
+import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
+import { skeletonWidth } from '../../components/ui/skeleton-width'
+import { invalidate } from '../../lib/queries/invalidate'
+import { useAssetTypes, useBuildings, useCategories, useDepartments, useRooms } from '../../lib/queries/master'
+import { useErrorToast } from '../../lib/useErrorToast'
 import type { AssetType, Building, Category, Department, Room } from '../../types/asset'
 import { MasterDeleteModal, MasterFormModal, type MasterTarget } from './MasterModals'
 
@@ -68,31 +71,24 @@ function Group({ title, meta, open, onToggle, actions, children }: {
 }
 
 export default function MasterDataPage() {
-  const toast = useToast()
+  const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
   const tab = (TABS.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'gedung') as Tab
-  const [data, setData] = useState<Data | null>(null)
+  const queries = [useBuildings(), useRooms(), useDepartments(), useCategories(), useAssetTypes()] as const
+  useErrorToast(...queries.map((q) => q.error))
+  const [buildings, rooms, departments, categories, types] = queries
+  const data: Data | null = queries.every((q) => q.isSuccess)
+    ? { buildings: buildings.data, rooms: rooms.data, departments: departments.data, categories: categories.data, types: types.data }
+    : null
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [form, setForm] = useState<FormState | null>(null)
   const [deleting, setDeleting] = useState<MasterTarget | null>(null)
-
-  const load = useCallback(
-    () =>
-      Promise.all([fetchBuildings(), fetchRooms(), fetchDepartments(), fetchCategories(), fetchAssetTypes()])
-        .then(([buildings, rooms, departments, categories, types]) => setData({ buildings, rooms, departments, categories, types }))
-        .catch((e) => toast.error(errorMessage(e))),
-    [toast],
-  )
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   const toggle = (key: string) => setOpen((o) => ({ ...o, [key]: !o[key] }))
   const done = () => {
     setForm(null)
     setDeleting(null)
-    load()
+    invalidate.master(queryClient)
   }
   const closeDelete = useCallback(() => setDeleting(null), [])
 
@@ -109,7 +105,17 @@ export default function MasterDataPage() {
     </Button>
   )
 
-  let body: ReactNode = <p className="text-sm text-slate-500">Memuat…</p>
+  let body: ReactNode = (
+    <ul className="divide-y divide-slate-100" aria-busy="true">
+      <LoadingLabel />
+      {Array.from({ length: 5 }, (_, i) => (
+        <li key={i} className="flex items-center justify-between gap-3 py-3.5">
+          <Skeleton className={`h-4 ${skeletonWidth(i)} max-w-64`} />
+          <Skeleton className="h-4 w-20" />
+        </li>
+      ))}
+    </ul>
+  )
 
   if (data && tab === 'gedung') {
     body = (

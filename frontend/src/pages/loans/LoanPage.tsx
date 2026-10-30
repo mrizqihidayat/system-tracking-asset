@@ -1,5 +1,6 @@
 import { EllipsisVertical, Search } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { AssetCode, Badge } from '../../components/ui/Badge'
@@ -8,10 +9,12 @@ import Button from '../../components/ui/Button'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu from '../../components/ui/DropdownMenu'
 import { Input, Select } from '../../components/ui/FormField'
-import { useToast } from '../../components/ui/toast-context'
-import { api, errorMessage } from '../../lib/api'
 import { formatDate } from '../../lib/format'
-import type { Paginated } from '../../types/api'
+import { invalidate } from '../../lib/queries/invalidate'
+import { listConfigs } from '../../lib/queries/list-configs'
+import { useLoans } from '../../lib/queries/lists'
+import { useErrorToast } from '../../lib/useErrorToast'
+import { useListParams } from '../../lib/useListParams'
 import type { Loan, LoanStatus } from '../../types/loan'
 import CancelLoanModal from './CancelLoanModal'
 import ConfirmDamageModal from './ConfirmDamageModal'
@@ -40,46 +43,23 @@ const assetCell = (l: Loan) => (
 )
 
 export default function LoanPage() {
-  const toast = useToast()
-  const [active, setActive] = useState<Paginated<Loan> | null>(null)
-  const [history, setHistory] = useState<Paginated<Loan> | null>(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [modal, setModal] = useState<ModalState>(null)
-  const [status, setStatus] = useState('')
-  const [pending, setPending] = useState(false)
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const activeList = useListParams(listConfigs.activeLoans)
+  const historyList = useListParams(listConfigs.loanHistory)
+  const active = useLoans(activeList.params)
+  const history = useLoans(historyList.params)
+  useErrorToast(active.error, history.error)
 
-  const load = useCallback(() => {
-    const params: Record<string, unknown> = { page, per_page: 10 }
-    if (status) params.status = status
-    if (pending) params.pending_confirmation = 1
-    if (search.trim()) params.search = search.trim()
-    return Promise.all([
-      api.get<Paginated<Loan>>('/loans', { params: { status: 'Dipinjam', per_page: 100 } }),
-      api.get<Paginated<Loan>>('/loans', { params }),
-    ])
-      .then(([a, h]) => {
-        setActive(a.data)
-        setHistory(h.data)
-      })
-      .catch((e) => toast.error(errorMessage(e)))
-      .finally(() => setLoading(false))
-  }, [page, status, pending, search, toast])
+  const status = historyList.get('status')
+  const pending = historyList.get('pending_confirmation') === '1'
+  const search = historyList.searchText
 
-  useEffect(() => {
-    const t = setTimeout(load, 250) // jeda singkat agar ketikan pencarian tidak memicu request berlebih
-    return () => clearTimeout(t)
-  }, [load])
-
+  const refresh = () => invalidate.loans(queryClient)
   const closeModal = () => setModal(null)
   const done = () => {
     closeModal()
-    load()
-  }
-  const filter = <T,>(setter: (v: T) => void) => (v: T) => {
-    setter(v)
-    setPage(1)
+    refresh()
   }
 
   const activeColumns: Column<Loan>[] = [
@@ -124,8 +104,8 @@ export default function LoanPage() {
         </>
       ),
     },
-    { header: 'Tgl. pinjam', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.borrow_date)}</span> },
-    { header: 'Rencana kembali', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.due_date)}</span> },
+    { header: 'Tgl. pinjam', sortKey: 'borrow_date', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.borrow_date)}</span> },
+    { header: 'Rencana kembali', sortKey: 'due_date', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.due_date)}</span> },
     {
       header: 'Status',
       mobile: 'badge',
@@ -161,14 +141,24 @@ export default function LoanPage() {
       />
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-        <LoanForm onSaved={load} />
+        <LoanForm onSaved={refresh} />
 
         <section className="space-y-3">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-semibold">Sedang dipinjam</h2>
-            <span className="text-sm text-slate-500">{active?.meta.total ?? 0} aset</span>
+            <span className="text-sm text-slate-500">{active.data?.meta.total ?? 0} aset</span>
           </div>
-          <DataTable columns={activeColumns} rows={active?.data ?? []} rowKey={(l) => l.id} loading={loading} emptyText="Tidak ada aset yang sedang dipinjam." />
+          <DataTable
+            columns={activeColumns}
+            rows={active.data?.data ?? []}
+            rowKey={(l) => l.id}
+            loading={active.isPending}
+            fetching={active.isPlaceholderData}
+            emptyText="Tidak ada aset yang sedang dipinjam."
+            meta={active.data?.meta}
+            unit="aset"
+            onPageChange={activeList.setPage}
+          />
           <p className="text-xs text-slate-500">
             Saat menerima kembali, admin memilih kondisi aset. Kondisi selain Baik membuat status aset berubah menjadi Perbaikan
             (Rusak Ringan bisa dipilih Tersedia atau Perbaikan).
@@ -184,12 +174,12 @@ export default function LoanPage() {
             <Input
               className="pl-9"
               value={search}
-              onChange={(e) => filter(setSearch)(e.target.value)}
+              onChange={(e) => historyList.setSearchText(e.target.value)}
               placeholder="Cari peminjam, unit, kode, atau nama aset"
               aria-label="Cari peminjaman"
             />
           </div>
-          <Select className="sm:w-auto" value={status} onChange={(e) => filter(setStatus)(e.target.value as LoanStatus | '')} aria-label="Status">
+          <Select className="sm:w-auto" value={status} onChange={(e) => historyList.setFilter('status', e.target.value as LoanStatus | '')} aria-label="Status">
             <option value="">Semua status</option>
             <option>Dipinjam</option>
             <option>Dikembalikan</option>
@@ -197,19 +187,22 @@ export default function LoanPage() {
             <option>Hilang</option>
           </Select>
           <label className="flex min-h-10 items-center gap-2 text-sm">
-            <input type="checkbox" checked={pending} onChange={(e) => filter(setPending)(e.target.checked)} />
+            <input type="checkbox" checked={pending} onChange={(e) => historyList.setFilter('pending_confirmation', e.target.checked ? '1' : '')} />
             Menunggu konfirmasi
           </label>
         </div>
         <DataTable
           columns={historyColumns}
-          rows={history?.data ?? []}
+          rows={history.data?.data ?? []}
           rowKey={(l) => l.id}
-          loading={loading}
+          loading={history.isPending}
+          fetching={history.isPlaceholderData}
           emptyText="Belum ada peminjaman."
-          meta={history?.meta}
+          meta={history.data?.meta}
           unit="peminjaman"
-          onPageChange={setPage}
+          onPageChange={historyList.setPage}
+          sort={historyList.sort}
+          onSortChange={historyList.setSort}
         />
       </section>
 

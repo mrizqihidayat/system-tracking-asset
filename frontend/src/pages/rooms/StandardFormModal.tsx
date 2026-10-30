@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { FormField, Input, Select } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
-import { api, errorMessage } from '../../lib/api'
-import { fetchAssetTypes, fetchDepartments } from '../../lib/lookups'
-import type { AssetType, Department } from '../../types/asset'
+import { api } from '../../lib/api'
+import { useConsumables } from '../../lib/queries/lists'
+import { useAssetTypes, useDepartments, useRequestCatalog } from '../../lib/queries/master'
+import { useErrorToast } from '../../lib/useErrorToast'
 import type { CatalogItem, Consumable, CountMethod, RoomStandard } from '../../types/room'
 import ActionModal from '../assets/modals/ActionModal'
 
 type FulfillmentType = '' | 'stok_shd' | 'ambil_dari' | 'minta_ke'
+
+/** Pilihan stok SHD untuk pemenuhan (maks. 100 barang, sama dengan sebelumnya). */
+const STOCK_PARAMS = { per_page: 100 }
 
 interface Props {
   roomId: number
@@ -21,13 +25,18 @@ interface Props {
 /** Form satu baris standar ruangan (SPEC §8): pemenuhan hanya satu, sesuai sumber SHD / unit lain. */
 export default function StandardFormModal({ roomId, roomName, standard, onClose, onDone }: Props) {
   const toast = useToast()
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [assetTypes, setAssetTypes] = useState<AssetType[]>([])
-  const [consumables, setConsumables] = useState<Consumable[]>([])
-  const [catalog, setCatalog] = useState<CatalogItem[]>([])
+  const { data: departments, error: departmentsError } = useDepartments()
+  const { data: assetTypes, error: typesError } = useAssetTypes()
+  const { data: catalogItems, error: catalogError } = useRequestCatalog()
+  const stock = useConsumables(STOCK_PARAMS)
+  useErrorToast(departmentsError, typesError, catalogError, stock.error)
+  const consumables: Consumable[] = stock.data?.data ?? []
+  const catalog: CatalogItem[] = catalogItems
 
   const [itemName, setItemName] = useState(standard?.item_name ?? '')
-  const [sourceId, setSourceId] = useState<number | null>(standard?.source_department?.id ?? null)
+  // Baris baru: sumber bawaan SHD sampai dipilih lain (undefined = belum dipilih).
+  const [pickedSourceId, setSourceId] = useState<number | null | undefined>(standard ? (standard.source_department?.id ?? null) : undefined)
+  const sourceId = pickedSourceId === undefined ? (departments.find((d) => d.is_internal)?.id ?? null) : pickedSourceId
   const [quantity, setQuantity] = useState(String(standard?.standard_quantity ?? 1))
   const [method, setMethod] = useState<CountMethod>(standard?.count_method ?? 'Manual')
   const [assetTypeId, setAssetTypeId] = useState<number | null>(standard?.asset_type?.id ?? null)
@@ -36,23 +45,6 @@ export default function StandardFormModal({ roomId, roomName, standard, onClose,
   const [consumableId, setConsumableId] = useState<number | null>(f?.type === 'stok_shd' ? f.consumable.id : null)
   const [note, setNote] = useState(f?.type === 'ambil_dari' ? f.note : '')
   const [catalogId, setCatalogId] = useState<number | null>(f?.type === 'minta_ke' ? f.catalog.id : null)
-
-  useEffect(() => {
-    Promise.all([
-      fetchDepartments(),
-      fetchAssetTypes(),
-      api.get<{ data: Consumable[] }>('/consumables', { params: { per_page: 100 } }),
-      api.get<{ data: CatalogItem[] }>('/request-catalog'),
-    ])
-      .then(([d, t, c, k]) => {
-        setDepartments(d)
-        setAssetTypes(t)
-        setConsumables(c.data.data)
-        setCatalog(k.data.data)
-        if (!standard) setSourceId((cur) => cur ?? d.find((x) => x.is_internal)?.id ?? null)
-      })
-      .catch((e) => toast.error(errorMessage(e)))
-  }, [standard, toast])
 
   const source = departments.find((d) => d.id === sourceId)
   const isShd = source?.is_internal ?? false

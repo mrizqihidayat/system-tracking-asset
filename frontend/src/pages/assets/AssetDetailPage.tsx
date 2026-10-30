@@ -1,9 +1,12 @@
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, EllipsisVertical, FileText, ImageOff, Pencil, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AssetCode, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
+import Button from '../../components/ui/Button'
 import { buttonClass } from '../../components/ui/button-class'
-import { Muted, Panel } from '../../components/ui/Page'
+import { Panel } from '../../components/ui/Page'
+import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu, { type MenuItem } from '../../components/ui/DropdownMenu'
@@ -11,8 +14,12 @@ import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { openInNewTab } from '../../lib/blob'
 import { formatDate, formatDateTime, formatSize } from '../../lib/format'
+import { invalidate } from '../../lib/queries/invalidate'
+import { queryKeys } from '../../lib/queries/keys'
+import { useAssetDetail, useAssetEvents, useAssetFiles } from '../../lib/queries/lists'
 import { useBlobUrl } from '../../lib/useBlobUrl'
-import type { Asset, AssetEvent, AssetFile, FileType, Room } from '../../types/asset'
+import { useErrorToast } from '../../lib/useErrorToast'
+import type { AssetEvent, AssetFile, FileType, Room } from '../../types/asset'
 import DeleteAssetModal from './modals/DeleteAssetModal'
 import FoundModal from './modals/FoundModal'
 import MoveLocationModal from './modals/MoveLocationModal'
@@ -84,44 +91,71 @@ function QrBox({ assetId, onOpen }: { assetId: number; onOpen: () => void }) {
   )
 }
 
+/** Kerangka halaman detail saat data pertama kali dimuat (kepala + panel data + panel foto + riwayat). */
+function DetailSkeleton() {
+  return (
+    <div className="space-y-5" aria-busy="true">
+      <LoadingLabel />
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-24" />
+        <div className="flex gap-2 pt-1">
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="h-5 w-20 rounded-full" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+        <Skeleton className="h-7 w-72 max-w-full" />
+        <Skeleton className="h-4 w-56 max-w-full" />
+      </div>
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <div className="rounded-xl border border-slate-200 bg-white p-5">
+          <Skeleton className="h-4 w-24" />
+          <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4">
+            {Array.from({ length: 8 }, (_, i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-4 w-32 max-w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-5">
+          <Skeleton className="h-4 w-28" />
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="aspect-square rounded-lg" />)}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AssetDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
-  const [asset, setAsset] = useState<Asset | null>(null)
-  const [actions, setActions] = useState<string[]>([])
-  const [events, setEvents] = useState<AssetEvent[]>([])
-  const [files, setFiles] = useState<AssetFile[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [othersOpen, setOthersOpen] = useState(false)
   const [modal, setModal] = useState<ModalState>(null)
   const [offerLoan, setOfferLoan] = useState(false)
 
-  const fetchData = useCallback(
-    () =>
-      Promise.all([
-        api.get<{ data: Asset; meta: { actions: string[] } }>(`/assets/${id}`),
-        api.get<{ data: AssetEvent[] }>(`/assets/${id}/events`),
-        api.get<{ data: AssetFile[] }>(`/assets/${id}/files`),
-      ]).then(([a, e, f]) => {
-        setAsset(a.data.data)
-        setActions(a.data.meta.actions)
-        setEvents(e.data.data)
-        setFiles(f.data.data)
-      }),
-    [id],
-  )
+  const detail = useAssetDetail(id)
+  const filesQuery = useAssetFiles(id ?? '')
+  const eventsQuery = useAssetEvents(id ?? '')
+  useErrorToast(filesQuery.error, eventsQuery.error)
 
+  // Aset tidak ada / gagal dimuat → kembali ke daftar (perilaku sebelumnya).
   useEffect(() => {
-    fetchData()
-      .catch((e) => {
-        toast.error(errorMessage(e))
-        navigate('/daftar-aset', { replace: true })
-      })
-      .finally(() => setLoading(false))
-  }, [fetchData, navigate, toast])
+    if (!detail.error) return
+    toast.error(errorMessage(detail.error))
+    navigate('/daftar-aset', { replace: true })
+  }, [detail.error, navigate, toast])
 
-  if (loading || !asset) return <Muted>Memuat…</Muted>
+  if (!detail.data) return <DetailSkeleton />
+
+  const asset = detail.data.data
+  const actions = detail.data.meta.actions
+  const files = filesQuery.data ?? []
+  const events = eventsQuery.data?.pages.flatMap((p) => p.data) ?? []
 
   const view = (request: Parameters<typeof openInNewTab>[0]) =>
     openInNewTab(request).catch((e) => toast.error(errorMessage(e)))
@@ -131,7 +165,7 @@ export default function AssetDetailPage() {
   const closeModal = () => setModal(null)
   const reloadAfter = () => {
     closeModal()
-    fetchData().catch((e) => toast.error(errorMessage(e)))
+    invalidate.assets(queryClient)
   }
 
   const fileOf = (type: FileType) => files.find((f) => f.file_type === type)
@@ -311,7 +345,18 @@ export default function AssetDetailPage() {
 
       <section className="space-y-3">
         <h2 className="font-semibold">Riwayat aset</h2>
-        <DataTable columns={eventColumns} rows={events} rowKey={(e) => e.id} emptyText="Belum ada riwayat." />
+        <DataTable
+          columns={eventColumns}
+          rows={events}
+          rowKey={(e) => e.id}
+          loading={eventsQuery.isPending}
+          emptyText="Belum ada riwayat."
+        />
+        {eventsQuery.hasNextPage && (
+          <Button variant="secondary" loading={eventsQuery.isFetchingNextPage} onClick={() => eventsQuery.fetchNextPage()}>
+            Tampilkan riwayat lebih lama
+          </Button>
+        )}
       </section>
 
       {modal?.kind === 'report' && <ReportModal asset={asset} mode={modal.mode} onClose={closeModal} onDone={reloadAfter} />}
@@ -328,7 +373,15 @@ export default function AssetDetailPage() {
       {modal?.kind === 'service' && <ServiceModal asset={asset} onClose={closeModal} onDone={reloadAfter} />}
       {modal?.kind === 'move' && <MoveLocationModal asset={asset} onClose={closeModal} onDone={reloadAfter} />}
       {modal?.kind === 'delete' && (
-        <DeleteAssetModal asset={asset} onClose={closeModal} onDone={() => navigate('/daftar-aset', { replace: true })} />
+        <DeleteAssetModal
+          asset={asset}
+          onClose={closeModal}
+          onDone={() => {
+            queryClient.removeQueries({ queryKey: queryKeys.assets.detail(asset.id) })
+            invalidate.assets(queryClient)
+            navigate('/daftar-aset', { replace: true })
+          }}
+        />
       )}
 
       <ConfirmDialog

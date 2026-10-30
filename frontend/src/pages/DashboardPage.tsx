@@ -1,50 +1,18 @@
 import { QrCode, Search } from 'lucide-react'
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AssetCode, Badge } from '../components/ui/Badge'
 import { buttonClass } from '../components/ui/button-class'
 import DropdownMenu from '../components/ui/DropdownMenu'
 import { Muted, PageHeader, Panel } from '../components/ui/Page'
+import { CardSkeleton, ListSkeleton } from '../components/ui/Skeleton'
 import { useToast } from '../components/ui/toast-context'
-import { api, errorMessage } from '../lib/api'
+import { errorMessage } from '../lib/api'
 import { downloadReport, REPORT_LABELS, type ReportType } from '../lib/download'
 import { formatDate } from '../lib/format'
+import { useDashboardCards, useDashboardPanels, useDashboardReadiness } from '../lib/queries/dashboard'
+import { useErrorToast } from '../lib/useErrorToast'
 import type { Loan } from '../types/loan'
-import type { ConsumableItem, SupplyRequest } from '../types/supply'
-
-interface Dashboard {
-  cards: {
-    total_assets: { total: number; owned_by_shd: number; from_other_units: number; not_feasible: number }
-    active_loans: { total: number; due_today: number; overdue: number }
-    needs_repair: { assets_in_repair: number; loans_pending_confirmation: number }
-    incomplete_rooms: { incomplete: number; total_rooms: number; total_buildings: number }
-    needs_service: { total: number; overdue: number; upcoming: number }
-    low_stock: { total: number; menipis: number; habis: number }
-  }
-  panels: {
-    loans_due: Loan[]
-    room_readiness: {
-      id: number
-      name: string
-      slug: string
-      rooms_count: number
-      incomplete_rooms_count: number
-      rooms_without_standards: number
-      incomplete_rooms: { id: number; name: string; slug: string; shortage_items: number; unchecked_items: number }[]
-    }[]
-    recent_requests: SupplyRequest[]
-    assets_need_service: {
-      id: number
-      code: string
-      name: string
-      next_service_date: string
-      days_until_service: number
-      is_overdue: boolean
-      room: { name: string; building: string } | null
-    }[]
-    low_stock: ConsumableItem[]
-  }
-}
 
 const requestColor = { Diajukan: 'blue', Diterima: 'green', 'Belum direspons': 'amber', Dikembalikan: 'slate', Dibatalkan: 'red' } as const
 
@@ -83,15 +51,11 @@ function ReadinessBar({ complete, incomplete }: { complete: number; incomplete: 
 export default function DashboardPage() {
   const toast = useToast()
   const navigate = useNavigate()
-  const [data, setData] = useState<Dashboard | null>(null)
   const [search, setSearch] = useState('')
-
-  useEffect(() => {
-    api
-      .get<{ data: Dashboard }>('/dashboard')
-      .then((r) => setData(r.data.data))
-      .catch((e) => toast.error(errorMessage(e)))
-  }, [toast])
+  const { data: cards, error: cardsError } = useDashboardCards()
+  const { data: readiness, error: readinessError } = useDashboardReadiness()
+  const { data: panels, error: panelsError } = useDashboardPanels()
+  useErrorToast(cardsError, readinessError, panelsError)
 
   const exportReport = (type: ReportType) => downloadReport(type).catch((e) => toast.error(errorMessage(e)))
 
@@ -129,21 +93,12 @@ export default function DashboardPage() {
     />
   )
 
-  if (!data) {
-    return (
-      <div className="space-y-5">
-        {header}
-        <Muted>Memuat…</Muted>
-      </div>
-    )
-  }
-  const { cards, panels } = data
-
   return (
     <div className="space-y-5">
       {header}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 min-[85rem]:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 min-[85rem]:grid-cols-6" aria-busy={!cards || undefined}>
+        {!cards ? Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />) : <>
         <StatCard
           label="Total aset"
           value={cards.total_assets.total}
@@ -200,12 +155,15 @@ export default function DashboardPage() {
           alert={cards.low_stock.habis > 0}
           note={`${cards.low_stock.menipis} menipis · ${cards.low_stock.habis} habis`}
         />
+        </>}
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-5">
         <Panel title="Peminjaman jatuh tempo & terlambat" link={{ to: '/peminjaman', label: 'Lihat semua' }} flush>
-          {panels.loans_due.length === 0 ? (
+          {!panels ? (
+            <ListSkeleton />
+          ) : panels.loans_due.length === 0 ? (
             <Muted className="px-5 pb-5">Tidak ada peminjaman yang jatuh tempo.</Muted>
           ) : (
             <>
@@ -255,7 +213,9 @@ export default function DashboardPage() {
         </Panel>
 
         <Panel title="Permintaan ke unit lain" link={{ to: '/permintaan', label: 'Kelola' }} flush>
-          {panels.recent_requests.length === 0 ? (
+          {!panels ? (
+            <ListSkeleton />
+          ) : panels.recent_requests.length === 0 ? (
             <Muted className="px-5 pb-5">Belum ada permintaan.</Muted>
           ) : (
             <ul className="divide-y divide-slate-100 border-t border-slate-100">
@@ -275,9 +235,10 @@ export default function DashboardPage() {
 
         <div className="min-w-0 space-y-5">
           <Panel title="Kelengkapan ruangan" link={{ to: '/kelengkapan-ruangan', label: 'Lihat ruangan' }} flush>
-            {panels.room_readiness.length === 0 && <Muted className="px-5 pb-5">Belum ada gedung.</Muted>}
+            {!readiness && <ListSkeleton />}
+            {readiness?.length === 0 && <Muted className="px-5 pb-5">Belum ada gedung.</Muted>}
             <ul className="divide-y divide-slate-100 border-t border-slate-100">
-              {panels.room_readiness.map((b) => {
+              {readiness?.map((b) => {
                 const incomplete = b.incomplete_rooms_count
                 const complete = b.rooms_count - incomplete
                 return (
@@ -316,7 +277,9 @@ export default function DashboardPage() {
           </Panel>
 
           <Panel title="Stok menipis" link={{ to: '/stok', label: 'Lihat stok' }} flush>
-            {panels.low_stock.length === 0 ? (
+            {!panels ? (
+              <ListSkeleton />
+            ) : panels.low_stock.length === 0 ? (
               <Muted className="px-5 pb-5">Semua stok aman.</Muted>
             ) : (
               <ul className="divide-y divide-slate-100 border-t border-slate-100">
@@ -336,7 +299,9 @@ export default function DashboardPage() {
           </Panel>
 
           <Panel title="Aset perlu servis" link={{ to: '/daftar-aset', label: 'Daftar aset' }} flush>
-            {panels.assets_need_service.length === 0 ? (
+            {!panels ? (
+              <ListSkeleton />
+            ) : panels.assets_need_service.length === 0 ? (
               <Muted className="px-5 pb-5">Tidak ada aset yang perlu servis dalam 14 hari.</Muted>
             ) : (
               <ul className="divide-y divide-slate-100 border-t border-slate-100">

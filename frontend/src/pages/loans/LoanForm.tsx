@@ -5,8 +5,8 @@ import Combobox from '../../components/ui/Combobox'
 import { FormField, Input } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
-import { fetchDepartments } from '../../lib/lookups'
-import type { Asset, Department } from '../../types/asset'
+import { useDepartments } from '../../lib/queries/master'
+import type { Asset } from '../../types/asset'
 import AssetPicker from './AssetPicker'
 import RoomSelect from './RoomSelect'
 
@@ -32,16 +32,12 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
   const presetId = params.get('asset_id')
   const [asset, setAsset] = useState<Asset | null>(null)
   const [form, setForm] = useState(emptyForm)
-  const [departments, setDepartments] = useState<Department[]>([])
+  const { data: departments } = useDepartments()
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
   const set = <K extends keyof ReturnType<typeof emptyForm>>(key: K, value: ReturnType<typeof emptyForm>[K]) =>
     setForm((f) => ({ ...f, [key]: value }))
-
-  useEffect(() => {
-    fetchDepartments().then(setDepartments).catch(() => undefined)
-  }, [])
 
   // ?asset_id=<id> (dari detail aset / hasil scan): isi aset otomatis jika boleh dipinjam.
   useEffect(() => {

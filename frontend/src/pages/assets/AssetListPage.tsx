@@ -1,6 +1,7 @@
 import { Plus, Search, SlidersHorizontal } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { AssetCode, StatusBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -11,85 +12,36 @@ import { PageHeader } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { openInNewTab } from '../../lib/blob'
-import { fetchBuildings, fetchCategories, fetchDepartments, fetchRooms } from '../../lib/lookups'
-import type { Paginated } from '../../types/api'
-import { CONDITIONS, STATUSES, type Asset, type Building, type Category, type Department, type Room } from '../../types/asset'
+import { listConfigs } from '../../lib/queries/list-configs'
+import { useAssets } from '../../lib/queries/lists'
+import { useBuildings, useCategories, useDepartments, useRooms } from '../../lib/queries/master'
+import { prefetchAsset } from '../../lib/queries/prefetch'
+import { useErrorToast } from '../../lib/useErrorToast'
+import { useListParams } from '../../lib/useListParams'
+import { CONDITIONS, STATUSES, type Asset } from '../../types/asset'
 
-const FILTERS = ['category_id', 'building_id', 'room_id', 'source_department_id', 'condition', 'status', 'search'] as const
+const FILTERS = [...listConfigs.assets.filters, 'search']
 const MAX_LABELS = 120
 
 export default function AssetListPage() {
   const toast = useToast()
-  const [params, setParams] = useSearchParams()
-  const [result, setResult] = useState<Paginated<Asset> | null>(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const list = useListParams(listConfigs.assets)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [printing, setPrinting] = useState(false)
-  const [searchText, setSearchText] = useState(params.get('search') ?? '')
   const [filtersOpen, setFiltersOpen] = useState(false)
 
-  const [categories, setCategories] = useState<Category[]>([])
-  const [buildings, setBuildings] = useState<Building[]>([])
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [rooms, setRooms] = useState<Room[]>([])
+  const buildingId = list.get('building_id')
+  const assets = useAssets(list.params)
+  const { data: categories } = useCategories()
+  const { data: buildings } = useBuildings()
+  const { data: departments } = useDepartments()
+  const { data: rooms } = useRooms(buildingId ? Number(buildingId) : null, true)
+  useErrorToast(assets.error)
+  const result = assets.data
 
-  const buildingId = params.get('building_id')
-  const query = params.toString()
-
-  useEffect(() => {
-    Promise.all([fetchCategories(), fetchBuildings(), fetchDepartments()])
-      .then(([c, b, d]) => {
-        setCategories(c)
-        setBuildings(b)
-        setDepartments(d)
-      })
-      .catch((e) => toast.error(errorMessage(e)))
-  }, [toast])
-
-  useEffect(() => {
-    if (!buildingId) return
-    fetchRooms(Number(buildingId))
-      .then(setRooms)
-      .catch((e) => toast.error(errorMessage(e)))
-  }, [buildingId, toast])
-
-  useEffect(() => {
-    let cancelled = false
-    api
-      .get<Paginated<Asset>>('/assets', { params: new URLSearchParams(query) })
-      .then((res) => !cancelled && setResult(res.data))
-      .catch((e) => !cancelled && toast.error(errorMessage(e)))
-      .finally(() => !cancelled && setLoading(false))
-    return () => {
-      cancelled = true
-    }
-  }, [query, toast])
-
-  // Pencarian ditunda agar tidak memanggil API di setiap ketikan.
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (searchText === (params.get('search') ?? '')) return
-      setFilter('search', searchText)
-    }, 400)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText])
-
-  function setFilter(key: string, value: string) {
-    const next = new URLSearchParams(params)
-    if (value) next.set(key, value)
-    else next.delete(key)
-    if (key === 'building_id') next.delete('room_id')
-    next.delete('page')
-    setLoading(true)
-    setParams(next, { replace: true })
-  }
-
-  const resetFilters = () => {
-    setSearchText('')
-    setLoading(true)
-    setParams({}, { replace: true })
-  }
+  const setFilter = (key: string, value: string) =>
+    list.setFilter(key, value, key === 'building_id' ? { room_id: null } : {})
 
   const toggle = (id: number) =>
     setSelected((prev) => {
@@ -128,10 +80,11 @@ export default function AssetListPage() {
         <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggle(a.id)} aria-label={`Pilih ${a.code}`} />
       ),
     },
-    { header: 'Kode', mobile: 'title', cell: (a) => <AssetCode code={a.code} /> },
+    { header: 'Kode', mobile: 'title', sortKey: 'code', cell: (a) => <AssetCode code={a.code} /> },
     {
       header: 'Nama aset',
       mobile: 'title',
+      sortKey: 'name',
       cell: (a) => (
         <Link to={`/daftar-aset/${a.id}`} className="font-medium hover:text-brand-700 hover:underline">
           {a.name}
@@ -152,8 +105,8 @@ export default function AssetListPage() {
         ),
     },
     { header: 'Sumber', cell: (a) => (a.source_department?.is_internal ? 'Milik SHD' : 'Unit lain') },
-    { header: 'Kondisi', cell: (a) => <span className="whitespace-nowrap">{a.condition}</span> },
-    { header: 'Status', mobile: 'badge', cell: (a) => <StatusBadge status={a.status} /> },
+    { header: 'Kondisi', sortKey: 'condition', cell: (a) => <span className="whitespace-nowrap">{a.condition}</span> },
+    { header: 'Status', mobile: 'badge', sortKey: 'status', cell: (a) => <StatusBadge status={a.status} /> },
     {
       header: 'Aksi',
       className: 'text-right',
@@ -165,9 +118,8 @@ export default function AssetListPage() {
       ),
     },
   ]
-  const activeFilters = FILTERS.filter((k) => k !== 'search' && params.get(k)).length
-
-  const hasFilter = FILTERS.some((k) => params.get(k))
+  const activeFilters = listConfigs.assets.filters.filter((k) => list.get(k)).length
+  const hasFilter = list.hasFilter
   const total = result?.meta.total
   const subtitle =
     total === undefined ? ' ' : hasFilter ? `${total} aset cocok dengan filter` : `${total} aset tercatat`
@@ -188,7 +140,7 @@ export default function AssetListPage() {
           <>
             <ExportButton
               type="assets"
-              filters={() => new URLSearchParams(FILTERS.flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])))}
+              filters={() => new URLSearchParams(FILTERS.flatMap((k) => (list.get(k) ? [[k, list.get(k)]] : [])))}
             />
             <Button
               variant="secondary"
@@ -219,8 +171,8 @@ export default function AssetListPage() {
             <Input
               placeholder="Cari nama, kode, atau nomor seri"
               aria-label="Cari aset"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              value={list.searchText}
+              onChange={(e) => list.setSearchText(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -236,35 +188,35 @@ export default function AssetListPage() {
         <div className={`${filtersOpen ? 'grid' : 'hidden'} gap-3 sm:grid-cols-2 lg:grid lg:grid-cols-7`}>
         {field(
           'Kategori',
-          <Select value={params.get('category_id') ?? ''} onChange={(e) => setFilter('category_id', e.target.value)}>
+          <Select value={list.get('category_id')} onChange={(e) => setFilter('category_id', e.target.value)}>
             <option value="">Semua kategori</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>,
         )}
         {field(
           'Gedung',
-          <Select value={buildingId ?? ''} onChange={(e) => setFilter('building_id', e.target.value)}>
+          <Select value={buildingId} onChange={(e) => setFilter('building_id', e.target.value)}>
             <option value="">Semua gedung</option>
             {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </Select>,
         )}
         {field(
           'Ruangan',
-          <Select value={params.get('room_id') ?? ''} disabled={!buildingId} onChange={(e) => setFilter('room_id', e.target.value)}>
+          <Select value={list.get('room_id')} disabled={!buildingId} onChange={(e) => setFilter('room_id', e.target.value)}>
             <option value="">Semua ruangan</option>
             {buildingId && rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </Select>,
         )}
         {field(
           'Status',
-          <Select value={params.get('status') ?? ''} onChange={(e) => setFilter('status', e.target.value)}>
+          <Select value={list.get('status')} onChange={(e) => setFilter('status', e.target.value)}>
             <option value="">Semua status</option>
             {STATUSES.map((s) => <option key={s}>{s}</option>)}
           </Select>,
         )}
         {field(
           'Sumber',
-          <Select value={params.get('source_department_id') ?? ''} onChange={(e) => setFilter('source_department_id', e.target.value)}>
+          <Select value={list.get('source_department_id')} onChange={(e) => setFilter('source_department_id', e.target.value)}>
             <option value="">Semua sumber</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>{d.is_internal ? `${d.name} (Milik SHD)` : d.name}</option>
@@ -273,13 +225,13 @@ export default function AssetListPage() {
         )}
         {field(
           'Kondisi',
-          <Select value={params.get('condition') ?? ''} onChange={(e) => setFilter('condition', e.target.value)}>
+          <Select value={list.get('condition')} onChange={(e) => setFilter('condition', e.target.value)}>
             <option value="">Semua kondisi</option>
             {CONDITIONS.map((c) => <option key={c}>{c}</option>)}
           </Select>,
         )}
         <div className="flex items-end">
-          <Button variant="ghost" className="w-full" disabled={!hasFilter} onClick={resetFilters}>
+          <Button variant="ghost" className="w-full" disabled={!hasFilter} onClick={list.reset}>
             Reset filter
           </Button>
         </div>
@@ -305,16 +257,15 @@ export default function AssetListPage() {
         columns={columns}
         rows={rows}
         rowKey={(a) => a.id}
-        loading={loading}
+        loading={assets.isPending}
+        fetching={assets.isPlaceholderData}
         unit="aset"
         emptyText={hasFilter ? 'Tidak ada aset yang cocok dengan filter.' : 'Belum ada aset.'}
         meta={result?.meta}
-        onPageChange={(p) => {
-          const next = new URLSearchParams(params)
-          next.set('page', String(p))
-          setLoading(true)
-          setParams(next)
-        }}
+        onPageChange={list.setPage}
+        sort={list.sort}
+        onSortChange={list.setSort}
+        onRowHover={(a) => prefetchAsset(queryClient, a.id)}
       />
     </div>
   )

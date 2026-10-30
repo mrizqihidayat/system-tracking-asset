@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
-import { fetchDepartments } from '../../lib/lookups'
-import type { Department } from '../../types/asset'
-import type { ConsumableItem, ConsumableUsage, RequestCatalog } from '../../types/supply'
+import { useDepartments, useRequestCatalog } from '../../lib/queries/master'
+import type { ConsumableItem, ConsumableUsage } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import RoomSelect from '../loans/RoomSelect'
 
@@ -17,8 +16,8 @@ interface Props {
 /** Tambah/ubah barang habis pakai (SPEC §10). Ubah data tidak mengubah jumlah. */
 export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const toast = useToast()
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [catalog, setCatalog] = useState<RequestCatalog[]>([])
+  const { data: departments } = useDepartments()
+  const { data: catalog } = useRequestCatalog()
   const [usedIn, setUsedIn] = useState<ConsumableUsage[]>([])
   const [name, setName] = useState(item?.name ?? '')
   const [category, setCategory] = useState(item?.category ?? '')
@@ -32,8 +31,6 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const [note, setNote] = useState(item?.note ?? '')
 
   useEffect(() => {
-    fetchDepartments().then(setDepartments).catch(() => undefined)
-    api.get<{ data: RequestCatalog[] }>('/request-catalog').then((r) => setCatalog(r.data.data)).catch(() => undefined)
     if (item) {
       api
         .get<{ meta: { used_in_rooms: ConsumableUsage[] } }>(`/consumables/${item.id}`)

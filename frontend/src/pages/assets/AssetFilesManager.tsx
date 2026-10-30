@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
 import Button from '../../components/ui/Button'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { openInNewTab } from '../../lib/blob'
 import { formatSize } from '../../lib/format'
+import { queryKeys } from '../../lib/queries/keys'
+import { useAssetFiles } from '../../lib/queries/lists'
+import { useErrorToast } from '../../lib/useErrorToast'
+import { Skeleton } from '../../components/ui/Skeleton'
 import type { AssetFile, FileType } from '../../types/asset'
 
 const MAX_BYTES = 5 * 1024 * 1024
@@ -20,22 +25,16 @@ const SLOTS: { type: FileType; label: string }[] = [
 /** Pengelolaan file di form Ubah. Upload/hapus langsung tersimpan (tanpa tombol Simpan form). */
 export default function AssetFilesManager({ assetId }: { assetId: number }) {
   const toast = useToast()
-  const [files, setFiles] = useState<AssetFile[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const filesQuery = useAssetFiles(assetId)
+  useErrorToast(filesQuery.error)
+  const files = filesQuery.data ?? []
+  const loading = filesQuery.isPending
   const [busy, setBusy] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<AssetFile | null>(null)
   const inputs = useRef<Record<string, HTMLInputElement | null>>({})
 
-  const load = useCallback(
-    () => api.get<{ data: AssetFile[] }>(`/assets/${assetId}/files`).then((res) => setFiles(res.data.data)),
-    [assetId],
-  )
-
-  useEffect(() => {
-    load()
-      .catch((e) => toast.error(errorMessage(e)))
-      .finally(() => setLoading(false))
-  }, [load, toast])
+  const load = () => queryClient.invalidateQueries({ queryKey: queryKeys.assets.files(assetId) })
 
   const upload = async (type: FileType, file: File | undefined, key: string) => {
     if (!file) return
@@ -102,7 +101,10 @@ export default function AssetFilesManager({ assetId }: { assetId: number }) {
         </p>
       </div>
       {loading ? (
-        <p className="text-sm text-slate-500">Memuat…</p>
+        <div className="space-y-3" aria-busy="true">
+          <span className="sr-only">Memuat…</span>
+          {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+        </div>
       ) : (
         <>
           <ul className="divide-y divide-slate-100 text-sm">

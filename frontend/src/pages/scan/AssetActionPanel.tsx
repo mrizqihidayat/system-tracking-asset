@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AssetCode, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
@@ -6,6 +7,7 @@ import { buttonClass } from '../../components/ui/button-class'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Modal from '../../components/ui/Modal'
 import { formatDate } from '../../lib/format'
+import { invalidate } from '../../lib/queries/invalidate'
 import type { Asset } from '../../types/asset'
 import FoundModal from '../assets/modals/FoundModal'
 import MoveLocationModal from '../assets/modals/MoveLocationModal'
@@ -44,6 +46,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 /** Modal hasil scan: ringkasan aset + tombol aksi sesuai status; aksi membuka form di modal berikutnya. */
 export default function AssetActionPanel({ asset, actions, matchedBy, initialAction, onClose, onChanged }: Props) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [action, setAction] = useState<string | null>(
     initialAction && actions.includes(initialAction) ? initialAction : null,
   )
@@ -53,6 +56,7 @@ export default function AssetActionPanel({ asset, actions, matchedBy, initialAct
   const back = () => setAction(null)
   const done = () => {
     setAction(null)
+    invalidate.assets(queryClient)
     onChanged()
   }
 

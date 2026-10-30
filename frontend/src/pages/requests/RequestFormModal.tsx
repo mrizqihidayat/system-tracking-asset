@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
-import { fetchDepartments, fetchRooms } from '../../lib/lookups'
-import type { Department } from '../../types/asset'
+import { useDepartments, useRooms } from '../../lib/queries/master'
 import type { RequestCatalog, RequestPrefill, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import RoomSelect from '../loans/RoomSelect'
@@ -23,7 +22,8 @@ const MANUAL = 'manual'
 /** Catat permintaan ke unit lain (proses permintaan tetap di luar sistem). */
 export default function RequestFormModal({ catalog, request, prefill, onClose, onDone }: Props) {
   const toast = useToast()
-  const [departments, setDepartments] = useState<Department[]>([])
+  const departments = useDepartments().data.filter((d) => !d.is_internal)
+  const { data: allRooms } = useRooms()
   const initialCatalog = request ? request.catalog?.id : prefill?.catalog_id
   const [catalogId, setCatalogId] = useState<string>(
     initialCatalog ? String(initialCatalog) : request || prefill?.item_name ? MANUAL : '',
@@ -39,18 +39,10 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
   const [roomId, setRoomId] = useState<number | null>(request?.room?.id ?? prefill?.room_id ?? null)
   const [note, setNote] = useState(request?.note ?? '')
 
-  useEffect(() => {
-    fetchDepartments().then((d) => setDepartments(d.filter((x) => !x.is_internal))).catch(() => undefined)
-  }, [])
-
-  // Ruangan dari query/saran hanya membawa id → cari gedungnya agar dropdown terisi.
+  // Ruangan dari query/saran hanya membawa id → cari gedungnya agar dropdown terisi (sampai gedung dipilih).
   const prefillRoom = prefill?.room_id
-  useEffect(() => {
-    if (!prefillRoom || request) return
-    fetchRooms()
-      .then((rooms) => setBuildingId(rooms.find((r) => r.id === prefillRoom)?.building_id ?? null))
-      .catch(() => undefined)
-  }, [prefillRoom, request])
+  const prefillBuilding = !request && prefillRoom ? allRooms.find((r) => r.id === prefillRoom)?.building_id ?? null : null
+  const effectiveBuildingId = buildingId ?? prefillBuilding
 
   const manual = catalogId === MANUAL
   const selected = catalog.find((c) => String(c.id) === catalogId)
@@ -124,7 +116,7 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
           <RoomSelect
             buildingLabel="Gedung terkait (opsional)"
             roomLabel="Ruangan terkait (opsional)"
-            buildingId={buildingId}
+            buildingId={effectiveBuildingId}
             roomId={roomId}
             onChange={(b, r) => {
               setBuildingId(b)
