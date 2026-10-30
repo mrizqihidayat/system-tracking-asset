@@ -1,6 +1,8 @@
+import { Lock } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ConditionBadge, StatusBadge } from '../../components/ui/Badge'
+import { Brand } from '../../components/layout/AppLayout'
+import { AssetCode, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
 import { api, errorMessage } from '../../lib/api'
 import { getToken } from '../../lib/auth'
 import { formatDate } from '../../lib/format'
@@ -28,9 +30,9 @@ interface PublicAsset {
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 py-2 text-sm">
+    <div className="flex justify-between gap-4 py-2.5 text-sm">
       <dt className="shrink-0 text-slate-500">{label}</dt>
-      <dd className="text-right">{children || '-'}</dd>
+      <dd className="min-w-0 text-right">{children || '-'}</dd>
     </div>
   )
 }
@@ -57,64 +59,76 @@ export default function PublicAssetPage() {
 
   const loc = asset?.current_location
   const buttons = (asset?.actions ?? []).filter((a) => a in SCAN_ACTIONS && a !== 'terima_kembali')
+  const allActions = [...buttons, ...(asset?.actions.includes('terima_kembali') ? ['terima_kembali'] : [])]
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-slate-50 p-4">
-      {error && <p role="alert" className="mt-10 text-center text-slate-600">{error}</p>}
-      {!error && !asset && <p className="mt-10 text-center text-slate-500">Memuat…</p>}
-      {asset && (
-        <div className="space-y-4">
-          <section className="rounded-lg border border-slate-200 bg-white p-5">
-            <h1 className="text-xl font-semibold">{asset.name}</h1>
-            <p className="mt-1 font-mono text-sm text-slate-500">{asset.code}</p>
-            <dl className="mt-3 divide-y divide-slate-100">
-              <Row label="Kategori">{asset.category}</Row>
-              <Row label="Jenis">{asset.asset_type}</Row>
-              <Row label="Sumber">{asset.source.name}</Row>
-              <Row label="Lokasi asal">{asset.room}, {asset.building}</Row>
-              <Row label="Lokasi saat ini">
-                {loc?.on_loan
-                  ? `Dipinjam · ${loc.room ? `${loc.room}, ${loc.building}` : (loc.note ?? '')}`
-                  : `${asset.room}, ${asset.building}`}
-              </Row>
-              <Row label="Penanggung jawab">{asset.pic_name}</Row>
-              <Row label="Kondisi"><ConditionBadge condition={asset.condition} /></Row>
-              <Row label="Status"><StatusBadge status={asset.status} /></Row>
-              <Row label="Tanggal perolehan">{asset.acquisition_date ? formatDate(asset.acquisition_date) : null}</Row>
-              <Row label="Servis berikutnya">{asset.next_service_date ? formatDate(asset.next_service_date) : null}</Row>
-              <Row label="Kode aset Keuangan"><span className="font-mono">{asset.finance_code}</span></Row>
-              <Row label="Standar ruangan">
-                {asset.room_standard.is_standard
-                  ? `Termasuk standar ruangan (${asset.room_standard.item_name})`
-                  : 'Tidak termasuk standar'}
-              </Row>
-            </dl>
-          </section>
-
-          {(asset.actions.includes('terima_kembali') || buttons.length > 0) && (
-            <section className="rounded-lg border border-slate-200 bg-white p-5">
-              <h2 className="font-semibold">Aksi</h2>
-              <p className="mb-3 text-xs text-slate-500">Khusus staf SHD — Anda akan diminta login.</p>
-              <div className="flex flex-wrap gap-2">
-                {[...buttons, ...(asset.actions.includes('terima_kembali') ? ['terima_kembali'] : [])].map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => goAction(key)}
-                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    {SCAN_ACTIONS[key]}
-                    <span className="block text-[11px] font-normal text-slate-400">Khusus staf SHD</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-          <p className="text-center text-xs text-slate-400">
-            <Link to="/login" className="underline">Masuk staf SHD</Link>
-          </p>
+    <div className="min-h-screen">
+      <header className="bg-rail px-4 py-4 text-white">
+        <div className="mx-auto max-w-lg">
+          <Brand compact />
         </div>
-      )}
+      </header>
+
+      <main className="mx-auto max-w-lg space-y-4 px-4 py-5">
+        {error && <p role="alert" className="mt-6 text-center text-slate-600">{error}</p>}
+        {!error && !asset && <p className="mt-6 text-center text-sm text-slate-500">Memuat…</p>}
+        {asset && (
+          <>
+            <section className="rounded-xl border border-slate-200 bg-white p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <AssetCode code={asset.code} className="text-sm" />
+                <StatusBadge status={asset.status} />
+                <ConditionBadge condition={asset.condition} />
+              </div>
+              <h1 className="mt-2 text-xl font-bold tracking-tight text-balance">{asset.name}</h1>
+              <p className="mt-0.5 text-sm text-slate-500">{asset.category} · {asset.asset_type}</p>
+              <dl className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
+                <Row label="Sumber">{asset.source.name}</Row>
+                <Row label="Lokasi asal">{asset.room}, {asset.building}</Row>
+                <Row label="Lokasi saat ini">
+                  {loc?.on_loan
+                    ? `Dipinjam · ${loc.room ? `${loc.room}, ${loc.building}` : (loc.note ?? '')}`
+                    : `${asset.room}, ${asset.building}`}
+                </Row>
+                <Row label="Penanggung jawab">{asset.pic_name}</Row>
+                <Row label="Tanggal perolehan">{asset.acquisition_date ? formatDate(asset.acquisition_date) : null}</Row>
+                <Row label="Servis berikutnya">{asset.next_service_date ? formatDate(asset.next_service_date) : null}</Row>
+                <Row label="Kode aset Keuangan">{asset.finance_code && <span className="font-mono">{asset.finance_code}</span>}</Row>
+                <Row label="Standar ruangan">
+                  {asset.room_standard.is_standard
+                    ? `Termasuk standar ruangan (${asset.room_standard.item_name})`
+                    : 'Tidak termasuk standar'}
+                </Row>
+              </dl>
+            </section>
+
+            {allActions.length > 0 && (
+              <section className="rounded-xl border border-slate-200 bg-white p-5">
+                <h2 className="font-semibold">Aksi</h2>
+                <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                  <Lock size={12} /> Khusus staf SHD, Anda akan diminta login.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {allActions.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => goAction(key)}
+                      className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-800 transition-colors hover:border-brand-600 hover:bg-brand-50"
+                    >
+                      {SCAN_ACTIONS[key]}
+                      <span className="block text-[11px] font-normal text-slate-500">Khusus staf SHD</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+            <p className="text-center text-sm">
+              <Link to="/login" className="font-semibold text-brand-700 hover:underline">Masuk staf SHD</Link>
+            </p>
+          </>
+        )}
+      </main>
     </div>
   )
 }

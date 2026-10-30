@@ -61,7 +61,7 @@ export default function ReportModal({ asset, mode, onClose, onDone }: Props) {
           )}
           {mode === 'hilang' && <p className="text-sm text-slate-600">Status aset akan menjadi Hilang.</p>}
           {mode === 'tidak_layak_pakai' && (
-            <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+            <p className="rounded-lg bg-warn-50 px-3 py-2.5 text-sm text-warn-700">
               Aset tidak layak pakai tidak bisa dipinjam atau diservis dan tidak dapat dikembalikan statusnya. Hanya Pindah
               lokasi dan Hapus aset yang masih tersedia.
             </p>

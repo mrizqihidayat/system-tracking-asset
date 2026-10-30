@@ -40,21 +40,21 @@ export default function DropdownMenu({ trigger, items, label, align = 'right', t
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 ${triggerClassName}`}
+        className={`inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-300 hover:bg-slate-50 ${triggerClassName}`}
       >
         {trigger}
       </button>
       {open && (
         <ul
           role="menu"
-          className={`absolute z-20 mt-1 min-w-48 rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg ${align === 'right' ? 'right-0' : 'left-0'}`}
+          className={`absolute z-20 mt-1 min-w-52 rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-[0_8px_24px_rgb(20_33_46/0.12)] ${align === 'right' ? 'right-0' : 'left-0'}`}
         >
           {items.map((item) => (
             <li key={item.label} role="none">
               <button
                 role="menuitem"
                 type="button"
-                className={`w-full px-3 py-2 text-left hover:bg-slate-50 ${item.danger ? 'text-red-700' : ''}`}
+                className={`w-full rounded-md px-3 py-2 text-left hover:bg-slate-100 ${item.danger ? 'text-bad-700 hover:bg-bad-50' : ''}`}
                 onClick={() => {
                   setOpen(false)
                   item.onClick()

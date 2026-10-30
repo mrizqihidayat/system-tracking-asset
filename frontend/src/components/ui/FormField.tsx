@@ -11,13 +11,13 @@ interface FieldProps {
 
 export function FormField({ label, error, required, children }: FieldProps) {
   return (
-    <label className="block space-y-1">
-      <span className="text-sm font-medium text-slate-700">
+    <label className="block space-y-1.5">
+      <span className="block text-sm font-medium text-slate-700">
         {label}
-        {required && <span className="text-red-600"> *</span>}
+        {required && <span className="text-bad-700"> *</span>}
       </span>
       {children}
-      {error && <span className="block text-xs text-red-600">{error}</span>}
+      {error && <span className="block text-xs font-medium text-bad-700">{error}</span>}
     </label>
   )
 }

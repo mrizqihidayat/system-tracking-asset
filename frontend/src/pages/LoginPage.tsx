@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import logo from '../assets/logo.png'
+import { Brand } from '../components/layout/AppLayout'
 import Button from '../components/ui/Button'
 import { FormField, Input } from '../components/ui/FormField'
 import { api, errorMessage, fieldErrors } from '../lib/api'
@@ -41,25 +43,39 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div>
-          <h1 className="text-xl font-semibold">Aset SHD</h1>
-          <p className="text-sm text-slate-500">Masuk untuk melanjutkan.</p>
+    <div className="grid min-h-screen lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <aside className="hidden flex-col justify-between bg-rail p-10 text-white lg:flex">
+        <Brand />
+        <div className="max-w-sm">
+          <p className="text-3xl font-bold leading-tight tracking-tight text-balance">
+            Aset, peminjaman, dan kelengkapan ruangan pelatihan dalam satu catatan.
+          </p>
+          <p className="mt-3 text-sm text-[#c4d6e4]">Departemen SHD · PT INALUM</p>
         </div>
-        {message && (
-          <div role="alert" className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-            {message}
+        <p className="text-xs text-[#b5cadb]">Khusus Staf/Admin Aset SHD</p>
+      </aside>
+
+      <main className="flex items-center justify-center px-4 py-10">
+        <form onSubmit={submit} className="w-full max-w-sm space-y-5">
+          <div>
+            <img src={logo} alt="INALUM" className="h-10 w-auto" />
+            <h1 className="mt-6 text-2xl font-bold tracking-tight">Masuk ke Aset SHD</h1>
+            <p className="mt-1 text-sm text-slate-500">Gunakan akun staf aset yang diberikan admin.</p>
           </div>
-        )}
-        <FormField label="Username" error={errors.username}>
-          <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus required />
-        </FormField>
-        <FormField label="Password" error={errors.password}>
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-        </FormField>
-        <Button type="submit" loading={loading} className="w-full">Masuk</Button>
-      </form>
+          {message && (
+            <div role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
+              {message}
+            </div>
+          )}
+          <FormField label="Username" error={errors.username}>
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus required />
+          </FormField>
+          <FormField label="Password" error={errors.password}>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+          </FormField>
+          <Button type="submit" loading={loading} className="w-full">Masuk</Button>
+        </form>
+      </main>
     </div>
   )
 }

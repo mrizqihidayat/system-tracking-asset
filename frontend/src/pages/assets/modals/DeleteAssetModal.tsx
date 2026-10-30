@@ -44,7 +44,7 @@ export default function DeleteAssetModal({ asset, onClose, onDone }: Props) {
     >
       {(errors) =>
         !impact ? (
-          <p className={`text-sm ${loadError ? 'text-red-700' : 'text-slate-500'}`}>
+          <p className={`text-sm ${loadError ? 'text-bad-700' : 'text-slate-500'}`}>
             {loadError || 'Memeriksa dampak penghapusan…'}
           </p>
         ) : (
@@ -58,13 +58,13 @@ export default function DeleteAssetModal({ asset, onClose, onDone }: Props) {
               <li>{impact.files_count} file (foto &amp; dokumen) ikut terhapus</li>
             </ul>
             {impact.active_loan && (
-              <p className="rounded-md border border-red-300 bg-red-50 p-2 text-sm text-red-800">
+              <p className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
                 Aset ini sedang dipinjam oleh <b>{impact.active_loan.borrower_name}</b> ({impact.active_loan.borrower_unit}).
                 Peminjaman aktifnya ikut terhapus.
               </p>
             )}
             {impact.affected_room_standards.length > 0 && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+              <div className="rounded-lg bg-warn-50 px-3 py-2.5 text-sm text-warn-700">
                 Mengurangi jumlah &ldquo;Ada&rdquo; pada standar ruangan:
                 <ul className="mt-1 list-disc pl-5">
                   {impact.affected_room_standards.map((s) => (

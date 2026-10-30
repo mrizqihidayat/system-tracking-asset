@@ -4,7 +4,10 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { buttonClass } from '../../components/ui/button-class'
+import { controlClass } from '../../components/ui/control-class'
 import DataTable, { type Column } from '../../components/ui/DataTable'
+import { Muted, PageHeader } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { formatDateTime } from '../../lib/format'
@@ -15,12 +18,15 @@ import StandardsModal from './StandardsModal'
 
 const BASE = '/kelengkapan-ruangan'
 
-const resultColor = { Sesuai: 'green', Kurang: 'amber', 'Belum dicek': 'slate' } as const
+const resultColor = { Sesuai: 'green', Kurang: 'red', 'Belum dicek': 'amber' } as const
 
-const chip = (active: boolean, activeClass: string) =>
-  `rounded-md border px-4 py-2 text-sm font-medium transition ${
-    active ? `${activeClass} border-transparent text-white` : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+const chip = (active: boolean) =>
+  `inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors ${
+    active ? 'border-brand-800 bg-brand-800 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
   }`
+
+// HP: chip digeser horizontal; sm ke atas: membungkus.
+const chipRow = '-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0'
 
 const requestUrl = (roomId: number, s?: RoomStandard) => {
   const p = new URLSearchParams({ room_id: String(roomId) })
@@ -99,7 +105,7 @@ export default function RoomsPage() {
     [checklist, checklistReady, actual],
   )
 
-  if (!buildings) return <p className="text-slate-500">Memuat…</p>
+  if (!buildings) return <Muted>Memuat…</Muted>
 
   // /kelengkapan-ruangan atau slug tidak cocok → gedung & ruangan pertama.
   if (!building || (!room && building.rooms.length > 0)) {
@@ -113,6 +119,7 @@ export default function RoomsPage() {
   const manualRows = rows.filter((s) => s.count_method === 'Manual')
   const shortages = rows.filter((s) => s.result === 'Kurang')
   const roomLabel = room && building ? `${room.name} · ${building.name}` : ''
+  const canSave = !!roomId && manualRows.length > 0
 
   const saveCheck = async () => {
     if (!roomId) return
@@ -164,9 +171,10 @@ export default function RoomsPage() {
   const columns: Column<RoomStandard>[] = [
     {
       header: 'Perlengkapan standar',
+      mobile: 'title',
       cell: (s) => (
         <>
-          {s.item_name}
+          <span className="font-medium">{s.item_name}</span>
           <span className="block text-xs text-slate-500">
             {s.count_method === 'QR' ? `Otomatis QR · ${s.asset_type?.name ?? '-'}` : 'Dicek manual'}
           </span>
@@ -177,7 +185,7 @@ export default function RoomsPage() {
       header: 'Sumber',
       cell: (s) => (s.source_department ? (s.source_department.is_internal ? `Milik ${s.source_department.name}` : s.source_department.name) : '-'),
     },
-    { header: 'Standar', cell: (s) => s.standard_quantity },
+    { header: 'Standar', cell: (s) => <span className="tabular-nums">{s.standard_quantity}</span> },
     {
       header: 'Ada',
       cell: (s) =>
@@ -189,7 +197,8 @@ export default function RoomsPage() {
             onChange={(e) => setActual((a) => ({ ...a, [s.id]: e.target.value }))}
             placeholder="—"
             aria-label={`Jumlah ada ${s.item_name}`}
-            className="w-20 rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            inputMode="numeric"
+            className={`${controlClass()} w-24! tabular-nums`}
           />
         ) : (
           s.present_quantity
@@ -199,12 +208,12 @@ export default function RoomsPage() {
       header: 'Selisih',
       cell: (s) =>
         s.difference === null ? (
-          <span className="text-slate-400">—</span>
+          <span className="text-slate-500">—</span>
         ) : (
-          <span className={s.difference < 0 ? 'font-semibold text-amber-700' : ''}>{s.difference}</span>
+          <span className={`tabular-nums ${s.difference < 0 ? 'font-semibold text-bad-700' : ''}`}>{s.difference}</span>
         ),
     },
-    { header: 'Hasil', cell: (s) => <Badge color={resultColor[s.result]}>{s.result}</Badge> },
+    { header: 'Hasil', mobile: 'badge', cell: (s) => <Badge color={resultColor[s.result]}>{s.result}</Badge> },
     {
       header: 'Ambil dari / Minta ke',
       cell: (s) => {
@@ -221,12 +230,12 @@ export default function RoomsPage() {
           <div className="space-y-1">
             <span className="block text-xs text-slate-600">{text}</span>
             {s.can_fill_from_stock && (
-              <Button variant="secondary" className="px-2! py-1! text-xs!" loading={filling === s.id} onClick={() => fillFromStock(s)}>
+              <Button variant="secondary" className="min-h-8! px-3! text-xs!" loading={filling === s.id} onClick={() => fillFromStock(s)}>
                 Isi dari stok
               </Button>
             )}
             {s.result === 'Kurang' && f?.type === 'minta_ke' && roomId && (
-              <Link to={requestUrl(roomId, s)} className="block text-xs text-brand-700 underline">Buat permintaan</Link>
+              <Link to={requestUrl(roomId, s)} className="block text-xs font-semibold text-brand-700 hover:underline">Buat permintaan</Link>
             )}
           </div>
         )
@@ -235,53 +244,51 @@ export default function RoomsPage() {
   ]
 
   return (
-    <div className="max-w-7xl space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Kelengkapan Ruangan</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Membandingkan isi ruangan terhadap standar perlengkapan default · {totalRooms} ruangan di {buildings.length} gedung
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ExportButton type="rooms" filters={() => ({ building_id: building?.id })} />
-          <Button variant="secondary" disabled={!roomId} onClick={() => setModal('standards')}>Atur standar ruangan</Button>
-          <Button loading={saving} disabled={!roomId || manualRows.length === 0} onClick={saveCheck}>Simpan hasil cek</Button>
-        </div>
-      </div>
+    <div className={`space-y-5 ${canSave ? 'pb-20 lg:pb-0' : ''}`}>
+      <PageHeader
+        title="Kelengkapan Ruangan"
+        description={`Isi ruangan dibanding standar perlengkapan · ${totalRooms} ruangan di ${buildings.length} gedung`}
+        actions={
+          <>
+            <ExportButton type="rooms" filters={() => ({ building_id: building?.id })} />
+            <Button variant="secondary" disabled={!roomId} onClick={() => setModal('standards')}>Atur standar ruangan</Button>
+            <Button loading={saving} disabled={!canSave} onClick={saveCheck} className="max-lg:hidden!">Simpan hasil cek</Button>
+          </>
+        }
+      />
 
-      <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
+      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Gedung</p>
-          <div className="flex flex-wrap gap-2">
+          <p className="mb-2 text-sm font-medium text-slate-500">Gedung</p>
+          <div className={chipRow}>
             {buildings.map((b) => (
-              <button key={b.id} type="button" className={chip(b.id === building?.id, 'bg-slate-900')}
+              <button key={b.id} type="button" className={chip(b.id === building?.id)}
                 onClick={() => navigate(b.rooms[0] ? `${BASE}/${b.slug}/${b.rooms[0].slug}` : `${BASE}/${b.slug}`)}>
                 {b.name}
               </button>
             ))}
-            <button type="button" className={chip(false, '')} onClick={() => setModal('building')} aria-label="Tambah gedung">
+            <button type="button" className={chip(false)} onClick={() => setModal('building')} aria-label="Tambah gedung">
               <Plus size={16} />
             </button>
           </div>
         </div>
         {building && (
           <div className="border-t border-slate-100 pt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Ruangan di {building.name}</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="mb-2 text-sm font-medium text-slate-500">Ruangan di {building.name}</p>
+            <div className={chipRow}>
               {building.rooms.map((r) => (
-                <button key={r.id} type="button" className={chip(r.id === roomId, 'bg-brand-700')}
+                <button key={r.id} type="button" className={chip(r.id === roomId)}
                   onClick={() => navigate(`${BASE}/${building.slug}/${r.slug}`)}
                   title={r.shortage_items ? `Kurang ${r.shortage_items} item` : r.total_items ? 'Lengkap' : 'Belum ada standar'}>
                   {r.name}
                   {r.shortage_items > 0 && (
-                    <span className={`ml-2 rounded-full px-1.5 text-xs ${r.id === roomId ? 'bg-white/20' : 'bg-amber-100 text-amber-800'}`}>
+                    <span className={`ml-2 rounded-full px-1.5 text-xs tabular-nums ${r.id === roomId ? 'bg-white/20' : 'bg-bad-50 text-bad-700'}`}>
                       −{r.shortage_items}
                     </span>
                   )}
                 </button>
               ))}
-              <button type="button" className={chip(false, '')} onClick={() => setModal('room')} aria-label="Tambah ruangan">
+              <button type="button" className={chip(false)} onClick={() => setModal('room')} aria-label="Tambah ruangan">
                 <Plus size={16} />
               </button>
             </div>
@@ -290,13 +297,13 @@ export default function RoomsPage() {
       </section>
 
       {room && shortages.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+        <div className="flex flex-col gap-3 rounded-xl bg-warn-50 px-5 py-4 text-sm text-warn-700 sm:flex-row sm:items-center sm:justify-between">
           <p>
             <b>{room.name} kurang {shortages.length} item.</b>
             {waysText}
           </p>
           {hasRequestable && roomId && (
-            <Link to={requestUrl(roomId)} className="rounded-md bg-amber-800 px-4 py-2 font-medium text-white hover:bg-amber-900">
+            <Link to={requestUrl(roomId)} className={buttonClass('secondary', 'shrink-0')}>
               Buat permintaan
             </Link>
           )}
@@ -304,8 +311,8 @@ export default function RoomsPage() {
       )}
 
       {room && (
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <h2 className="font-semibold">Checklist {roomLabel}</h2>
             <span className="text-sm text-slate-500">
               {room.last_checked_at
@@ -322,11 +329,16 @@ export default function RoomsPage() {
             emptyText="Belum ada standar perlengkapan. Klik “Atur standar ruangan” untuk menambah."
           />
           {manualRows.length > 0 && (
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="text-xs text-slate-500">
               Isi kolom Ada untuk baris manual, lalu klik “Simpan hasil cek”. Baris QR dihitung otomatis dari aset di ruangan ini.
             </p>
           )}
         </section>
+      )}
+      {canSave && (
+        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
+          <Button loading={saving} onClick={saveCheck} className="w-full">Simpan hasil cek</Button>
+        </div>
       )}
       {building && building.rooms.length === 0 && (
         <p className="text-sm text-slate-500">Belum ada ruangan di {building.name}. Tambah ruangan dengan tombol +.</p>

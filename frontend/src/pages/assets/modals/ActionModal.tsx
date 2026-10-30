@@ -51,7 +51,7 @@ export default function ActionModal({ title, submitLabel, danger, submitDisabled
     >
       <form id="action-form" onSubmit={submit} className="space-y-3">
         {message && (
-          <div role="alert" className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <div role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
             {message}
           </div>
         )}

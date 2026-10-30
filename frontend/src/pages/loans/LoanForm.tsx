@@ -96,7 +96,7 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
       <h2 className="mb-4 font-semibold">Catat peminjaman baru</h2>
       <form onSubmit={submit} className="space-y-4">
         <AssetPicker asset={asset} onPick={setAsset} error={errors.asset_id} />
@@ -141,7 +141,7 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
           <FormField label="Kondisi saat keluar">
             <Input value={asset?.condition ?? ''} placeholder="Otomatis dari aset" disabled readOnly />
           </FormField>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <FormField label="No. approval" error={errors.approval_number}>
               <Input value={form.approval_number} placeholder="Opsional" onChange={(e) => set('approval_number', e.target.value)} error={errors.approval_number} maxLength={100} />
             </FormField>
@@ -151,9 +151,9 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row">
+          <Button variant="secondary" onClick={reset}>Kosongkan</Button>
           <Button type="submit" loading={saving}>Simpan peminjaman</Button>
-          <Button variant="secondary" onClick={reset}>Batal</Button>
         </div>
       </form>
     </section>

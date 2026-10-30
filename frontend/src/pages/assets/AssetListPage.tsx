@@ -1,10 +1,13 @@
+import { Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
-import { StatusBadge } from '../../components/ui/Badge'
+import { AssetCode, StatusBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { buttonClass } from '../../components/ui/button-class'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import { Input, Select } from '../../components/ui/FormField'
+import { PageHeader } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { openInNewTab } from '../../lib/blob'
@@ -23,6 +26,7 @@ export default function AssetListPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [printing, setPrinting] = useState(false)
   const [searchText, setSearchText] = useState(params.get('search') ?? '')
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const [categories, setCategories] = useState<Category[]>([])
   const [buildings, setBuildings] = useState<Building[]>([])
@@ -119,12 +123,21 @@ export default function AssetListPage() {
     {
       header: 'Pilih',
       className: 'w-10',
+      mobile: 'badge',
       cell: (a) => (
         <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggle(a.id)} aria-label={`Pilih ${a.code}`} />
       ),
     },
-    { header: 'Kode', cell: (a) => <span className="font-mono">{a.code}</span> },
-    { header: 'Nama aset', cell: (a) => a.name },
+    { header: 'Kode', mobile: 'title', cell: (a) => <AssetCode code={a.code} /> },
+    {
+      header: 'Nama aset',
+      mobile: 'title',
+      cell: (a) => (
+        <Link to={`/daftar-aset/${a.id}`} className="font-medium hover:text-brand-700 hover:underline">
+          {a.name}
+        </Link>
+      ),
+    },
     { header: 'Kategori', cell: (a) => a.asset_type?.category?.name ?? '-' },
     {
       header: 'Lokasi',
@@ -139,18 +152,20 @@ export default function AssetListPage() {
         ),
     },
     { header: 'Sumber', cell: (a) => (a.source_department?.is_internal ? 'Milik SHD' : 'Unit lain') },
-    { header: 'Kondisi', cell: (a) => a.condition },
-    { header: 'Status', cell: (a) => <StatusBadge status={a.status} /> },
+    { header: 'Kondisi', cell: (a) => <span className="whitespace-nowrap">{a.condition}</span> },
+    { header: 'Status', mobile: 'badge', cell: (a) => <StatusBadge status={a.status} /> },
     {
       header: 'Aksi',
       className: 'text-right',
+      mobile: 'hidden',
       cell: (a) => (
-        <Link to={`/daftar-aset/${a.id}`} className="text-brand-700 underline">
+        <Link to={`/daftar-aset/${a.id}`} className="font-semibold text-brand-700 hover:underline">
           Detail
         </Link>
       ),
     },
   ]
+  const activeFilters = FILTERS.filter((k) => k !== 'search' && params.get(k)).length
 
   const hasFilter = FILTERS.some((k) => params.get(k))
   const total = result?.meta.total
@@ -158,54 +173,67 @@ export default function AssetListPage() {
     total === undefined ? ' ' : hasFilter ? `${total} aset cocok dengan filter` : `${total} aset tercatat`
 
   const field = (label: string, control: ReactNode, className = '') => (
-    <label className={`block space-y-1 ${className}`}>
-      <span className="text-xs text-slate-500">{label}</span>
+    <label className={`block space-y-1.5 ${className}`}>
+      <span className="block text-xs font-medium text-slate-500">{label}</span>
       {control}
     </label>
   )
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Daftar Aset</h1>
-          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ExportButton
-            type="assets"
-            filters={() => new URLSearchParams(FILTERS.flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])))}
-          />
+      <PageHeader
+        title="Daftar Aset"
+        description={subtitle}
+        actions={
+          <>
+            <ExportButton
+              type="assets"
+              filters={() => new URLSearchParams(FILTERS.flatMap((k) => (params.get(k) ? [[k, params.get(k)!]] : [])))}
+            />
+            <Button
+              variant="secondary"
+              disabled={selected.size === 0 || selected.size > MAX_LABELS}
+              loading={printing}
+              onClick={printLabels}
+              title={
+                selected.size === 0
+                  ? 'Centang aset yang labelnya ingin dicetak'
+                  : selected.size > MAX_LABELS
+                    ? `Maksimal ${MAX_LABELS} label per cetak`
+                    : undefined
+              }
+            >
+              Cetak label QR{selected.size > 0 ? ` (${selected.size})` : ''}
+            </Button>
+            <Link to="/daftar-aset/baru" className={buttonClass('primary')}>
+              <Plus size={16} /> Tambah aset
+            </Link>
+          </>
+        }
+      />
+
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Input
+              placeholder="Cari nama, kode, atau nomor seri"
+              aria-label="Cari aset"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="pl-9"
+            />
+          </div>
           <Button
             variant="secondary"
-            disabled={selected.size === 0 || selected.size > MAX_LABELS}
-            loading={printing}
-            onClick={printLabels}
-            title={
-              selected.size === 0
-                ? 'Centang aset yang labelnya ingin dicetak'
-                : selected.size > MAX_LABELS
-                  ? `Maksimal ${MAX_LABELS} label per cetak`
-                  : undefined
-            }
+            className="lg:hidden"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((v) => !v)}
           >
-            Cetak label QR{selected.size > 0 ? ` (${selected.size})` : ''}
+            <SlidersHorizontal size={16} /> Filter{activeFilters > 0 ? ` (${activeFilters})` : ''}
           </Button>
-          <Link
-            to="/daftar-aset/baru"
-            className="inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-          >
-            Tambah aset
-          </Link>
         </div>
-      </div>
-
-      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
-        {field(
-          'Cari aset',
-          <Input placeholder="Nama atau kode aset" value={searchText} onChange={(e) => setSearchText(e.target.value)} />,
-          'lg:col-span-3',
-        )}
+        <div className={`${filtersOpen ? 'grid' : 'hidden'} gap-3 sm:grid-cols-2 lg:grid lg:grid-cols-7`}>
         {field(
           'Kategori',
           <Select value={params.get('category_id') ?? ''} onChange={(e) => setFilter('category_id', e.target.value)}>
@@ -233,7 +261,6 @@ export default function AssetListPage() {
             <option value="">Semua status</option>
             {STATUSES.map((s) => <option key={s}>{s}</option>)}
           </Select>,
-          'lg:col-span-2',
         )}
         {field(
           'Sumber',
@@ -243,7 +270,6 @@ export default function AssetListPage() {
               <option key={d.id} value={d.id}>{d.is_internal ? `${d.name} (Milik SHD)` : d.name}</option>
             ))}
           </Select>,
-          'lg:col-span-2',
         )}
         {field(
           'Kondisi',
@@ -253,22 +279,23 @@ export default function AssetListPage() {
           </Select>,
         )}
         <div className="flex items-end">
-          <Button variant="secondary" className="w-full" disabled={!hasFilter} onClick={resetFilters}>
-            Reset
+          <Button variant="ghost" className="w-full" disabled={!hasFilter} onClick={resetFilters}>
+            Reset filter
           </Button>
+        </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 text-sm text-slate-600">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <button
-          className="text-brand-700 underline disabled:text-slate-400 disabled:no-underline"
+          className="font-semibold text-brand-700 hover:underline disabled:text-slate-500 disabled:no-underline"
           disabled={rows.length === 0}
           onClick={togglePage}
         >
           {allOnPage ? 'Batal pilih halaman ini' : 'Pilih semua di halaman ini'}
         </button>
         {selected.size > 0 && (
-          <button className="text-brand-700 underline" onClick={() => setSelected(new Set())}>
+          <button className="font-semibold text-brand-700 hover:underline" onClick={() => setSelected(new Set())}>
             Kosongkan pilihan ({selected.size})
           </button>
         )}

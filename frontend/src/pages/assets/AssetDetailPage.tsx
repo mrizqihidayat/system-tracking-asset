@@ -1,7 +1,9 @@
-import { ChevronDown, ChevronRight, EllipsisVertical, FileText } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, EllipsisVertical, FileText, ImageOff, Pencil, TriangleAlert } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { StatusBadge } from '../../components/ui/Badge'
+import { AssetCode, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
+import { buttonClass } from '../../components/ui/button-class'
+import { Muted, Panel } from '../../components/ui/Page'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu, { type MenuItem } from '../../components/ui/DropdownMenu'
@@ -24,46 +26,43 @@ type ModalState =
   | { kind: 'found' | 'service' | 'move' | 'delete' }
   | null
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
   return (
-    <div>
-      <dt className="text-xs text-slate-500">{label}</dt>
+    <div className={wide ? 'col-span-2' : ''}>
+      <dt className="text-xs font-medium text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-sm">{children || '-'}</dd>
     </div>
   )
 }
 
-function Card({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
-      <h2 className="mb-4 font-semibold">{title}</h2>
-      {children}
-    </section>
-  )
-}
-
-const boxClass = 'flex aspect-square flex-col items-center justify-center gap-1 overflow-hidden rounded-md border text-center text-xs'
+const boxClass =
+  'flex aspect-square flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border text-center text-xs'
 
 function PhotoBox({ label, file, onOpen }: { label: string; file?: AssetFile; onOpen: (f: AssetFile) => void }) {
   const isImage = file?.mime_type.startsWith('image/') ?? false
   const src = useBlobUrl(file && isImage ? file.download_url : null)
 
   if (!file) {
-    return <div className={`${boxClass} border-dashed border-slate-300 p-2 text-slate-400`}>Belum ada {label.toLowerCase()}</div>
+    return (
+      <div className={`${boxClass} border-dashed border-slate-300 bg-slate-50 p-2 text-slate-500`}>
+        <ImageOff size={22} className="text-slate-400" />
+        Belum ada {label.toLowerCase()}
+      </div>
+    )
   }
   return (
     <button
       type="button"
       onClick={() => onOpen(file)}
       aria-label={`Lihat ${label}`}
-      className={`${boxClass} border-slate-200 bg-slate-50 hover:border-brand-500`}
+      className={`${boxClass} border-slate-200 bg-slate-50 transition-colors hover:border-brand-600`}
     >
       {isImage && src ? (
         <img src={src} alt={label} className="h-full w-full object-cover" />
       ) : (
         <>
-          <FileText size={28} className="text-slate-400" />
-          <span className="px-1 text-slate-600">{isImage ? 'Memuat…' : 'PDF · klik untuk melihat'}</span>
+          <FileText size={26} className="text-slate-400" />
+          <span className="px-1 text-slate-600">{isImage ? 'Memuat…' : 'PDF · ketuk untuk melihat'}</span>
         </>
       )}
     </button>
@@ -77,10 +76,10 @@ function QrBox({ assetId, onOpen }: { assetId: number; onOpen: () => void }) {
       type="button"
       onClick={onOpen}
       aria-label="Lihat label QR (PDF)"
-      className={`${boxClass} border-slate-200 bg-slate-50 p-2 hover:border-brand-500`}
+      className={`${boxClass} border-slate-200 bg-white p-2 transition-colors hover:border-brand-600`}
     >
-      {src ? <img src={src} alt="Label QR" className="h-4/5 w-4/5 object-contain" /> : <span className="text-slate-400">Memuat…</span>}
-      <span className="text-slate-600">Label QR</span>
+      {src ? <img src={src} alt="Label QR" className="h-4/5 w-4/5 object-contain" /> : <span className="text-slate-500">Memuat…</span>}
+      <span className="font-medium text-slate-600">Label QR</span>
     </button>
   )
 }
@@ -122,7 +121,7 @@ export default function AssetDetailPage() {
       .finally(() => setLoading(false))
   }, [fetchData, navigate, toast])
 
-  if (loading || !asset) return <p className="text-slate-500">Memuat…</p>
+  if (loading || !asset) return <Muted>Memuat…</Muted>
 
   const view = (request: Parameters<typeof openInNewTab>[0]) =>
     openInNewTab(request).catch((e) => toast.error(errorMessage(e)))
@@ -162,14 +161,21 @@ export default function AssetDetailPage() {
   ].filter((i): i is MenuItem => !!i)
 
   const eventColumns: Column<AssetEvent>[] = [
-    { header: 'Tanggal', cell: (e) => formatDateTime(e.event_date) },
+    {
+      header: 'Tanggal',
+      mobile: 'badge',
+      cell: (e) => <span className="whitespace-nowrap text-slate-600">{formatDateTime(e.event_date)}</span>,
+    },
     {
       header: 'Kegiatan',
+      mobile: 'title',
       cell: (e) => (
         <>
           <span className="font-medium">{e.event_type}</span>
           {e.from_room && e.to_room && (
-            <span className="block text-xs text-slate-500">{roomLabel(e.from_room)} → {roomLabel(e.to_room)}</span>
+            <span className="flex flex-wrap items-center gap-1 text-xs text-slate-500">
+              {roomLabel(e.from_room)} <ArrowRight size={12} /> {roomLabel(e.to_room)}
+            </span>
           )}
           {e.note && <span className="block whitespace-pre-wrap text-xs text-slate-500">{e.note}</span>}
         </>
@@ -184,55 +190,57 @@ export default function AssetDetailPage() {
     <li className="flex items-center justify-between py-2.5 text-sm">
       <span>{label}</span>
       {file ? (
-        <button className="text-brand-700 underline" onClick={() => viewFile(file)}>Lihat</button>
+        <button className="font-semibold text-brand-700 hover:underline" onClick={() => viewFile(file)}>Lihat</button>
       ) : (
-        <span className="text-slate-400">Belum ada</span>
+        <span className="text-slate-500">Belum ada</span>
       )}
     </li>
   )
 
   return (
-    <div className="max-w-6xl space-y-5">
-      <nav className="text-sm text-slate-500">
-        <Link to="/daftar-aset" className="text-brand-700 underline">Daftar Aset</Link> · {asset.code}
-      </nav>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{asset.name}</h1>
-          <p className="mt-1 font-mono text-sm text-slate-500">
-            {asset.code} · S/N {asset.serial_number ?? '-'}
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <Link to="/daftar-aset" className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+            <ArrowLeft size={14} /> Daftar Aset
+          </Link>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <AssetCode code={asset.code} className="text-sm" />
+            <StatusBadge status={asset.status} />
+            <ConditionBadge condition={asset.condition} />
+          </div>
+          <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-balance">{asset.name}</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {asset.asset_type?.name ?? '-'}
+            {asset.brand && ` · ${asset.brand}`} · S/N {asset.serial_number ?? '-'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {reportItems.length > 0 && <DropdownMenu label="Lapor rusak / hilang" trigger="Lapor rusak / hilang" items={reportItems} />}
-          <Link
-            to={`/daftar-aset/${asset.id}/ubah`}
-            className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Ubah data
+          <Link to={`/daftar-aset/${asset.id}/ubah`} className={buttonClass('secondary')}>
+            <Pencil size={16} /> Ubah data
           </Link>
           {can('pinjam') && (
-            <Link
-              to={`/peminjaman?asset_id=${asset.id}`}
-              className="inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            >
+            <Link to={`/peminjaman?asset_id=${asset.id}`} className={buttonClass('primary')}>
               Catat peminjaman
             </Link>
           )}
-          <DropdownMenu label="Aksi lainnya" trigger={<EllipsisVertical size={18} />} items={moreItems} triggerClassName="px-2!" />
+          <DropdownMenu label="Aksi lainnya" trigger={<EllipsisVertical size={18} />} items={moreItems} triggerClassName="px-2.5!" />
         </div>
       </div>
 
       {asset.lost_during_loan && (
-        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-          Hilang saat dipinjam oleh {asset.lost_during_loan.borrower_name}, {asset.lost_during_loan.borrower_unit},{' '}
-          {formatDate(asset.lost_during_loan.date)}.
+        <div className="flex items-start gap-3 rounded-xl bg-bad-50 px-4 py-3 text-sm text-bad-700">
+          <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+          <p>
+            Hilang saat dipinjam oleh <b>{asset.lost_during_loan.borrower_name}</b>, {asset.lost_during_loan.borrower_unit},{' '}
+            {formatDate(asset.lost_during_loan.date)}.
+          </p>
         </div>
       )}
 
-      <div className="grid items-start gap-5 lg:grid-cols-2">
-        <Card title="Data aset">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <Panel title="Data aset">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
             <Field label="Kategori">{asset.asset_type?.category?.name}</Field>
             <Field label="Sumber">{asset.source_department?.name}</Field>
@@ -246,27 +254,27 @@ export default function AssetDetailPage() {
             <Field label="Status"><StatusBadge status={asset.status} /></Field>
             <Field label="Tanggal perolehan">{asset.acquisition_date ? formatDate(asset.acquisition_date) : null}</Field>
             <Field label="Servis berikutnya">{asset.next_service_date ? formatDate(asset.next_service_date) : null}</Field>
-            <Field label="Kode aset Keuangan"><span className="font-mono">{asset.finance_code}</span></Field>
-            <div className="col-span-2">
-              <Field label="Standar ruangan">
-                {std ? (std.is_standard ? `Wajib di ${asset.room?.name} (${std.quantity} unit)` : 'Tidak termasuk standar ruangan') : null}
-              </Field>
-            </div>
-            {asset.asset_type && <Field label="Jenis aset">{asset.asset_type.name}</Field>}
-            {asset.brand && <Field label="Merek">{asset.brand}</Field>}
+            <Field label="Kode aset Keuangan">{asset.finance_code && <span className="font-mono">{asset.finance_code}</span>}</Field>
+            <Field label="Standar ruangan" wide>
+              {std ? (std.is_standard ? `Wajib di ${asset.room?.name} (${std.quantity} unit)` : 'Tidak termasuk standar ruangan') : null}
+            </Field>
             {asset.previous_codes && asset.previous_codes.length > 0 && (
-              <Field label="Kode lama">{asset.previous_codes.map((c) => c.code).join(', ')}</Field>
+              <Field label="Kode lama" wide>
+                <span className="flex flex-wrap gap-1.5">
+                  {asset.previous_codes.map((c) => <AssetCode key={c.code} code={c.code} />)}
+                </span>
+              </Field>
             )}
             {asset.specification && (
-              <div className="col-span-2"><Field label="Spesifikasi"><span className="whitespace-pre-wrap">{asset.specification}</span></Field></div>
+              <Field label="Spesifikasi" wide><span className="whitespace-pre-wrap">{asset.specification}</span></Field>
             )}
             {asset.note && (
-              <div className="col-span-2"><Field label="Catatan"><span className="whitespace-pre-wrap">{asset.note}</span></Field></div>
+              <Field label="Catatan" wide><span className="whitespace-pre-wrap">{asset.note}</span></Field>
             )}
           </dl>
-        </Card>
+        </Panel>
 
-        <Card title="Foto & dokumen">
+        <Panel title="Foto & dokumen">
           <div className="grid grid-cols-3 gap-3">
             <PhotoBox label="Foto aset" file={fileOf('Foto Aset')} onOpen={viewFile} />
             <PhotoBox label="Foto kondisi terakhir" file={fileOf('Foto Kondisi')} onOpen={viewFile} />
@@ -290,20 +298,21 @@ export default function AssetDetailPage() {
                 <ul className="mt-1 divide-y divide-slate-100">
                   {others.map((file) => (
                     <li key={file.id} className="flex items-center justify-between gap-2 py-2 text-sm">
-                      <span className="min-w-0 truncate">{file.original_name} <span className="text-slate-400">· {formatSize(file.size)}</span></span>
-                      <button className="shrink-0 text-brand-700 underline" onClick={() => viewFile(file)}>Lihat</button>
+                      <span className="min-w-0 truncate">{file.original_name} <span className="text-slate-500">· {formatSize(file.size)}</span></span>
+                      <button className="shrink-0 font-semibold text-brand-700 hover:underline" onClick={() => viewFile(file)}>Lihat</button>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
           )}
-        </Card>
+        </Panel>
       </div>
 
-      <Card title="Riwayat aset">
+      <section className="space-y-3">
+        <h2 className="font-semibold">Riwayat aset</h2>
         <DataTable columns={eventColumns} rows={events} rowKey={(e) => e.id} emptyText="Belum ada riwayat." />
-      </Card>
+      </section>
 
       {modal?.kind === 'report' && <ReportModal asset={asset} mode={modal.mode} onClose={closeModal} onDone={reloadAfter} />}
       {modal?.kind === 'found' && (

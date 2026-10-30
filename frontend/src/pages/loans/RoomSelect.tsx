@@ -31,7 +31,7 @@ export default function RoomSelect({ buildingLabel, roomLabel, buildingId, roomI
   }, [buildingId, toast])
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid gap-3 sm:grid-cols-2">
       <FormField label={buildingLabel} required={required}>
         <Select value={buildingId ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null, null)}>
           <option value="">Pilih gedung</option>

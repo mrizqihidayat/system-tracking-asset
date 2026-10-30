@@ -1,7 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import { Badge } from '../components/ui/Badge'
+import { QrCode, Search } from 'lucide-react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { AssetCode, Badge } from '../components/ui/Badge'
+import { buttonClass } from '../components/ui/button-class'
 import DropdownMenu from '../components/ui/DropdownMenu'
+import { Muted, PageHeader, Panel } from '../components/ui/Page'
 import { useToast } from '../components/ui/toast-context'
 import { api, errorMessage } from '../lib/api'
 import { downloadReport, REPORT_LABELS, type ReportType } from '../lib/download'
@@ -45,42 +48,43 @@ interface Dashboard {
 
 const requestColor = { Diajukan: 'blue', Diterima: 'green', 'Belum direspons': 'amber', Dikembalikan: 'slate', Dibatalkan: 'red' } as const
 
-const linkClass = 'text-sm text-brand-700 underline'
-
-function StatCard({ label, value, tone = 'text-slate-900', note }: { label: string; value: number; tone?: string; note: ReactNode }) {
+function StatCard({ label, value, to, alert, note }: { label: string; value: number; to: string; alert?: boolean; note: ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`mt-2 text-3xl font-semibold ${tone}`}>{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{note}</p>
-    </div>
-  )
-}
-
-function Panel({ title, link, children }: { title: string; link?: { to: string; label: string }; children: ReactNode }) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
-      <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="font-semibold">{title}</h2>
-        {link && <Link to={link.to} className={linkClass}>{link.label}</Link>}
-      </div>
-      {children}
-    </section>
+    <Link
+      to={to}
+      className="group rounded-xl border border-slate-200 bg-white px-4 py-3.5 transition-colors hover:border-brand-200"
+    >
+      <p className="text-sm font-medium text-slate-500 group-hover:text-brand-700">{label}</p>
+      <p className={`mt-0.5 text-3xl font-bold tabular-nums ${alert ? 'text-bad-700' : ''}`}>{value}</p>
+      <p className="mt-0.5 text-xs text-slate-500">{note}</p>
+    </Link>
   )
 }
 
 function Tempo({ loan }: { loan: Loan }) {
-  if (loan.is_due_today) return <span className="font-semibold text-amber-700">Hari ini</span>
+  if (loan.is_due_today) return <Badge color="amber">Hari ini</Badge>
   const days = Math.round((new Date(`${loan.due_date}T00:00:00`).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000)
-  if (loan.is_overdue) return <span className="font-semibold text-red-700">Terlambat {Math.abs(days)} hari</span>
-  return <span>{days} hari lagi</span>
+  if (loan.is_overdue) return <Badge color="red">{`Terlambat ${Math.abs(days)} hari`}</Badge>
+  return <Badge color="blue">{`${days} hari lagi`}</Badge>
 }
 
-const Empty = ({ children }: { children: ReactNode }) => <p className="py-2 text-sm text-slate-500">{children}</p>
+/** Bar kesiapan ruangan per gedung: lengkap (hijau) vs kurang (merah). */
+function ReadinessBar({ complete, incomplete }: { complete: number; incomplete: number }) {
+  const total = complete + incomplete
+  if (total === 0) return null
+  return (
+    <div className="flex h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+      <span className="bg-bar-ok" style={{ width: `${(complete / total) * 100}%` }} />
+      <span className="bg-bar-bad" style={{ width: `${(incomplete / total) * 100}%` }} />
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [data, setData] = useState<Dashboard | null>(null)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     api
@@ -91,150 +95,262 @@ export default function DashboardPage() {
 
   const exportReport = (type: ReportType) => downloadReport(type).catch((e) => toast.error(errorMessage(e)))
 
-  if (!data) return <p className="text-slate-500">Memuat…</p>
-  const { cards, panels } = data
+  const submitSearch = (e: FormEvent) => {
+    e.preventDefault()
+    const q = search.trim()
+    navigate(q ? `/daftar-aset?search=${encodeURIComponent(q)}` : '/daftar-aset')
+  }
 
-  return (
-    <div className="max-w-7xl space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600">Ringkasan kondisi aset dan kesiapan ruangan</p>
-        </div>
-        <div className="flex gap-2">
+  const header = (
+    <PageHeader
+      title="Dashboard"
+      actions={
+        <>
+          <form onSubmit={submitSearch} className="relative w-full sm:w-64" role="search">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari kode atau nama aset"
+              aria-label="Cari aset"
+              className="min-h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm placeholder:text-slate-500 hover:border-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            />
+          </form>
           <DropdownMenu
             label="Ekspor laporan"
             trigger="Ekspor laporan"
             items={(Object.keys(REPORT_LABELS) as ReportType[]).map((t) => ({ label: REPORT_LABELS[t], onClick: () => exportReport(t) }))}
           />
-          <Link
-            to="/daftar-aset/baru"
-            className="inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-          >
-            Tambah aset
+          <Link to="/scan" className={buttonClass('primary')}>
+            <QrCode size={16} /> Scan QR
           </Link>
-        </div>
-      </div>
+        </>
+      }
+    />
+  )
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  if (!data) {
+    return (
+      <div className="space-y-5">
+        {header}
+        <Muted>Memuat…</Muted>
+      </div>
+    )
+  }
+  const { cards, panels } = data
+
+  return (
+    <div className="space-y-5">
+      {header}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 min-[85rem]:grid-cols-6">
         <StatCard
-          label="Total aset tercatat"
+          label="Total aset"
           value={cards.total_assets.total}
+          to="/daftar-aset"
           note={
             <>
-              {cards.total_assets.owned_by_shd} milik SHD · {cards.total_assets.from_other_units} dari unit lain
-              {cards.total_assets.not_feasible > 0 && ` · ${cards.total_assets.not_feasible} tidak layak pakai (tidak dihitung)`}
+              {cards.total_assets.owned_by_shd} milik SHD · {cards.total_assets.from_other_units} unit lain
+              {cards.total_assets.not_feasible > 0 && ` · ${cards.total_assets.not_feasible} tidak layak pakai`}
             </>
           }
         />
         <StatCard
           label="Sedang dipinjam"
           value={cards.active_loans.total}
-          tone="text-brand-700"
+          to="/peminjaman"
           note={
             <>
               {cards.active_loans.due_today} jatuh tempo hari ini
-              {cards.active_loans.overdue > 0 && <span className="text-red-700"> · {cards.active_loans.overdue} terlambat</span>}
+              {cards.active_loans.overdue > 0 && (
+                <span className="font-semibold text-bad-700"> · {cards.active_loans.overdue} terlambat</span>
+              )}
             </>
           }
         />
         <StatCard
           label="Perlu perbaikan"
           value={cards.needs_repair.assets_in_repair}
-          tone="text-amber-700"
+          to="/daftar-aset?status=Perbaikan"
           note={`${cards.needs_repair.loans_pending_confirmation} menunggu konfirmasi peminjam`}
         />
         <StatCard
           label="Ruangan belum lengkap"
           value={cards.incomplete_rooms.incomplete}
-          tone="text-amber-700"
-          note={`dari ${cards.incomplete_rooms.total_rooms} ruangan di ${cards.incomplete_rooms.total_buildings} gedung`}
+          to="/kelengkapan-ruangan"
+          alert={cards.incomplete_rooms.incomplete > 0}
+          note={`dari ${cards.incomplete_rooms.total_rooms} ruangan · ${cards.incomplete_rooms.total_buildings} gedung`}
+        />
+        <StatCard
+          label="Perlu servis"
+          value={cards.needs_service.total}
+          to="/daftar-aset"
+          note={
+            cards.needs_service.overdue > 0 ? (
+              <span className="font-semibold text-bad-700">{cards.needs_service.overdue} lewat tanggal</span>
+            ) : (
+              `${cards.needs_service.upcoming} dalam 14 hari`
+            )
+          }
+        />
+        <StatCard
+          label="Stok menipis"
+          value={cards.low_stock.total}
+          to="/stok"
+          alert={cards.low_stock.habis > 0}
+          note={`${cards.low_stock.menipis} menipis · ${cards.low_stock.habis} habis`}
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm">
-          <span className="text-slate-600">Perlu servis</span>
-          <span>
-            <b>{cards.needs_service.total}</b> aset
-            {cards.needs_service.overdue > 0 && <span className="text-red-700"> · {cards.needs_service.overdue} lewat tanggal</span>}
-          </span>
-        </div>
-        <Link to="/stok" className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm hover:border-brand-500">
-          <span className="text-slate-600">Stok habis pakai menipis</span>
-          <span>
-            <b>{cards.low_stock.total}</b> barang
-            {cards.low_stock.habis > 0 && <span className="text-red-700"> · {cards.low_stock.habis} habis</span>}
-          </span>
-        </Link>
-      </div>
-
-      <div className="grid items-start gap-5 lg:grid-cols-2">
-        <Panel title="Peminjaman jatuh tempo" link={{ to: '/peminjaman', label: 'Lihat semua' }}>
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-5">
+        <Panel title="Peminjaman jatuh tempo & terlambat" link={{ to: '/peminjaman', label: 'Lihat semua' }} flush>
           {panels.loans_due.length === 0 ? (
-            <Empty>Tidak ada peminjaman yang jatuh tempo.</Empty>
+            <Muted className="px-5 pb-5">Tidak ada peminjaman yang jatuh tempo.</Muted>
           ) : (
-            <table className="w-full text-left text-sm">
-              <thead className="text-slate-500">
-                <tr className="border-b border-slate-200">
-                  <th className="py-2 pr-3 font-normal">Kode</th>
-                  <th className="py-2 pr-3 font-normal">Aset</th>
-                  <th className="py-2 pr-3 font-normal">Peminjam</th>
-                  <th className="py-2 font-normal">Tempo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {panels.loans_due.map((l) => (
-                  <tr key={l.id}>
-                    <td className="py-3 pr-3 font-mono text-xs">{l.asset?.code}</td>
-                    <td className="py-3 pr-3">{l.asset?.name}</td>
-                    <td className="py-3 pr-3">{l.borrower_name}</td>
-                    <td className="py-3"><Tempo loan={l} /></td>
+            <>
+              <table className="hidden w-full text-left text-sm md:table">
+                <thead className="border-y border-slate-100 bg-slate-50 text-xs text-slate-500">
+                  <tr>
+                    <th className="px-5 py-2.5 font-semibold">Kode</th>
+                    <th className="px-3 py-2.5 font-semibold">Aset</th>
+                    <th className="px-3 py-2.5 font-semibold">Peminjam</th>
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Rencana kembali</th>
+                    <th className="px-5 py-2.5 font-semibold">Status</th>
                   </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {panels.loans_due.map((l) => (
+                    <tr key={l.id}>
+                      <td className="px-5 py-3">{l.asset && <AssetCode code={l.asset.code} />}</td>
+                      <td className="px-3 py-3">{l.asset?.name}</td>
+                      <td className="px-3 py-3">
+                        {l.borrower_name}
+                        <span className="block text-xs text-slate-500">{l.borrower_unit}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3">{formatDate(l.due_date)}</td>
+                      <td className="px-5 py-3"><Tempo loan={l} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <ul className="divide-y divide-slate-100 border-t border-slate-100 md:hidden">
+                {panels.loans_due.map((l) => (
+                  <li key={l.id} className="space-y-1 px-5 py-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        {l.asset && <AssetCode code={l.asset.code} />}
+                        <p className="mt-1 font-medium">{l.asset?.name}</p>
+                      </div>
+                      <Tempo loan={l} />
+                    </div>
+                    <p className="text-slate-500">
+                      {l.borrower_name} · {l.borrower_unit} · kembali {formatDate(l.due_date)}
+                    </p>
+                  </li>
                 ))}
-              </tbody>
-            </table>
+              </ul>
+            </>
           )}
         </Panel>
 
-        <div className="space-y-5">
-          <Panel title="Kesiapan ruangan" link={{ to: '/kelengkapan-ruangan', label: 'Cek kelengkapan' }}>
-            {panels.room_readiness.length === 0 && <Empty>Belum ada gedung.</Empty>}
-            <div className="space-y-4">
+        <Panel title="Permintaan ke unit lain" link={{ to: '/permintaan', label: 'Kelola' }} flush>
+          {panels.recent_requests.length === 0 ? (
+            <Muted className="px-5 pb-5">Belum ada permintaan.</Muted>
+          ) : (
+            <ul className="divide-y divide-slate-100 border-t border-slate-100">
+              {panels.recent_requests.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{r.item_name}</span>
+                    <span className="block truncate text-xs text-slate-500">{r.provider_department?.name ?? '-'}</span>
+                  </span>
+                  <Badge color={requestColor[r.display_status]}>{r.display_status}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+        </div>
+
+        <div className="min-w-0 space-y-5">
+          <Panel title="Kelengkapan ruangan" link={{ to: '/kelengkapan-ruangan', label: 'Lihat ruangan' }} flush>
+            {panels.room_readiness.length === 0 && <Muted className="px-5 pb-5">Belum ada gedung.</Muted>}
+            <ul className="divide-y divide-slate-100 border-t border-slate-100">
               {panels.room_readiness.map((b) => {
-                const others = b.rooms_count - b.incomplete_rooms.length
+                const incomplete = b.incomplete_rooms_count
+                const complete = b.rooms_count - incomplete
                 return (
-                  <div key={b.id}>
-                    <p className="mb-1 text-xs uppercase tracking-wide text-slate-500">{b.name} · {b.rooms_count} ruangan</p>
-                    <ul className="space-y-1.5 text-sm">
-                      {b.incomplete_rooms.map((r) => (
-                        <li key={r.id} className="flex items-center justify-between gap-2">
-                          <Link to={`/kelengkapan-ruangan/${b.slug}/${r.slug}`} className="hover:underline">{r.name}</Link>
-                          <Badge color="amber">{`Kurang ${r.shortage_items} item`}</Badge>
-                        </li>
-                      ))}
-                      {others > 0 && (
-                        <li className="flex items-center justify-between gap-2">
-                          <span>{b.incomplete_rooms.length ? `${others} ruangan lainnya` : `Semua ${others} ruangan`}</span>
-                          <Badge color="green">Lengkap</Badge>
-                        </li>
+                  <li key={b.id} className="space-y-2 px-5 py-3.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-semibold">{b.name}</span>
+                      {incomplete > 0 ? (
+                        <Badge color="red">{`Kurang ${incomplete} ruangan`}</Badge>
+                      ) : (
+                        <Badge color="green">Lengkap</Badge>
                       )}
-                    </ul>
-                  </div>
+                    </div>
+                    <ReadinessBar complete={complete} incomplete={incomplete} />
+                    <p className="text-sm text-slate-500">
+                      {complete} lengkap · {incomplete} kurang · {b.rooms_count} ruangan
+                    </p>
+                    {incomplete > 0 && (
+                      <ul className="space-y-1 pt-1 text-sm">
+                        {b.incomplete_rooms.map((r) => (
+                          <li key={r.id} className="flex items-center justify-between gap-3">
+                            <Link to={`/kelengkapan-ruangan/${b.slug}/${r.slug}`} className="min-w-0 truncate text-brand-700 hover:underline">
+                              {r.name}
+                            </Link>
+                            <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-bad-700">
+                              Kurang {r.shortage_items} item
+                              {r.unchecked_items > 0 && <span className="font-normal text-slate-500"> · {r.unchecked_items} belum dicek</span>}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
                 )
               })}
-            </div>
+            </ul>
           </Panel>
 
-          <Panel title="Permintaan ke unit lain" link={{ to: '/permintaan', label: 'Kelola' }}>
-            {panels.recent_requests.length === 0 ? (
-              <Empty>Belum ada permintaan.</Empty>
+          <Panel title="Stok menipis" link={{ to: '/stok', label: 'Lihat stok' }} flush>
+            {panels.low_stock.length === 0 ? (
+              <Muted className="px-5 pb-5">Semua stok aman.</Muted>
             ) : (
-              <ul className="space-y-2 text-sm">
-                {panels.recent_requests.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate">{r.item_name} · {r.provider_department?.name ?? '-'}</span>
-                    <Badge color={requestColor[r.display_status]}>{r.display_status}</Badge>
+              <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                {panels.low_stock.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+                    <span className="min-w-0 truncate">{c.name}</span>
+                    <span className="flex shrink-0 items-center gap-3">
+                      <span className="whitespace-nowrap tabular-nums text-slate-500">
+                        {c.quantity} {c.unit}
+                      </span>
+                      <Badge color={c.status === 'Habis' ? 'red' : 'amber'}>{c.status}</Badge>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel title="Aset perlu servis" link={{ to: '/daftar-aset', label: 'Daftar aset' }} flush>
+            {panels.assets_need_service.length === 0 ? (
+              <Muted className="px-5 pb-5">Tidak ada aset yang perlu servis dalam 14 hari.</Muted>
+            ) : (
+              <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                {panels.assets_need_service.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+                    <Link to={`/daftar-aset/${a.id}`} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 hover:text-brand-700">
+                      <AssetCode code={a.code} />
+                      <span>{a.name}</span>
+                    </Link>
+                    {a.is_overdue ? (
+                      <Badge color="red">{`Lewat ${Math.abs(a.days_until_service)} hari`}</Badge>
+                    ) : (
+                      <span className="shrink-0 whitespace-nowrap text-slate-500">{formatDate(a.next_service_date)}</span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -242,41 +358,6 @@ export default function DashboardPage() {
           </Panel>
         </div>
       </div>
-
-      {(panels.assets_need_service.length > 0 || panels.low_stock.length > 0) && (
-        <div className="grid items-start gap-5 lg:grid-cols-2">
-          {panels.assets_need_service.length > 0 && (
-            <Panel title="Aset perlu servis" link={{ to: '/daftar-aset', label: 'Daftar aset' }}>
-              <ul className="space-y-2 text-sm">
-                {panels.assets_need_service.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between gap-2">
-                    <Link to={`/daftar-aset/${a.id}`} className="min-w-0 truncate hover:underline">
-                      <span className="font-mono text-xs text-slate-500">{a.code}</span> {a.name}
-                    </Link>
-                    <span className={`shrink-0 text-xs ${a.is_overdue ? 'font-semibold text-red-700' : 'text-slate-600'}`}>
-                      {a.is_overdue ? `Lewat ${Math.abs(a.days_until_service)} hari` : formatDate(a.next_service_date)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          )}
-          {panels.low_stock.length > 0 && (
-            <Panel title="Stok menipis" link={{ to: '/stok', label: 'Kelola stok' }}>
-              <ul className="space-y-2 text-sm">
-                {panels.low_stock.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate">
-                      {c.name} <span className="text-slate-500">· {c.quantity} {c.unit} (min. {c.min_quantity})</span>
-                    </span>
-                    <Badge color={c.status === 'Habis' ? 'red' : 'amber'}>{c.status}</Badge>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          )}
-        </div>
-      )}
     </div>
   )
 }

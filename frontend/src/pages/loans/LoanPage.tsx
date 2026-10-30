@@ -1,8 +1,9 @@
-import { EllipsisVertical } from 'lucide-react'
+import { EllipsisVertical, Search } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
-import { Badge } from '../../components/ui/Badge'
+import { AssetCode, Badge } from '../../components/ui/Badge'
+import { PageHeader } from '../../components/ui/Page'
 import Button from '../../components/ui/Button'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu from '../../components/ui/DropdownMenu'
@@ -23,18 +24,18 @@ const statusColor = { Dipinjam: 'blue', Dikembalikan: 'green', Dibatalkan: 'slat
 
 /** "Hari ini" / "N hari lagi" / "Terlambat N hari" dari rencana kembali. */
 function Tempo({ loan }: { loan: Loan }) {
-  if (loan.is_due_today) return <span className="font-semibold text-amber-700">Hari ini</span>
+  if (loan.is_due_today) return <Badge color="amber">Hari ini</Badge>
   const days = Math.round((new Date(`${loan.due_date}T00:00:00`).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000)
-  if (loan.is_overdue) return <span className="font-semibold text-red-700">Terlambat {Math.abs(days)} hari</span>
-  return <span>{days} hari lagi</span>
+  if (loan.is_overdue) return <Badge color="red">{`Terlambat ${Math.abs(days)} hari`}</Badge>
+  return <span className="whitespace-nowrap text-slate-600">{days} hari lagi</span>
 }
 
 const assetCell = (l: Loan) => (
   <>
+    {l.asset && <AssetCode code={l.asset.code} />}
     {l.asset ? (
-      <Link to={`/daftar-aset/${l.asset.id}`} className="font-medium hover:underline">{l.asset.name}</Link>
+      <Link to={`/daftar-aset/${l.asset.id}`} className="mt-1 block font-medium hover:text-brand-700 hover:underline">{l.asset.name}</Link>
     ) : '-'}
-    <span className="block font-mono text-xs text-slate-500">{l.asset?.code}</span>
   </>
 )
 
@@ -82,21 +83,29 @@ export default function LoanPage() {
   }
 
   const activeColumns: Column<Loan>[] = [
-    { header: 'Aset', cell: assetCell },
-    { header: 'Peminjam', cell: (l) => l.borrower_name },
-    { header: 'Tempo', cell: (l) => <Tempo loan={l} /> },
+    {
+      header: 'Aset & peminjam',
+      mobile: 'title',
+      cell: (l) => (
+        <>
+          {assetCell(l)}
+          <span className="block text-xs text-slate-500">{l.borrower_name} · {l.borrower_unit}</span>
+        </>
+      ),
+    },
+    { header: 'Tempo', mobile: 'badge', cell: (l) => <Tempo loan={l} /> },
     {
       header: '',
       className: 'text-right',
       cell: (l) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button variant="secondary" className="px-3! py-1!" onClick={() => setModal({ kind: 'return', loan: l })}>
+        <div className="flex items-center gap-1 md:justify-end">
+          <Button variant="secondary" className="flex-1 px-3! md:flex-none" onClick={() => setModal({ kind: 'return', loan: l })}>
             Terima kembali
           </Button>
           <DropdownMenu
             label="Aksi lainnya"
             trigger={<EllipsisVertical size={16} />}
-            triggerClassName="px-1.5!"
+            triggerClassName="px-2.5!"
             items={[{ label: 'Batalkan', danger: true, onClick: () => setModal({ kind: 'cancel', loan: l }) }]}
           />
         </div>
@@ -105,7 +114,7 @@ export default function LoanPage() {
   ]
 
   const historyColumns: Column<Loan>[] = [
-    { header: 'Aset', cell: assetCell },
+    { header: 'Aset', mobile: 'title', cell: assetCell },
     {
       header: 'Peminjam',
       cell: (l) => (
@@ -115,12 +124,13 @@ export default function LoanPage() {
         </>
       ),
     },
-    { header: 'Tgl. pinjam', cell: (l) => formatDate(l.borrow_date) },
-    { header: 'Rencana kembali', cell: (l) => formatDate(l.due_date) },
+    { header: 'Tgl. pinjam', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.borrow_date)}</span> },
+    { header: 'Rencana kembali', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.due_date)}</span> },
     {
       header: 'Status',
+      mobile: 'badge',
       cell: (l) => (
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-col items-end gap-1 md:flex-row md:flex-wrap md:items-center">
           <Badge color={statusColor[l.status]}>{l.status}</Badge>
           {l.damage_confirmation && (
             <Badge color={l.damage_confirmation === 'Dikonfirmasi' ? 'green' : 'amber'}>
@@ -135,7 +145,7 @@ export default function LoanPage() {
       className: 'text-right',
       cell: (l) =>
         l.damage_confirmation === 'Menunggu Konfirmasi' ? (
-          <Button variant="secondary" className="px-3! py-1!" onClick={() => setModal({ kind: 'confirm', loan: l })}>
+          <Button variant="secondary" className="w-full md:w-auto" onClick={() => setModal({ kind: 'confirm', loan: l })}>
             Konfirmasi kerusakan
           </Button>
         ) : null,
@@ -143,27 +153,23 @@ export default function LoanPage() {
   ]
 
   return (
-    <div className="max-w-7xl space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Peminjaman &amp; Pengembalian</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Dicatat admin atas nama peminjam. Approval atasan di luar sistem, nomornya dicatat di sini.
-          </p>
-        </div>
-        <ExportButton type="loans" filters={() => ({ status, pending_confirmation: pending ? 1 : '', search: search.trim() })} />
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Peminjaman & Pengembalian"
+        description="Dicatat admin atas nama peminjam. Approval atasan di luar sistem, nomornya dicatat di sini."
+        actions={<ExportButton type="loans" filters={() => ({ status, pending_confirmation: pending ? 1 : '', search: search.trim() })} />}
+      />
 
-      <div className="grid items-start gap-5 xl:grid-cols-2">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <LoanForm onSaved={load} />
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="mb-3 flex items-baseline justify-between">
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-semibold">Sedang dipinjam</h2>
             <span className="text-sm text-slate-500">{active?.meta.total ?? 0} aset</span>
           </div>
           <DataTable columns={activeColumns} rows={active?.data ?? []} rowKey={(l) => l.id} loading={loading} emptyText="Tidak ada aset yang sedang dipinjam." />
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="text-xs text-slate-500">
             Saat menerima kembali, admin memilih kondisi aset. Kondisi selain Baik membuat status aset berubah menjadi Perbaikan
             (Rusak Ringan bisa dipilih Tersedia atau Perbaikan).
           </p>
@@ -172,22 +178,25 @@ export default function LoanPage() {
 
       <section className="space-y-3">
         <h2 className="font-semibold">Riwayat peminjaman</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            className="max-w-xs"
-            value={search}
-            onChange={(e) => filter(setSearch)(e.target.value)}
-            placeholder="Cari peminjam, unit, kode, atau nama aset"
-            aria-label="Cari peminjaman"
-          />
-          <Select className="w-auto" value={status} onChange={(e) => filter(setStatus)(e.target.value as LoanStatus | '')} aria-label="Status">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative sm:w-80">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Input
+              className="pl-9"
+              value={search}
+              onChange={(e) => filter(setSearch)(e.target.value)}
+              placeholder="Cari peminjam, unit, kode, atau nama aset"
+              aria-label="Cari peminjaman"
+            />
+          </div>
+          <Select className="sm:w-auto" value={status} onChange={(e) => filter(setStatus)(e.target.value as LoanStatus | '')} aria-label="Status">
             <option value="">Semua status</option>
             <option>Dipinjam</option>
             <option>Dikembalikan</option>
             <option>Dibatalkan</option>
             <option>Hilang</option>
           </Select>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex min-h-10 items-center gap-2 text-sm">
             <input type="checkbox" checked={pending} onChange={(e) => filter(setPending)(e.target.checked)} />
             Menunggu konfirmasi
           </label>

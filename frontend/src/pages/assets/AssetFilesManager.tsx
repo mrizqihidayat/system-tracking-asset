@@ -94,11 +94,12 @@ export default function AssetFilesManager({ assetId }: { assetId: number }) {
   const others = files.filter((f) => f.file_type === 'Lainnya')
 
   return (
-    <section className="max-w-3xl space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
       <div>
         <h2 className="font-semibold">Foto &amp; dokumen</h2>
-        <p className="text-xs text-slate-500">Perubahan file langsung tersimpan.</p>
-        <p className="text-xs text-slate-500">JPG, PNG, WebP, atau PDF, maksimal 5 MB per file.</p>
+        <p className="mt-0.5 text-xs text-slate-500">
+          Perubahan file langsung tersimpan. JPG, PNG, WebP, atau PDF, maksimal 5 MB per file.
+        </p>
       </div>
       {loading ? (
         <p className="text-sm text-slate-500">Memuat…</p>
@@ -108,23 +109,23 @@ export default function AssetFilesManager({ assetId }: { assetId: number }) {
             {SLOTS.map(({ type, label }) => {
               const file = files.find((f) => f.file_type === type)
               return (
-                <li key={type} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <li key={type} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="min-w-0">
-                    <span className="font-medium">{label}</span>
+                    <span className="block font-medium">{label}</span>
                     {file ? (
-                      <span className="ml-2 break-all text-slate-500">{file.original_name} · {formatSize(file.size)}</span>
+                      <span className="block break-all text-xs text-slate-500">{file.original_name} · {formatSize(file.size)}</span>
                     ) : (
-                      <span className="ml-2 text-slate-400">Belum ada</span>
+                      <span className="block text-xs text-slate-500">Belum ada</span>
                     )}
                   </span>
-                  <span className="flex gap-2">
+                  <span className="flex shrink-0 gap-2">
                     {picker(type, type)}
-                    {file && <Button variant="secondary" className="px-3! py-1!" onClick={() => view(file)}>Lihat</Button>}
-                    <Button variant="secondary" className="px-3! py-1!" loading={busy === type} onClick={() => inputs.current[type]?.click()}>
+                    {file && <Button variant="secondary" className="px-3!" onClick={() => view(file)}>Lihat</Button>}
+                    <Button variant="secondary" className="px-3!" loading={busy === type} onClick={() => inputs.current[type]?.click()}>
                       {file ? 'Ganti' : 'Unggah'}
                     </Button>
                     {file && (
-                      <Button variant="secondary" className="px-3! py-1! text-red-700" onClick={() => setToDelete(file)}>Hapus</Button>
+                      <Button variant="secondary" className="px-3! text-bad-700!" onClick={() => setToDelete(file)}>Hapus</Button>
                     )}
                   </span>
                 </li>
@@ -133,10 +134,10 @@ export default function AssetFilesManager({ assetId }: { assetId: number }) {
           </ul>
 
           <div className="space-y-2 border-t border-slate-100 pt-3 text-sm">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="font-medium">Dokumen lain ({others.length})</span>
               {picker('Lainnya', 'Lainnya')}
-              <Button variant="secondary" className="px-3! py-1!" loading={busy === 'Lainnya'} onClick={() => inputs.current.Lainnya?.click()}>
+              <Button variant="secondary" className="px-3!" loading={busy === 'Lainnya'} onClick={() => inputs.current.Lainnya?.click()}>
                 Tambah dokumen
               </Button>
             </div>
@@ -146,8 +147,8 @@ export default function AssetFilesManager({ assetId }: { assetId: number }) {
                   <li key={file.id} className="flex items-center justify-between gap-2 py-2">
                     <span className="min-w-0 break-all">{file.original_name} <span className="text-slate-500">· {formatSize(file.size)}</span></span>
                     <span className="flex shrink-0 gap-2">
-                      <Button variant="secondary" className="px-3! py-1!" onClick={() => view(file)}>Lihat</Button>
-                      <Button variant="secondary" className="px-3! py-1! text-red-700" onClick={() => setToDelete(file)}>Hapus</Button>
+                      <Button variant="secondary" className="px-3!" onClick={() => view(file)}>Lihat</Button>
+                      <Button variant="secondary" className="px-3! text-bad-700!" onClick={() => setToDelete(file)}>Hapus</Button>
                     </span>
                   </li>
                 ))}

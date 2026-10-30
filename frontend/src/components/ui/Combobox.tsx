@@ -55,17 +55,17 @@ export default function Combobox({
         onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
       />
       {open && (filtered.length > 0 || canCreate) && (
-        <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg">
+        <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-[0_8px_24px_rgb(20_33_46/0.12)]">
           {filtered.map((o) => (
             <li key={o.id}>
-              <button type="button" className="w-full px-3 py-1.5 text-left hover:bg-brand-50" onClick={() => pick(o.id, o.label)}>
+              <button type="button" className="w-full rounded-md px-3 py-2 text-left hover:bg-brand-50" onClick={() => pick(o.id, o.label)}>
                 {o.label}
               </button>
             </li>
           ))}
           {canCreate && (
             <li>
-              <button type="button" className="w-full px-3 py-1.5 text-left text-brand-700 hover:bg-brand-50" onClick={() => pick(null, value.trim())}>
+              <button type="button" className="w-full rounded-md px-3 py-2 text-left font-medium text-brand-700 hover:bg-brand-50" onClick={() => pick(null, value.trim())}>
                 Tambah “{value.trim()}”
               </button>
             </li>

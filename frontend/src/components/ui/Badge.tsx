@@ -1,25 +1,31 @@
 import type { Condition, Status } from '../../types/asset'
 
 const tone = {
-  green: 'bg-green-100 text-green-800',
-  blue: 'bg-blue-100 text-blue-800',
-  amber: 'bg-amber-100 text-amber-800',
-  red: 'bg-red-100 text-red-800',
-  slate: 'bg-slate-200 text-slate-700',
+  green: 'bg-ok-50 text-ok-700',
+  blue: 'bg-info-50 text-info-700',
+  amber: 'bg-warn-50 text-warn-700',
+  red: 'bg-bad-50 text-bad-700',
+  slate: 'bg-slate-100 text-slate-600',
 }
 
-export function Badge({ children, color = 'slate' }: { children: string; color?: keyof typeof tone }) {
-  return <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${tone[color]}`}>{children}</span>
+export type BadgeColor = keyof typeof tone
+
+export function Badge({ children, color = 'slate' }: { children: string; color?: BadgeColor }) {
+  return (
+    <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${tone[color]}`}>
+      {children}
+    </span>
+  )
 }
 
-const statusColor: Record<Status, keyof typeof tone> = {
+const statusColor: Record<Status, BadgeColor> = {
   Tersedia: 'green',
   Dipinjam: 'blue',
   Perbaikan: 'amber',
   Hilang: 'red',
   'Tidak Layak Pakai': 'slate',
 }
-const conditionColor: Record<Condition, keyof typeof tone> = {
+const conditionColor: Record<Condition, BadgeColor> = {
   Baik: 'green',
   'Rusak Ringan': 'amber',
   'Rusak Berat': 'red',
@@ -29,3 +35,12 @@ export const StatusBadge = ({ status }: { status: Status }) => <Badge color={sta
 export const ConditionBadge = ({ condition }: { condition: Condition }) => (
   <Badge color={conditionColor[condition]}>{condition}</Badge>
 )
+
+/** Kode aset sebagai label pelat mono; tidak pernah patah baris. */
+export function AssetCode({ code, className = '' }: { code: string; className?: string }) {
+  return (
+    <span className={`inline-block whitespace-nowrap rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-800 ${className}`}>
+      {code}
+    </span>
+  )
+}

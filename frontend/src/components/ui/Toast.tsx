@@ -9,9 +9,9 @@ interface Item {
 }
 
 const styles: Record<ToastKind, string> = {
-  success: 'border-green-300 bg-green-50 text-green-800',
-  error: 'border-red-300 bg-red-50 text-red-800',
-  info: 'border-slate-300 bg-white text-slate-800',
+  success: 'text-ok-700',
+  error: 'text-bad-700',
+  info: 'text-brand-700',
 }
 const icons = { success: CheckCircle2, error: XCircle, info: Info }
 
@@ -37,12 +37,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="fixed right-4 top-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2" role="status">
+      <div className="fixed inset-x-4 top-4 z-50 flex flex-col gap-2 sm:left-auto sm:w-96" role="status">
         {items.map(({ id, message, kind }) => {
           const Icon = icons[kind]
           return (
-            <div key={id} className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm shadow ${styles[kind]}`}>
-              <Icon size={18} className="mt-0.5 shrink-0" />
+            <div
+              key={id}
+              className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-[0_8px_24px_rgb(20_33_46/0.14)]"
+            >
+              <Icon size={18} className={`mt-0.5 shrink-0 ${styles[kind]}`} />
               <span>{message}</span>
             </div>
           )

@@ -29,7 +29,7 @@ export default function ScanCodePage() {
     load()
   }, [load])
 
-  if (!result) return <p className="text-slate-500">Memuat…</p>
+  if (!result) return <p className="text-sm text-slate-500">Memuat…</p>
 
   return (
     <AssetActionPanel

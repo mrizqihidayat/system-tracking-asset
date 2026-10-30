@@ -1,8 +1,9 @@
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Badge } from '../../components/ui/Badge'
+import { AssetCode, Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { PageHeader } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/toast-context'
 import { errorMessage } from '../../lib/api'
 import { fetchAssetTypes, fetchBuildings, fetchCategories, fetchDepartments, fetchRooms } from '../../lib/lookups'
@@ -36,8 +37,8 @@ interface Data {
 function RowActions({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) {
   return (
     <div className="flex shrink-0 gap-3 text-sm">
-      {onEdit && <button className="text-brand-700 underline" onClick={onEdit}>Ubah</button>}
-      {onDelete && <button className="text-red-700 underline" onClick={onDelete}>Hapus</button>}
+      {onEdit && <button className="font-semibold text-brand-700 hover:underline" onClick={onEdit}>Ubah</button>}
+      {onDelete && <button className="font-semibold text-bad-700 hover:underline" onClick={onDelete}>Hapus</button>}
     </div>
   )
 }
@@ -54,14 +55,14 @@ function Group({ title, meta, open, onToggle, actions, children }: {
   return (
     <li className="py-1">
       <div className="flex items-center justify-between gap-3 py-2">
-        <button className="flex min-w-0 items-center gap-2 text-left" onClick={onToggle} aria-expanded={open}>
+        <button className="flex min-h-10 min-w-0 items-center gap-2 text-left" onClick={onToggle} aria-expanded={open}>
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <span className="font-medium">{title}</span>
           <span className="text-xs text-slate-500">{meta}</span>
         </button>
         {actions}
       </div>
-      {open && <div className="mb-2 ml-6 rounded-md border border-slate-100 bg-slate-50 px-3">{children}</div>}
+      {open && <div className="mb-2 ml-6 rounded-lg bg-slate-50 px-3">{children}</div>}
     </li>
   )
 }
@@ -103,8 +104,8 @@ export default function MasterDataPage() {
   )
 
   const addButton = (label: string, onClick: () => void) => (
-    <Button variant="secondary" className="px-3! py-1.5!" onClick={onClick}>
-      <Plus size={14} /> {label}
+    <Button variant="secondary" onClick={onClick}>
+      <Plus size={16} /> {label}
     </Button>
   )
 
@@ -135,7 +136,7 @@ export default function MasterDataPage() {
                   })}
                   <li className="py-2">
                     <button
-                      className="flex items-center gap-1 text-sm text-brand-700"
+                      className="flex min-h-9 items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"
                       onClick={() => setForm({ kind: 'Ruangan', createUrl: `/buildings/${b.id}/rooms` })}
                     >
                       <Plus size={14} /> Tambah ruangan di {b.name}
@@ -164,7 +165,7 @@ export default function MasterDataPage() {
                   {d.is_internal && <Badge color="blue">Internal</Badge>}
                 </span>
                 {d.is_internal ? (
-                  <span className="text-xs text-slate-400">Tidak dapat diubah</span>
+                  <span className="text-xs text-slate-500">Tidak dapat diubah</span>
                 ) : (
                   <RowActions onEdit={() => setForm({ kind: 'Departemen', target })} onDelete={() => setDeleting(target)} />
                 )}
@@ -199,7 +200,7 @@ export default function MasterDataPage() {
                     const tt: MasterTarget = { kind: 'Jenis aset', name: t.name, url: `/asset-types/${t.id}`, code: t.code }
                     return childRow(
                       t.name,
-                      <span className="font-mono text-xs text-slate-500">({t.code})</span>,
+                      <AssetCode code={t.code} className="ml-1" />,
                       () => setForm({ kind: 'Jenis aset', target: tt, withCode: true }),
                       () => setDeleting(tt),
                       t.id,
@@ -207,7 +208,7 @@ export default function MasterDataPage() {
                   })}
                   <li className="py-2">
                     <button
-                      className="flex items-center gap-1 text-sm text-brand-700"
+                      className="flex min-h-9 items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"
                       onClick={() => setForm({ kind: 'Jenis aset', createUrl: '/asset-types', extra: { category_id: c.id }, withCode: true })}
                     >
                       <Plus size={14} /> Tambah jenis aset di {c.name}
@@ -224,20 +225,20 @@ export default function MasterDataPage() {
 
   return (
     <div className="max-w-4xl space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold">Data Master</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Ganti nama atau hapus gedung, ruangan, departemen, kategori, dan jenis aset. Data yang masih dipakai tidak bisa dihapus.
-        </p>
-      </div>
+      <PageHeader
+        title="Data Master"
+        description="Ganti nama atau hapus gedung, ruangan, departemen, kategori, dan jenis aset. Data yang masih dipakai tidak bisa dihapus."
+      />
 
-      <div className="flex gap-1 border-b border-slate-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
         {TABS.map((t) => (
           <button
             key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
             onClick={() => setParams({ tab: t.key }, { replace: true })}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-              tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+              tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
             {t.label}
@@ -245,7 +246,7 @@ export default function MasterDataPage() {
         ))}
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5">{body}</section>
+      <section className="rounded-xl border border-slate-200 bg-white p-5">{body}</section>
 
       {form && <MasterFormModal {...form} onClose={() => setForm(null)} onDone={done} />}
       {deleting && <MasterDeleteModal target={deleting} onClose={closeDelete} onDone={done} />}

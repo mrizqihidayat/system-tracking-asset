@@ -1,4 +1,4 @@
-import { EllipsisVertical } from 'lucide-react'
+import { EllipsisVertical, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
@@ -8,6 +8,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu, { type MenuItem } from '../../components/ui/DropdownMenu'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
+import { PageHeader, Panel } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { formatDate } from '../../lib/format'
@@ -33,8 +34,8 @@ type ModalState =
 
 function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">{title}</h2>
         {action}
       </div>
@@ -142,19 +143,20 @@ export default function RequestsPage() {
   }
 
   const catalogColumns: Column<RequestCatalog>[] = [
-    { header: 'Item', cell: (c) => c.item_name },
+    { header: 'Item', mobile: 'title', cell: (c) => <span className="font-medium">{c.item_name}</span> },
     { header: 'Unit penyedia', cell: (c) => c.provider_department?.name ?? '-' },
     { header: 'Cara permintaan', cell: (c) => c.request_method },
     { header: 'Perlu dikembalikan', cell: (c) => (c.must_return ? 'Ya' : 'Tidak') },
-    { header: 'Lead time', cell: (c) => `${c.lead_time_days} hari` },
+    { header: 'Lead time', cell: (c) => <span className="whitespace-nowrap">{c.lead_time_days} hari</span> },
     {
       header: '',
       className: 'w-10',
+      mobile: 'badge',
       cell: (c) => (
         <DropdownMenu
           label="Aksi katalog"
           trigger={<EllipsisVertical size={16} />}
-          triggerClassName="px-1.5!"
+          triggerClassName="px-2.5!"
           items={[
             { label: 'Ubah', onClick: () => setModal({ kind: 'catalog', item: c }) },
             { label: 'Hapus', danger: true, onClick: () => setDeleting(c) },
@@ -165,17 +167,18 @@ export default function RequestsPage() {
   ]
 
   const historyColumns: Column<SupplyRequest>[] = [
-    { header: 'Tanggal', cell: (r) => formatDate(r.request_date) },
+    { header: 'Tanggal', cell: (r) => <span className="whitespace-nowrap">{formatDate(r.request_date)}</span> },
     {
       header: 'Item',
+      mobile: 'title',
       cell: (r) => (
         <>
-          {r.item_name}
+          <span className="font-medium">{r.item_name}</span>
           {r.note && <span className="block text-xs text-slate-500">{r.note}</span>}
         </>
       ),
     },
-    { header: 'Jumlah', cell: (r) => r.quantity },
+    { header: 'Jumlah', cell: (r) => <span className="tabular-nums">{r.quantity}</span> },
     {
       header: 'Untuk kegiatan',
       cell: (r) => (
@@ -186,10 +189,11 @@ export default function RequestsPage() {
       ),
     },
     { header: 'Unit penyedia', cell: (r) => r.provider_department?.name ?? '-' },
-    { header: 'Status', cell: (r) => <Badge color={statusColor[r.display_status]}>{r.display_status}</Badge> },
+    { header: 'Status', mobile: 'badge', cell: (r) => <Badge color={statusColor[r.display_status]}>{r.display_status}</Badge> },
     {
       header: '',
       className: 'w-10',
+      mobile: 'badge',
       cell: (r) => {
         const items: MenuItem[] = []
         if (r.status === 'Diajukan') {
@@ -203,42 +207,44 @@ export default function RequestsPage() {
           items.push({ label: 'Tandai Dikembalikan', onClick: () => setModal({ kind: 'status', request: r, status: 'Dikembalikan' }) })
         }
         return items.length ? (
-          <DropdownMenu label="Aksi permintaan" trigger={<EllipsisVertical size={16} />} triggerClassName="px-1.5!" items={items} />
+          <DropdownMenu label="Aksi permintaan" trigger={<EllipsisVertical size={16} />} triggerClassName="px-2.5!" items={items} />
         ) : null
       },
     },
   ]
 
   return (
-    <div className="max-w-7xl space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Permintaan ke Unit Lain</h1>
-          <p className="mt-1 text-sm text-slate-600">Perlengkapan yang tidak dimiliki SHD dan harus diminta ke unit penyedia</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ExportButton
-            type="requests"
-            filters={() => ({
-              ...(status === 'Belum direspons' ? { unresponded: 1 } : { status }),
-              search: search.trim(),
-            })}
-          />
-          <Button onClick={() => setModal({ kind: 'request', request: null })}>Buat permintaan</Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Permintaan ke Unit Lain"
+        description="Perlengkapan yang tidak dimiliki SHD dan harus diminta ke unit penyedia."
+        actions={
+          <>
+            <ExportButton
+              type="requests"
+              filters={() => ({
+                ...(status === 'Belum direspons' ? { unresponded: 1 } : { status }),
+                search: search.trim(),
+              })}
+            />
+            <Button onClick={() => setModal({ kind: 'request', request: null })}>
+              <Plus size={16} /> Buat permintaan
+            </Button>
+          </>
+        }
+      />
 
       {suggestions.length > 0 && (
-        <Card title="Saran permintaan">
-          <div className="grid gap-4 md:grid-cols-2">
+        <Panel title="Saran permintaan" flush>
+          <div className="grid border-t border-slate-100 md:grid-cols-2 md:divide-x md:divide-slate-100">
             {suggestions.map((g) => (
-              <div key={g.provider_department.id} className="rounded-md border border-slate-200">
-                <p className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium">{g.provider_department.name}</p>
+              <div key={g.provider_department.id} className="border-b border-slate-100 last:border-b-0">
+                <p className="bg-slate-50 px-5 py-2 text-sm font-semibold text-slate-700">{g.provider_department.name}</p>
                 <ul className="divide-y divide-slate-100">
                   {g.items.map((s, i) => (
-                    <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                    <li key={i} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
                       <div className="min-w-0">
-                        <p>{s.item_name} <span className="text-slate-500">× {s.quantity}</span></p>
+                        <p className="font-medium">{s.item_name} <span className="font-normal tabular-nums text-slate-500">× {s.quantity}</span></p>
                         <p className="text-xs text-slate-500">
                           {s.source === 'stok' ? `Stok ${s.stock_status?.toLowerCase()}` : `Kurang di ${s.room?.name} (${s.room?.building})`}
                           {s.has_open_request && ' · sudah ada permintaan Diajukan'}
@@ -246,7 +252,7 @@ export default function RequestsPage() {
                       </div>
                       <Button
                         variant="secondary"
-                        className="shrink-0 px-2! py-1! text-xs!"
+                        className="min-h-8! shrink-0 px-3! text-xs!"
                         onClick={() =>
                           setModal({
                             kind: 'request',
@@ -269,20 +275,20 @@ export default function RequestsPage() {
               </div>
             ))}
           </div>
-        </Card>
+        </Panel>
       )}
 
       <Card
         title="Katalog perlengkapan dari unit lain"
-        action={<Button variant="secondary" className="px-3! py-1.5!" onClick={() => setModal({ kind: 'catalog', item: null })}>Tambah item</Button>}
+        action={<Button variant="secondary" onClick={() => setModal({ kind: 'catalog', item: null })}><Plus size={16} /> Tambah item</Button>}
       >
         <DataTable columns={catalogColumns} rows={catalog} rowKey={(c) => c.id} loading={loading} emptyText="Katalog masih kosong." />
       </Card>
 
       <Card title="Riwayat permintaan">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Input
-            className="max-w-xs"
+            className="sm:max-w-xs"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
@@ -292,7 +298,7 @@ export default function RequestsPage() {
             aria-label="Cari permintaan"
           />
           <Select
-            className="w-auto"
+            className="sm:w-auto"
             value={status}
             onChange={(e) => {
               setStatus(e.target.value)

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import ExportButton from '../../components/ExportButton'
 import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { PageHeader } from '../../components/ui/Page'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu from '../../components/ui/DropdownMenu'
@@ -105,6 +106,8 @@ export default function ConsumablesPage() {
   const columns: Column<ConsumableItem>[] = [
     {
       header: 'Nama',
+      headerClassName: 'text-center',
+      mobile: 'title',
       cell: (c) => (
         <>
           <span className="font-medium">{c.name}</span>
@@ -112,17 +115,18 @@ export default function ConsumablesPage() {
         </>
       ),
     },
-    { header: 'Kategori', cell: (c) => c.category ?? '-' },
+    { header: 'Kategori', className: 'text-center', cell: (c) => c.category ?? '-' },
     {
       header: 'Jumlah',
+      className: 'text-center',
       cell: (c) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 md:justify-center">
           <button
             type="button"
             aria-label={`Kurangi ${c.name}`}
             disabled={busyId === c.id || c.quantity === 0}
             onClick={() => adjust(c, -1)}
-            className="rounded border border-slate-300 p-1 hover:bg-slate-50 disabled:opacity-40"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
           >
             <Minus size={14} />
           </button>
@@ -130,7 +134,7 @@ export default function ConsumablesPage() {
             type="button"
             title="Klik untuk mengisi jumlah langsung"
             onClick={() => setModal({ kind: 'quantity', item: c })}
-            className="min-w-14 rounded px-2 py-1 text-center font-medium hover:bg-slate-100"
+            className="min-h-9 min-w-16 whitespace-nowrap rounded-lg px-2 text-center font-semibold tabular-nums hover:bg-slate-100"
           >
             {c.quantity} <span className="text-xs font-normal text-slate-500">{c.unit}</span>
           </button>
@@ -139,16 +143,16 @@ export default function ConsumablesPage() {
             aria-label={`Tambah ${c.name}`}
             disabled={busyId === c.id}
             onClick={() => adjust(c, 1)}
-            className="rounded border border-slate-300 p-1 hover:bg-slate-50 disabled:opacity-40"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
           >
             <Plus size={14} />
           </button>
         </div>
       ),
     },
-    { header: 'Minimum', cell: (c) => c.min_quantity },
-    { header: 'Status', cell: (c) => <Badge color={statusColor[c.status]}>{c.status}</Badge> },
-    { header: 'Minta ke', cell: (c) => c.provider_department?.name ?? '-' },
+    { header: 'Minimum', className: 'text-center', cell: (c) => <span className="tabular-nums">{c.min_quantity}</span> },
+    { header: 'Status', className: 'text-center', mobile: 'badge', cell: (c) => <Badge color={statusColor[c.status]}>{c.status}</Badge> },
+    { header: 'Departemen penyedia', className: 'text-center', cell: (c) => c.provider_department?.name ?? '-' },
     {
       header: 'Lokasi simpan',
       cell: (c) => (c.room ? `${c.room.name}${c.room.building ? `, ${c.room.building.name}` : ''}` : '-'),
@@ -156,11 +160,12 @@ export default function ConsumablesPage() {
     {
       header: '',
       className: 'w-10',
+      mobile: 'badge',
       cell: (c) => (
         <DropdownMenu
           label="Aksi barang"
           trigger={<EllipsisVertical size={16} />}
-          triggerClassName="px-1.5!"
+          triggerClassName="px-2.5!"
           items={[
             { label: 'Ubah data', onClick: () => setModal({ kind: 'form', item: c }) },
             { label: 'Hapus', danger: true, onClick: () => askDelete(c) },
@@ -171,23 +176,23 @@ export default function ConsumablesPage() {
   ]
 
   return (
-    <div className="max-w-7xl space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Stok Habis Pakai</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Barang yang disimpan SHD{result ? ` · ${result.meta.total} barang` : ''}. Stok menipis/habis masuk saran permintaan.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ExportButton type="consumables" filters={() => ({ status, search: search.trim() })} />
-          <Button onClick={() => setModal({ kind: 'form', item: null })}>Tambah barang</Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Stok Habis Pakai"
+        description={`Barang yang disimpan SHD${result ? ` · ${result.meta.total} barang` : ''}. Stok menipis/habis masuk saran permintaan.`}
+        actions={
+          <>
+            <ExportButton type="consumables" filters={() => ({ status, search: search.trim() })} />
+            <Button onClick={() => setModal({ kind: 'form', item: null })}>
+              <Plus size={16} /> Tambah barang
+            </Button>
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Input
-          className="max-w-xs"
+          className="sm:max-w-xs"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value)
@@ -197,7 +202,7 @@ export default function ConsumablesPage() {
           aria-label="Cari barang"
         />
         <Select
-          className="w-auto"
+          className="sm:w-auto"
           value={status}
           onChange={(e) => {
             setStatus(e.target.value)

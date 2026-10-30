@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ConditionBadge, StatusBadge } from '../../components/ui/Badge'
+import { AssetCode, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { buttonClass } from '../../components/ui/button-class'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Modal from '../../components/ui/Modal'
 import { formatDate } from '../../lib/format'
@@ -33,9 +34,9 @@ const roomLabel = (room?: { name: string; building?: { name: string } } | null) 
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 py-1.5 text-sm">
+    <div className="flex justify-between gap-4 py-2 text-sm">
       <dt className="shrink-0 text-slate-500">{label}</dt>
-      <dd className="text-right">{children || '-'}</dd>
+      <dd className="min-w-0 text-right">{children || '-'}</dd>
     </div>
   )
 }
@@ -71,20 +72,24 @@ export default function AssetActionPanel({ asset, actions, matchedBy, initialAct
         onClose={onClose}
         footer={
           <>
-            <Link to={`/daftar-aset/${asset.id}`} className="mr-auto self-center text-sm text-brand-700 underline">
-              Buka detail
-            </Link>
             <Button variant="secondary" onClick={onClose}>Tutup</Button>
+            <Link to={`/daftar-aset/${asset.id}`} className={buttonClass('ghost', 'sm:mr-auto sm:-order-1')}>
+              Buka detail aset
+            </Link>
           </>
         }
       >
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <AssetCode code={asset.code} className="text-sm" />
+          <StatusBadge status={asset.status} />
+          <ConditionBadge condition={asset.condition} />
+        </div>
         {matchedBy === 'previous_code' && (
-          <div role="alert" className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div role="alert" className="mb-3 rounded-lg bg-warn-50 px-3 py-2.5 text-sm text-warn-700">
             Kode yang dipindai adalah kode lama. Kode aset saat ini: <b>{asset.code}</b>.
           </div>
         )}
         <dl className="divide-y divide-slate-100">
-          <Row label="Kode"><span className="font-mono">{asset.code}</span></Row>
           <Row label="Jenis">{asset.asset_type?.name}</Row>
           <Row label="Spesifikasi"><span className="whitespace-pre-wrap">{asset.specification}</span></Row>
           <Row label="Sumber">{asset.source_department?.name}</Row>
@@ -95,11 +100,9 @@ export default function AssetActionPanel({ asset, actions, matchedBy, initialAct
               {asset.active_loan.borrower_name}, {asset.active_loan.borrower_unit} · kembali {formatDate(asset.active_loan.due_date)}
             </Row>
           )}
-          <Row label="Kondisi"><ConditionBadge condition={asset.condition} /></Row>
-          <Row label="Status"><StatusBadge status={asset.status} /></Row>
         </dl>
         {available.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             {available.map((key) => (
               <Button key={key} variant={key === 'pinjam' ? 'primary' : 'secondary'} onClick={() => run(key)}>
                 {SCAN_ACTIONS[key]}

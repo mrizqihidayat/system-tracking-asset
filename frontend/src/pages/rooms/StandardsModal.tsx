@@ -63,8 +63,8 @@ export default function StandardsModal({ roomId, roomName, standards, onClose, o
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-3">
-                  <button className="text-brand-700 underline" onClick={() => setEditing(s)}>Ubah</button>
-                  <button className="text-red-700 underline" onClick={() => setDeleting(s)}>Hapus</button>
+                  <button className="font-semibold text-brand-700 hover:underline" onClick={() => setEditing(s)}>Ubah</button>
+                  <button className="font-semibold text-bad-700 hover:underline" onClick={() => setDeleting(s)}>Hapus</button>
                 </div>
               </li>
             ))}
