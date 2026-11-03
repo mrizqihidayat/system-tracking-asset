@@ -165,7 +165,7 @@ export default function LoanPage() {
               aria-label="Cari peminjaman"
             />
           </div>
-          <Select className="sm:w-auto" value={status} onChange={(e) => historyList.setFilter('status', e.target.value as LoanStatus | '')} aria-label="Status">
+          <Select clearable className="sm:w-auto" value={status} onChange={(e) => historyList.setFilter('status', e.target.value as LoanStatus | '')} aria-label="Status">
             <option value="">Semua status</option>
             <option>Dipinjam</option>
             <option>Dikembalikan</option>

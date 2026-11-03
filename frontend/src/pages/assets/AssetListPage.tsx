@@ -185,35 +185,35 @@ export default function AssetListPage() {
         <div className={`${filtersOpen ? 'grid' : 'hidden'} gap-3 sm:grid-cols-2 lg:grid lg:grid-cols-7`}>
         {field(
           'Kategori',
-          <Select value={list.get('category_id')} onChange={(e) => setFilter('category_id', e.target.value)}>
+          <Select clearable value={list.get('category_id')} onChange={(e) => setFilter('category_id', e.target.value)}>
             <option value="">Semua kategori</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>,
         )}
         {field(
           'Gedung',
-          <Select value={buildingId} onChange={(e) => setFilter('building_id', e.target.value)}>
+          <Select clearable value={buildingId} onChange={(e) => setFilter('building_id', e.target.value)}>
             <option value="">Semua gedung</option>
             {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </Select>,
         )}
         {field(
           'Ruangan',
-          <Select value={list.get('room_id')} disabled={!buildingId} onChange={(e) => setFilter('room_id', e.target.value)}>
+          <Select clearable value={list.get('room_id')} disabled={!buildingId} onChange={(e) => setFilter('room_id', e.target.value)}>
             <option value="">Semua ruangan</option>
             {buildingId && rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </Select>,
         )}
         {field(
           'Status',
-          <Select value={list.get('status')} onChange={(e) => setFilter('status', e.target.value)}>
+          <Select clearable value={list.get('status')} onChange={(e) => setFilter('status', e.target.value)}>
             <option value="">Semua status</option>
             {STATUSES.map((s) => <option key={s}>{s}</option>)}
           </Select>,
         )}
         {field(
           'Sumber',
-          <Select value={list.get('source_department_id')} onChange={(e) => setFilter('source_department_id', e.target.value)}>
+          <Select clearable value={list.get('source_department_id')} onChange={(e) => setFilter('source_department_id', e.target.value)}>
             <option value="">Semua sumber</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
@@ -222,7 +222,7 @@ export default function AssetListPage() {
         )}
         {field(
           'Kondisi',
-          <Select value={list.get('condition')} onChange={(e) => setFilter('condition', e.target.value)}>
+          <Select clearable value={list.get('condition')} onChange={(e) => setFilter('condition', e.target.value)}>
             <option value="">Semua kondisi</option>
             {CONDITIONS.map((c) => <option key={c}>{c}</option>)}
           </Select>,

@@ -23,13 +23,14 @@ export default function RoomSelect({ buildingLabel, roomLabel, buildingId, roomI
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <FormField label={buildingLabel} required={required}>
-        <Select value={buildingId ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null, null)}>
+        <Select clearable={!required} value={buildingId ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null, null)}>
           <option value="">Pilih gedung</option>
           {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </Select>
       </FormField>
       <FormField label={roomLabel} required={required} error={error}>
         <Select
+          clearable={!required}
           value={roomId ?? ''}
           disabled={!buildingId}
           error={error}

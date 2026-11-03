@@ -25,6 +25,8 @@ import ActionModal from '../assets/modals/ActionModal'
 import CatalogFormModal from './CatalogFormModal'
 import RequestFormModal from './RequestFormModal'
 
+const CATALOG_PER_PAGE = 5
+
 const statusColor = {
   Diajukan: 'blue',
   Diterima: 'green',
@@ -128,6 +130,10 @@ export default function RequestsPage() {
     }
   })
   const [deleting, setDeleting] = useState<{ item: RequestCatalog; usage: CatalogUsage } | null>(null)
+  // Katalog sudah dimuat utuh: halaman dibagi di browser, tanpa request baru.
+  const [catalogPage, setCatalogPage] = useState(1)
+  const catalogLastPage = Math.max(1, Math.ceil(catalog.length / CATALOG_PER_PAGE))
+  const catalogPageNow = Math.min(catalogPage, catalogLastPage)
   const status = list.get('status')
   const search = list.searchText
 
@@ -333,7 +339,16 @@ export default function RequestsPage() {
         title="Katalog perlengkapan dari unit lain"
         action={<Button variant="secondary" onClick={() => setModal({ kind: 'catalog', item: null })}><Plus size={16} /> Tambah item</Button>}
       >
-        <DataTable columns={catalogColumns} rows={catalog} rowKey={(c) => c.id} loading={catalogQuery.isPending} emptyText="Katalog masih kosong." />
+        <DataTable
+          columns={catalogColumns}
+          rows={catalog.slice((catalogPageNow - 1) * CATALOG_PER_PAGE, catalogPageNow * CATALOG_PER_PAGE)}
+          rowKey={(c) => c.id}
+          loading={catalogQuery.isPending}
+          emptyText="Katalog masih kosong."
+          meta={catalog.length > CATALOG_PER_PAGE ? { current_page: catalogPageNow, last_page: catalogLastPage, per_page: CATALOG_PER_PAGE, total: catalog.length } : undefined}
+          unit="item"
+          onPageChange={setCatalogPage}
+        />
       </Card>
 
       <Card title="Riwayat permintaan">
@@ -346,6 +361,7 @@ export default function RequestsPage() {
             aria-label="Cari permintaan"
           />
           <Select
+            clearable
             className="sm:w-auto"
             value={status}
             onChange={(e) => list.setFilter('status', e.target.value)}

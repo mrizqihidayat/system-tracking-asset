@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 
 import { controlClass } from './control-class'
 
@@ -26,13 +26,7 @@ export function Input({ error, className = '', ...rest }: InputHTMLAttributes<HT
   return <input className={`${controlClass(error)} ${className}`} {...rest} />
 }
 
-export function Select({ error, className = '', children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { error?: string }) {
-  return (
-    <select className={`${controlClass(error)} ${className}`} {...rest}>
-      {children}
-    </select>
-  )
-}
+export { default as Select } from './Select'
 
 export function Textarea({ error, className = '', ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { error?: string }) {
   return <textarea rows={3} className={`${controlClass(error)} ${className}`} {...rest} />

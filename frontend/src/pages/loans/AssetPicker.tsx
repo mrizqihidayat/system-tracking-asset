@@ -3,6 +3,7 @@ import { Scanner } from '@yudiel/react-qr-scanner'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { AssetCode, StatusBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { dropdownOptionClass, dropdownPanelClass } from '../../components/ui/dropdown-class'
 import { FormField, Input } from '../../components/ui/FormField'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toast-context'
@@ -151,7 +152,7 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
               <ul
                 id="asset-suggestions"
                 role="listbox"
-                className="absolute z-10 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-[0_8px_24px_rgb(20_33_46/0.12)]"
+                className={`absolute z-10 mt-1.5 max-h-72 w-full ${dropdownPanelClass}`}
               >
                 {items.length === 0 ? (
                   <li className="px-3 py-2.5 text-slate-500">Tidak ada aset tersedia yang cocok.</li>
@@ -163,7 +164,7 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
                         onMouseDown={(e) => e.preventDefault()}
                         onMouseEnter={() => setActive(i)}
                         onClick={() => pick(a)}
-                        className={`flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left ${i === active ? 'bg-brand-50' : ''}`}
+                        className={`flex flex-col items-start gap-0.5 ${dropdownOptionClass(i === active)}`}
                       >
                         <span className="flex min-w-0 max-w-full items-center gap-2">
                           <AssetCode code={a.code} />

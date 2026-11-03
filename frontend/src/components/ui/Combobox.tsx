@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { Check, ChevronDown } from 'lucide-react'
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { controlClass } from './control-class'
+import { dropdownOpenClass, dropdownOptionClass, dropdownPanelClass } from './dropdown-class'
+import { useAnchoredPanel } from './useAnchoredPanel'
 
 interface Props {
   value: string
@@ -14,63 +18,133 @@ interface Props {
   disabled?: boolean
 }
 
+/** Kolom ketik-untuk-mencari; daftar pilihannya sama dengan Select. */
 export default function Combobox({
   value, onChange, onSelect, options, placeholder, allowCreate, error, disabled,
 }: Props) {
   const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
+  const [active, setActive] = useState(-1)
+  const input = useRef<HTMLInputElement>(null)
+  const list = useRef<HTMLUListElement>(null)
+  const listId = useId()
 
   const query = value.trim().toLowerCase()
-  const filtered = options.filter((o) => o.label.toLowerCase().includes(query))
   const exact = options.some((o) => o.label.toLowerCase() === query)
-  const canCreate = allowCreate && query !== '' && !exact
+  // Kolom berisi pilihan yang sudah tepat: tampilkan semua pilihan, bukan hanya yang cocok.
+  const filtered = exact ? options : options.filter((o) => o.label.toLowerCase().includes(query))
+  const canCreate = !!allowCreate && query !== '' && !exact
+  const count = filtered.length + (canCreate ? 1 : 0)
+
+  const close = useCallback(() => setOpen(false), [])
+  const { style, place } = useAnchoredPanel(input, list, open, count, close)
+
+  const show = () => {
+    place()
+    setOpen(true)
+  }
 
   const pick = (id: string | number | null, label: string) => {
     onChange(label)
     onSelect?.({ id, label })
     setOpen(false)
+    setActive(-1)
+  }
+
+  useEffect(() => {
+    if (open && active >= 0) list.current?.children[active]?.scrollIntoView({ block: 'nearest' })
+  }, [open, active])
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      if (open) {
+        // Hanya menutup daftar, bukan popup di belakangnya.
+        e.stopPropagation()
+        setOpen(false)
+      }
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (!open) show()
+      else if (count) setActive((i) => (i < 0 ? 0 : (i + (e.key === 'ArrowDown' ? 1 : -1) + count) % count))
+    } else if (e.key === 'Enter' && open && active >= 0) {
+      e.preventDefault()
+      const option = filtered[active]
+      if (option) pick(option.id, option.label)
+      else pick(null, value.trim())
+    } else if (e.key === 'Tab') {
+      setOpen(false)
+    }
   }
 
   return (
-    <div ref={box} className="relative">
+    <div className="relative">
       <input
-        className={controlClass(error)}
+        ref={input}
+        role="combobox"
+        aria-expanded={open && count > 0}
+        aria-controls={open && count > 0 ? listId : undefined}
+        aria-autocomplete="list"
+        aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined}
+        className={`${controlClass(error)} pr-9 ${open && count > 0 ? dropdownOpenClass : ''}`}
         value={value}
         placeholder={placeholder}
         disabled={disabled}
         autoComplete="off"
-        onFocus={() => setOpen(true)}
+        onFocus={show}
+        onClick={show}
         onChange={(e) => {
           onChange(e.target.value)
-          setOpen(true)
+          setActive(-1)
+          show()
         }}
-        onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+        onKeyDown={onKeyDown}
       />
-      {open && (filtered.length > 0 || canCreate) && (
-        <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-[0_8px_24px_rgb(20_33_46/0.12)]">
-          {filtered.map((o) => (
-            <li key={o.id}>
-              <button type="button" className="w-full rounded-md px-3 py-2 text-left hover:bg-brand-50" onClick={() => pick(o.id, o.label)}>
-                {o.label}
-              </button>
-            </li>
-          ))}
+      <ChevronDown
+        size={16}
+        className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition-transform ${open && count > 0 ? 'rotate-180' : ''}`}
+        aria-hidden
+      />
+      {open && count > 0 && createPortal(
+        <ul
+          ref={list}
+          id={listId}
+          role="listbox"
+          style={style}
+          // Fokus tetap di kolom agar bisa terus mengetik.
+          onMouseDown={(e) => e.preventDefault()}
+          onMouseLeave={() => setActive(-1)}
+          className={`fixed z-50 ${dropdownPanelClass}`}
+        >
+          {filtered.map((o, i) => {
+            const selected = o.label.toLowerCase() === query
+            return (
+              <li
+                key={o.id}
+                id={`${listId}-${i}`}
+                role="option"
+                aria-selected={selected}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => pick(o.id, o.label)}
+                className={`flex items-center justify-between gap-2 ${dropdownOptionClass(i === active, selected)}`}
+              >
+                <span className="min-w-0">{o.label}</span>
+                {selected && <Check size={16} className="shrink-0" aria-hidden />}
+              </li>
+            )
+          })}
           {canCreate && (
-            <li>
-              <button type="button" className="w-full rounded-md px-3 py-2 text-left font-medium text-brand-700 hover:bg-brand-50" onClick={() => pick(null, value.trim())}>
-                Tambah “{value.trim()}”
-              </button>
+            <li
+              id={`${listId}-${filtered.length}`}
+              role="option"
+              aria-selected={false}
+              onMouseEnter={() => setActive(filtered.length)}
+              onClick={() => pick(null, value.trim())}
+              className={`flex items-center font-medium text-brand-700 ${dropdownOptionClass(active === filtered.length)}`}
+            >
+              Tambah “{value.trim()}”
             </li>
           )}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   )

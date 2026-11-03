@@ -219,6 +219,7 @@ export default function ConsumablesPage() {
           aria-label="Cari barang"
         />
         <Select
+          clearable
           className="sm:w-auto"
           value={status}
           onChange={(e) => list.setFilter('status', e.target.value)}

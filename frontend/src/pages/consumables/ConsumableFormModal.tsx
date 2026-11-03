@@ -125,7 +125,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
               </Select>
             </FormField>
             <FormField label="Katalog permintaan (opsional)" error={errors.catalog_id}>
-              <Select value={catalogId ?? ''} disabled={!providerId} onChange={(e) => setCatalogId(Number(e.target.value) || null)} error={errors.catalog_id}>
+              <Select clearable value={catalogId ?? ''} disabled={!providerId} onChange={(e) => setCatalogId(Number(e.target.value) || null)} error={errors.catalog_id}>
                 <option value="">{catalogOptions.length ? 'Tidak ada' : 'Tidak ada katalog dari unit ini'}</option>
                 {catalogOptions.map((c) => <option key={c.id} value={c.id}>{c.item_name}</option>)}
               </Select>
