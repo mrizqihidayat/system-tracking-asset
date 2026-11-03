@@ -16,7 +16,7 @@ import type { Loan } from '../types/loan'
 
 const requestColor = { Diajukan: 'blue', Diterima: 'green', 'Belum direspons': 'amber', Dikembalikan: 'slate', Dibatalkan: 'red' } as const
 
-function StatCard({ label, value, to, alert, note }: { label: string; value: number; to: string; alert?: boolean; note: ReactNode }) {
+function StatCard({ label, value, to, alert, note }: { label: string; value: number; to: string; alert?: boolean; note?: ReactNode }) {
   return (
     <Link
       to={to}
@@ -24,7 +24,7 @@ function StatCard({ label, value, to, alert, note }: { label: string; value: num
     >
       <p className="text-sm font-medium text-slate-500 group-hover:text-brand-700">{label}</p>
       <p className={`mt-0.5 text-3xl font-bold tabular-nums ${alert ? 'text-bad-700' : ''}`}>{value}</p>
-      <p className="mt-0.5 text-xs text-slate-500">{note}</p>
+      {note && <p className="mt-0.5 text-xs text-slate-500">{note}</p>}
     </Link>
   )
 }
@@ -127,7 +127,6 @@ export default function DashboardPage() {
           label="Perlu perbaikan"
           value={cards.needs_repair.assets_in_repair}
           to="/daftar-aset?status=Perbaikan"
-          note={`${cards.needs_repair.loans_pending_confirmation} menunggu konfirmasi peminjam`}
         />
         <StatCard
           label="Ruangan belum lengkap"

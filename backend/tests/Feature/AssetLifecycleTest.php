@@ -113,29 +113,21 @@ class AssetLifecycleTest extends TestCase
         ])->assertUnprocessable();
         $this->assertSame(1, Loan::count());
 
-        // 3. Kembali rusak berat → Perbaikan + menunggu konfirmasi
+        // 3. Kembali rusak berat → Perbaikan
         $this->patchJson("/api/loans/{$loanId}/return", ['return_condition' => 'Rusak Berat', 'note' => 'Lensa pecah'])
             ->assertOk()
             ->assertJsonPath('data.status', 'Dikembalikan')
-            ->assertJsonPath('data.damage_confirmation', 'Menunggu Konfirmasi');
+            ->assertJsonPath('data.return_condition', 'Rusak Berat');
 
         $asset->refresh();
         $this->assertSame('Perbaikan', $asset->status->value);
         $this->assertSame('Rusak Berat', $asset->condition->value);
         $this->assertSame(['Registrasi', 'Dipinjam', 'Dikembalikan'], $this->eventTypes($asset));
         $this->assertSame('Kurang', $this->checklistRow()['result']);
-        $this->assertSame(['assets_in_repair' => 1, 'loans_pending_confirmation' => 1], $this->dashboard()['needs_repair']);
+        $this->assertSame(['assets_in_repair' => 1], $this->dashboard()['needs_repair']);
         $this->assertSame(0, $this->dashboard()['active_loans']['total']);
 
-        // 4. Konfirmasi kerusakan (di luar sistem): tidak mengubah aset
-        $this->patchJson("/api/loans/{$loanId}/confirm-damage", ['damage_confirmation_note' => 'Peminjam setuju'])
-            ->assertOk()
-            ->assertJsonPath('data.damage_confirmation', 'Dikonfirmasi');
-
-        $this->assertSame('Perbaikan', $asset->fresh()->status->value);
-        $this->assertSame(['assets_in_repair' => 1, 'loans_pending_confirmation' => 0], $this->dashboard()['needs_repair']);
-
-        // 5. Servis → Tersedia lagi, jadwal servis berikutnya dekat → muncul "perlu servis"
+        // 4. Servis → Tersedia lagi, jadwal servis berikutnya dekat → muncul "perlu servis"
         $this->postJson("/api/assets/{$id}/services", [
             'service_date' => today()->toDateString(),
             'vendor' => 'CV Mitra',

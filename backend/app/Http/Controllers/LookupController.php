@@ -30,18 +30,9 @@ class LookupController extends Controller
      */
     public function requestMethods(Request $request): JsonResponse
     {
-        $used = $this->applySearch(SupplyRequest::query()->whereNotNull('request_method'), $request->query('search'), 'request_method')
-            ->distinct()
-            ->orderBy('request_method')
-            ->pluck('request_method');
-
         $search = mb_strtolower(trim((string) $request->query('search', '')));
-        $defaults = collect(SupplyRequest::DEFAULT_REQUEST_METHODS)
-            ->filter(fn (string $method): bool => $search === '' || str_contains(mb_strtolower($method), $search));
-
-        $methods = $defaults->concat($used)
-            ->unique(fn (string $method): string => mb_strtolower(trim($method)))
-            ->take(self::LIMIT)
+        $methods = collect(SupplyRequest::DEFAULT_REQUEST_METHODS)
+            ->filter(fn (string $method): bool => $search === '' || str_contains(mb_strtolower($method), $search))
             ->values();
 
         return response()->json(['data' => $methods]);

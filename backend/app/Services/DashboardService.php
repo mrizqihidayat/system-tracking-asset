@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\AssetStatus;
 use App\Enums\ConsumableStatus;
-use App\Enums\DamageConfirmation;
 use App\Http\Resources\ConsumableResource;
 use App\Http\Resources\LoanResource;
 use App\Http\Resources\SupplyRequestResource;
@@ -41,7 +40,6 @@ class DashboardService
             'active_loans' => $this->activeLoans(),
             'needs_repair' => [
                 'assets_in_repair' => Asset::query()->where('status', AssetStatus::Perbaikan->value)->count(),
-                'loans_pending_confirmation' => Loan::query()->where('damage_confirmation', DamageConfirmation::MenungguKonfirmasi->value)->count(),
             ],
             'incomplete_rooms' => $this->incompleteRooms($this->readiness->summary()),
             'needs_service' => $this->needsService(),

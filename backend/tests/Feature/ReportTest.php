@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
 use App\Enums\CountMethod;
-use App\Enums\DamageConfirmation;
 use App\Enums\LoanStatus;
 use App\Enums\RequestStatus;
 use App\Models\Asset;
@@ -193,7 +192,6 @@ class ReportTest extends TestCase
         Loan::factory()->create([
             'asset_id' => $this->asset(['code' => 'SHD-LPT-002'])->id,
             'borrow_date' => '2026-08-01', 'due_date' => '2026-08-05', 'status' => LoanStatus::Dikembalikan,
-            'damage_confirmation' => DamageConfirmation::MenungguKonfirmasi,
         ]);
 
         $sheet = fn (string $query) => $this->sheets($this->report('loans', $query))['Peminjaman'];
@@ -214,7 +212,6 @@ class ReportTest extends TestCase
         $this->assertSame('Dipinjam', $data[0][9]);
         $this->assertSame('Ya', $data[0][10]);
 
-        $this->assertCount(1, $this->dataRows($sheet('?pending_confirmation=1')));
         $this->assertCount(1, $this->dataRows($sheet('?overdue=1')));
         $this->assertSame($inPeriod->id, Loan::query()->overdue()->value('id'));
         $this->getJson('/api/reports/loans?from=2026-10-31&to=2026-10-01')->assertUnprocessable();

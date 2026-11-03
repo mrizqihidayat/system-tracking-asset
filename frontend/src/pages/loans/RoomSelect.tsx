@@ -15,8 +15,10 @@ interface Props {
 /** Pilihan Gedung → Ruangan (dropdown, sesuai mockup peminjaman). */
 export default function RoomSelect({ buildingLabel, roomLabel, buildingId, roomId, onChange, required, error }: Props) {
   const { data: buildings, error: buildingsError } = useBuildings()
-  const { data: rooms, error: roomsError } = useRooms(buildingId, true)
+  // Semua ruangan satu daftar (di-cache), disaring di browser: ganti gedung tanpa request baru.
+  const { data: allRooms, error: roomsError } = useRooms()
   useErrorToast(buildingsError, roomsError)
+  const rooms = allRooms.filter((r) => r.building_id === buildingId)
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -34,7 +36,7 @@ export default function RoomSelect({ buildingLabel, roomLabel, buildingId, roomI
           onChange={(e) => onChange(buildingId, e.target.value ? Number(e.target.value) : null)}
         >
           <option value="">{buildingId ? 'Pilih ruangan' : 'Pilih gedung dulu'}</option>
-          {(buildingId ? rooms : []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
         </Select>
       </FormField>
     </div>

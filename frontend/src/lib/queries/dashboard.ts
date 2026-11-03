@@ -7,7 +7,7 @@ import { queryKeys } from './keys'
 export interface DashboardCards {
   total_assets: { total: number; owned_by_shd: number; from_other_units: number; not_feasible: number }
   active_loans: { total: number; due_today: number; overdue: number }
-  needs_repair: { assets_in_repair: number; loans_pending_confirmation: number }
+  needs_repair: { assets_in_repair: number }
   incomplete_rooms: { incomplete: number; total_rooms: number; total_buildings: number }
   needs_service: { total: number; overdue: number; upcoming: number }
   low_stock: { total: number; menipis: number; habis: number }

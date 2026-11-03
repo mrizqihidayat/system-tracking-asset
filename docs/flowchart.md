@@ -130,7 +130,7 @@ flowchart TD
     P2 -- Tidak --> P3[Tampilkan aset tidak bisa dipinjam] --> Z
     P2 -- Ya --> P3a{Kondisi fisik sama dengan catatan?}
     P3a -- Tidak --> P3b[[Catat kerusakan dulu]] --> P1
-    P3a -- Ya --> P4[Input peminjam, unit kerja, keperluan, gedung & ruangan tujuan, tgl pinjam default hari ini, rencana kembali, no. approval; kondisi keluar otomatis]
+    P3a -- Ya --> P4[Input peminjam, unit kerja, keperluan, gedung & ruangan tujuan, tgl pinjam default hari ini, rencana kembali, no. / tanggal approval; kondisi keluar otomatis]
     P4 --> P5{Tgl pinjam tidak di masa depan & tidak sebelum aset terdaftar; rencana kembali >= tgl pinjam?}
     P5 -- Tidak --> P4
     P5 -- Ya --> P6[(Transaksi Dipinjam, status aset Dipinjam, riwayat Dipinjam)] --> Z
@@ -141,14 +141,10 @@ flowchart TD
     R1a -- Kembali --> R2[Cek fisik, pilih kondisi, ruangan penyimpanan default lokasi asal, tanggal kembali]
     R2 --> R3{Kondisi}
     R3 -- Baik --> R4[Status Tersedia]
-    R3 -- Rusak Berat --> R5[Status Perbaikan, catatan wajib]
+    R3 -- Rusak Berat --> R5[Staf pilih Perbaikan default / Tidak Layak Pakai, catatan wajib]
     R3 -- Rusak Ringan --> R6[Staf pilih Tersedia default / Perbaikan, catatan wajib]
-    R4 & R5 & R6 --> R7{Lebih buruk dari kondisi keluar?}
-    R7 -- Ya --> R8[Tandai Menunggu Konfirmasi]
-    R7 -- Tidak --> R9[Tanpa konfirmasi]
-    R8 & R9 --> R10[(Transaksi Dikembalikan, riwayat Dikembalikan; jika ruangan berbeda, lokasi asal pindah + riwayat Pindah Lokasi)] --> Z
+    R4 & R5 & R6 --> R10[(Transaksi Dikembalikan, riwayat Dikembalikan; jika ruangan berbeda, lokasi asal pindah + riwayat Pindah Lokasi; jika Tidak Layak Pakai, riwayat Tidak Layak Pakai)] --> Z
 
-    B -- Konfirmasi kerusakan --> K1[Peminjam mengonfirmasi di luar sistem] --> K2[Input catatan konfirmasi wajib, no. dokumen opsional] --> K3[(Tandai Dikonfirmasi, waktu & staf otomatis)] --> Z
 
     B -- Batalkan --> X1[Pilih transaksi Dipinjam] --> X2[Input alasan] --> X3[(Transaksi Dibatalkan, status aset mengikuti kondisi aset, riwayat Dibatalkan)] --> Z
 
@@ -196,17 +192,20 @@ flowchart TD
 
     C -- Kelola katalog --> K1[Input item, unit penyedia, perlu dikembalikan, lead time] --> K2[(Simpan katalog)] --> B
 
-    C -- Buat permintaan --> P1[Pilih item katalog / dari saran kekurangan]
+    C -- Buat permintaan --> P1[Pilih item katalog / dari saran kekurangan; pilih pengembalian barang, default dari katalog]
     P1 --> P2[Input cara permintaan, tanggal, jumlah, kegiatan, ruangan terkait]
     P2 --> P3[(Simpan status Diajukan)]
     P3 --> P4[Staf mengirim permintaan di luar sistem] --> B
 
     C -- Update status --> U1{Barang sudah diterima?}
     U1 -- Belum, lewat lead time --> U2[Tampil Belum direspons] --> B
-    U1 -- Ya --> U3[(Status Diterima)] --> U4{Perlu dikembalikan?}
+    U1 -- Ya --> U8[Konfirmasi dampak ke stok / Ada ruangan]
+    U8 --> U3[(Status Diterima; disimpan SHD: stok bertambah, tidak disimpan: Ada ruangan bertambah, tanpa tautan: tidak berubah)]
+    U3 --> U4{Dipilih Dikembalikan?}
     U4 -- Tidak --> B
-    U4 -- Ya --> U5[Setelah dipakai, barang dikembalikan] --> U6[(Status Dikembalikan)] --> B
-    U1 -- Batal --> U7[(Status Dibatalkan)] --> B
+    U4 -- Ya --> U5[Setelah dipakai, barang dikembalikan] --> U9[Konfirmasi dampak]
+    U9 --> U6[(Status Dikembalikan; kurangi tujuan yang tercatat, minimal 0, jika berhenti di 0 cek manual)] --> B
+    U1 -- Batal --> U10[Konfirmasi dampak] --> U7[(Status Dibatalkan; jika sudah Diterima, kurangi tujuan yang tercatat, minimal 0)] --> B
 
     C -- Kembali --> Z([Selesai])
 ```

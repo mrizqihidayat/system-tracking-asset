@@ -119,7 +119,6 @@ class ReportService
                 $loan->isOverdue() ? 'Ya' : 'Tidak',
                 $this->value($loan->condition_out),
                 $this->value($loan->return_condition),
-                $this->value($loan->damage_confirmation),
                 $loan->note,
             ]);
 
@@ -128,7 +127,7 @@ class ReportService
             ReportColumn::text('Unit kerja', 14), ReportColumn::text('Keperluan', 28), ReportColumn::text('Tujuan', 28),
             ReportColumn::date('Tgl pinjam'), ReportColumn::date('Rencana kembali'), ReportColumn::datetime('Tgl kembali'),
             ReportColumn::text('Status', 14), ReportColumn::text('Terlambat', 11), ReportColumn::text('Kondisi keluar', 14),
-            ReportColumn::text('Kondisi kembali', 14), ReportColumn::text('Konfirmasi kerusakan', 20), ReportColumn::text('Catatan', 30),
+            ReportColumn::text('Kondisi kembali', 14), ReportColumn::text('Catatan', 30),
         ];
 
         $summary = $this->summary([
@@ -136,7 +135,6 @@ class ReportService
             'Status' => $filters['status'] ?? null,
             'Terlambat' => $this->flag($filters, 'overdue'),
             'Jatuh tempo hari ini' => $this->flag($filters, 'due_today'),
-            'Menunggu konfirmasi' => $this->flag($filters, 'pending_confirmation'),
             'Aset' => isset($filters['asset_id']) ? Asset::query()->whereKey($filters['asset_id'])->value('code') : null,
             'Pencarian' => $filters['search'] ?? null,
         ]);

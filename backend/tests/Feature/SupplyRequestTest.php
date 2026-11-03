@@ -12,6 +12,7 @@ use App\Models\RoomStandard;
 use App\Models\SupplyRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class SupplyRequestTest extends TestCase
@@ -361,8 +362,12 @@ class SupplyRequestTest extends TestCase
         $this->assertSame($catalog->id, $items['kekurangan_ruangan:Tisu']['catalog_id']);
         $this->assertSame(10, $items['stok:Spidol']['quantity']);
         $this->assertSame('Habis', $items['stok:Spidol']['stock_status']);
-        $this->assertSame(6, $items['stok:Tisu']['quantity']);
-        $this->assertSame('Menipis', $items['stok:Tisu']['stock_status']);
+        $this->assertSame('Tisu', $items['kekurangan_ruangan:Tisu']['catalog_name']);
+        $this->assertNull($items['stok:Spidol']['catalog_name']);
+        // Nama barang sebenarnya, katalognya sebagai keterangan.
+        $this->assertSame(6, $items['stok:Kertas']['quantity']);
+        $this->assertSame('Tisu', $items['stok:Kertas']['catalog_name']);
+        $this->assertSame('Menipis', $items['stok:Kertas']['stock_status']);
     }
 
     public function test_room_suggestion_follows_stock_and_is_not_duplicated(): void
@@ -413,6 +418,177 @@ class SupplyRequestTest extends TestCase
 
         $this->assertTrue($items['Tisu']['has_open_request']);
         $this->assertFalse($items['Spidol']['has_open_request']);
+    }
+
+    public function test_open_request_flag_is_per_item_when_linked_to_stock(): void
+    {
+        $catalog = $this->catalog(['item_name' => 'ATK Isi Ulang']);
+        $pensil = Consumable::factory()->create(['name' => 'Pensil', 'quantity' => 1, 'min_quantity' => 5, 'provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
+        Consumable::factory()->create(['name' => 'Spidol', 'quantity' => 1, 'min_quantity' => 5, 'provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
+
+        $this->supplyRequest(['catalog_id' => $catalog->id, 'consumable_id' => $pensil->id, 'item_name' => 'Pensil']);
+
+        $items = collect($this->getJson('/api/supply-requests/suggestions')->assertOk()->json('data.0.items'))->keyBy('item_name');
+
+        $this->assertTrue($items['Pensil']['has_open_request']);
+        $this->assertFalse($items['Spidol']['has_open_request']);
+    }
+
+    // ---------- status mengubah stok / Ada ruangan ----------
+
+    private function notStoredStandard(int $actual = 0): array
+    {
+        $room = Room::factory()->create(['name' => 'Ruang Kelas 1']);
+        $tisu = Consumable::factory()->create(['name' => 'Tisu', 'quantity' => 0, 'min_quantity' => 0, 'is_stored' => false, 'provider_department_id' => $this->deptA->id]);
+        $standard = RoomStandard::factory()->create([
+            'room_id' => $room->id, 'item_name' => 'Tisu', 'source_department_id' => $this->deptA->id, 'standard_quantity' => 2,
+            'count_method' => CountMethod::Manual, 'actual_quantity' => $actual, 'consumable_id' => $tisu->id,
+        ]);
+
+        return [$room, $tisu, $standard];
+    }
+
+    private function setStatus(SupplyRequest $request, string $status): TestResponse
+    {
+        return $this->patchJson("/api/supply-requests/{$request->id}/status", ['status' => $status]);
+    }
+
+    public function test_must_return_choice_from_form_defaults_to_catalog(): void
+    {
+        $returned = $this->catalog(['must_return' => true]);
+        $kept = $this->catalog(['item_name' => 'Kursi', 'must_return' => false]);
+        $base = ['request_method' => 'Memo', 'quantity' => 1];
+
+        // Tidak dikirim: mengikuti katalog.
+        $this->postJson('/api/supply-requests', [...$base, 'catalog_id' => $returned->id])->assertCreated()->assertJsonPath('data.must_return', true);
+        $this->postJson('/api/supply-requests', [...$base, 'catalog_id' => $kept->id])->assertCreated()->assertJsonPath('data.must_return', false);
+
+        // Pilihan di form yang disimpan, walau berbeda dari katalog.
+        $this->postJson('/api/supply-requests', [...$base, 'catalog_id' => $returned->id, 'must_return' => false])->assertCreated()->assertJsonPath('data.must_return', false);
+        $this->postJson('/api/supply-requests', [...$base, 'catalog_id' => $kept->id, 'must_return' => true])->assertCreated()->assertJsonPath('data.must_return', true);
+
+        // Di luar katalog: default tidak dikembalikan, boleh pilih dikembalikan; pilihan menentukan aksi Dikembalikan.
+        $manual = [...$base, 'item_name' => 'Tenda', 'provider_department_id' => $this->deptA->id];
+        $this->postJson('/api/supply-requests', $manual)->assertCreated()->assertJsonPath('data.must_return', false);
+        $id = $this->postJson('/api/supply-requests', [...$manual, 'must_return' => true])
+            ->assertCreated()->assertJsonPath('data.must_return', true)->json('data.id');
+
+        $this->patchJson("/api/supply-requests/{$id}/status", ['status' => 'Diterima'])->assertOk();
+        $this->patchJson("/api/supply-requests/{$id}/status", ['status' => 'Dikembalikan'])->assertOk();
+
+        $this->postJson('/api/supply-requests', [...$manual, 'must_return' => 'mungkin'])->assertJsonValidationErrors('must_return');
+    }
+
+    public function test_store_with_stock_link_uses_item_name_of_consumable(): void
+    {
+        $catalog = $this->catalog(['item_name' => 'ATK Isi Ulang']);
+        $pensil = Consumable::factory()->create(['name' => 'Pensil 2B', 'provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
+
+        $this->postJson('/api/supply-requests', ['catalog_id' => $catalog->id, 'consumable_id' => $pensil->id, 'quantity' => 5, 'request_method' => 'Memo'])
+            ->assertCreated()
+            ->assertJsonPath('data.item_name', 'Pensil 2B')
+            ->assertJsonPath('data.consumable_id', $pensil->id)
+            ->assertJsonPath('data.catalog.item_name', 'ATK Isi Ulang');
+    }
+
+    public function test_received_not_stored_item_adds_room_quantity_and_clears_suggestion(): void
+    {
+        [$room, $tisu, $standard] = $this->notStoredStandard();
+        $request = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => $room->id, 'item_name' => 'Tisu', 'quantity' => 2]);
+
+        $this->assertNotEmpty($this->getJson('/api/supply-requests/suggestions')->json('data'));
+
+        $this->getJson("/api/supply-requests/{$request->id}/status-impact?status=Diterima")
+            ->assertOk()
+            ->assertExactJson(['data' => ['message' => 'Ada Tisu di Ruang Kelas 1 akan bertambah 2.', 'clamped' => false]]);
+        $this->assertSame(0, $standard->fresh()->actual_quantity);
+
+        $this->setStatus($request, 'Diterima')
+            ->assertOk()
+            ->assertJsonPath('meta.impact.message', 'Ada Tisu di Ruang Kelas 1 akan bertambah 2.');
+
+        $this->assertSame(2, $standard->fresh()->actual_quantity);
+        $this->assertSame(0, $tisu->fresh()->quantity);
+        $this->assertSame([], $this->getJson('/api/supply-requests/suggestions')->json('data'));
+    }
+
+    public function test_received_stored_item_adds_stock_only(): void
+    {
+        $room = Room::factory()->create();
+        $pulpen = Consumable::factory()->create(['name' => 'Pulpen', 'quantity' => 1, 'min_quantity' => 0, 'provider_department_id' => $this->deptA->id]);
+        $standard = RoomStandard::factory()->create([
+            'room_id' => $room->id, 'source_department_id' => $this->deptA->id, 'standard_quantity' => 10,
+            'count_method' => CountMethod::Manual, 'actual_quantity' => 1, 'consumable_id' => $pulpen->id,
+        ]);
+        $request = $this->supplyRequest(['consumable_id' => $pulpen->id, 'room_id' => $room->id, 'quantity' => 5]);
+
+        $this->getJson("/api/supply-requests/{$request->id}/status-impact?status=Diterima")
+            ->assertJsonPath('data.message', 'Stok Pulpen akan bertambah 5.');
+        $this->setStatus($request, 'Diterima')->assertOk();
+
+        $this->assertSame(6, $pulpen->fresh()->quantity);
+        $this->assertSame(1, $standard->fresh()->actual_quantity);
+    }
+
+    public function test_returned_or_cancelled_after_received_reverses_and_stops_at_zero(): void
+    {
+        [$room, $tisu, $standard] = $this->notStoredStandard();
+        $catalog = $this->catalog(['must_return' => true]);
+        $returned = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => $room->id, 'quantity' => 3, 'must_return' => true, 'catalog_id' => $catalog->id]);
+
+        $this->setStatus($returned, 'Diterima')->assertOk();
+        $this->assertSame(3, $standard->fresh()->actual_quantity);
+        $this->setStatus($returned, 'Dikembalikan')->assertOk()->assertJsonPath('meta.impact.clamped', false);
+        $this->assertSame(0, $standard->fresh()->actual_quantity);
+
+        // Stok sudah terpakai: berhenti di 0 dan minta dicek manual.
+        $pulpen = Consumable::factory()->create(['name' => 'Pulpen', 'quantity' => 0, 'min_quantity' => 0, 'provider_department_id' => $this->deptA->id]);
+        $request = $this->supplyRequest(['consumable_id' => $pulpen->id, 'quantity' => 5]);
+        $this->setStatus($request, 'Diterima')->assertOk();
+        $pulpen->update(['quantity' => 3]);
+
+        $this->getJson("/api/supply-requests/{$request->id}/status-impact?status=Dibatalkan")
+            ->assertExactJson(['data' => ['message' => 'Stok Pulpen hanya tersisa 3, jadi berkurang 3 sampai 0. Cek manual selisihnya.', 'clamped' => true]]);
+        $this->setStatus($request, 'Dibatalkan')->assertOk()->assertJsonPath('meta.impact.clamped', true);
+        $this->assertSame(0, $pulpen->fresh()->quantity);
+    }
+
+    public function test_cancel_before_received_and_unlinked_requests_change_nothing(): void
+    {
+        [$room, $tisu, $standard] = $this->notStoredStandard(1);
+
+        $cancelled = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => $room->id, 'quantity' => 2]);
+        $this->setStatus($cancelled, 'Dibatalkan')->assertOk()->assertJsonPath('meta.impact.message', 'Tidak mengubah stok atau kelengkapan ruangan.');
+
+        $unlinked = $this->supplyRequest(['room_id' => $room->id, 'item_name' => 'Tisu', 'quantity' => 2]);
+        $this->setStatus($unlinked, 'Diterima')->assertOk();
+        $this->setStatus($unlinked, 'Dibatalkan')->assertOk();
+
+        // Tidak disimpan SHD tanpa standar di ruangan itu.
+        $otherRoom = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => Room::factory()->create()->id, 'quantity' => 2]);
+        $this->setStatus($otherRoom, 'Diterima')->assertOk();
+        $this->assertNull($otherRoom->fresh()->applied_to);
+
+        $this->assertSame(1, $standard->fresh()->actual_quantity);
+    }
+
+    public function test_reverse_is_skipped_when_target_was_deleted(): void
+    {
+        [$room, $tisu, $standard] = $this->notStoredStandard();
+        $request = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => $room->id, 'quantity' => 2]);
+        $this->setStatus($request, 'Diterima')->assertOk();
+
+        $this->deleteJson("/api/room-standards/{$standard->id}")->assertOk();
+
+        $this->setStatus($request, 'Dibatalkan')->assertOk()->assertJsonPath('meta.impact.message', 'Tidak mengubah stok atau kelengkapan ruangan.');
+    }
+
+    public function test_status_impact_rejects_invalid_transition(): void
+    {
+        $request = $this->supplyRequest(['status' => RequestStatus::Dibatalkan]);
+
+        $this->getJson("/api/supply-requests/{$request->id}/status-impact?status=Diterima")->assertJsonValidationErrors('status');
+        $this->getJson("/api/supply-requests/{$request->id}/status-impact")->assertJsonValidationErrors('status');
     }
 
     public function test_suggestions_empty_when_nothing_needed(): void

@@ -92,7 +92,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/loans/{loan}', [LoanController::class, 'show'])->whereNumber('loan');
     Route::patch('/loans/{loan}/return', [LoanController::class, 'giveBack'])->whereNumber('loan');
     Route::patch('/loans/{loan}/cancel', [LoanController::class, 'cancel'])->whereNumber('loan');
-    Route::patch('/loans/{loan}/confirm-damage', [LoanController::class, 'confirmDamage'])->whereNumber('loan');
 
     // Kelengkapan ruangan (SPEC §8); standar diisi manual per ruangan (tanpa salin)
     Route::get('/room-readiness', RoomReadinessController::class);
@@ -113,6 +112,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/supply-requests', [SupplyRequestController::class, 'index']);
     Route::post('/supply-requests', [SupplyRequestController::class, 'store']);
     Route::put('/supply-requests/{supplyRequest}', [SupplyRequestController::class, 'update'])->whereNumber('supplyRequest');
+    Route::get('/supply-requests/{supplyRequest}/status-impact', [SupplyRequestController::class, 'statusImpact'])->whereNumber('supplyRequest');
     Route::patch('/supply-requests/{supplyRequest}/status', [SupplyRequestController::class, 'updateStatus'])->whereNumber('supplyRequest');
 
     // Stok habis pakai (SPEC §10)

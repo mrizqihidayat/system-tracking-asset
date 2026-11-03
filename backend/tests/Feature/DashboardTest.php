@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
 use App\Enums\CountMethod;
-use App\Enums\DamageConfirmation;
 use App\Enums\LoanStatus;
 use App\Enums\RequestStatus;
 use App\Models\Asset;
@@ -116,25 +115,13 @@ class DashboardTest extends TestCase
         $this->assertTrue($data['panels']['loans_due'][1]['is_due_today']);
     }
 
-    public function test_needs_repair_counts_assets_and_pending_confirmations(): void
+    public function test_needs_repair_counts_assets_in_repair(): void
     {
         $this->asset(['status' => AssetStatus::Perbaikan]);
         $this->asset(['status' => AssetStatus::Perbaikan]);
-        Loan::factory()->create([
-            'asset_id' => $this->asset()->id,
-            'status' => LoanStatus::Dikembalikan,
-            'damage_confirmation' => DamageConfirmation::MenungguKonfirmasi,
-        ]);
-        Loan::factory()->create([
-            'asset_id' => $this->asset()->id,
-            'status' => LoanStatus::Dikembalikan,
-            'damage_confirmation' => DamageConfirmation::Dikonfirmasi,
-        ]);
+        $this->asset();
 
-        $this->assertSame(
-            ['assets_in_repair' => 2, 'loans_pending_confirmation' => 1],
-            $this->dashboard()['cards']['needs_repair'],
-        );
+        $this->assertSame(['assets_in_repair' => 2], $this->dashboard()['cards']['needs_repair']);
     }
 
     public function test_incomplete_rooms_ignore_unchecked_and_rooms_without_standards(): void

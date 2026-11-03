@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\AssetCondition;
-use App\Enums\DamageConfirmation;
 use App\Enums\LoanStatus;
 use App\Support\Search;
 use Database\Factories\LoanFactory;
@@ -15,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['asset_id', 'borrower_name', 'borrower_unit', 'purpose', 'destination_room_id', 'destination_note', 'borrow_date', 'due_date', 'condition_out', 'approval_number', 'approval_date', 'borrowed_by', 'status', 'return_date', 'return_condition', 'return_room_id', 'received_by', 'damage_confirmation', 'damage_confirmed_at', 'damage_confirmed_by', 'damage_confirmation_note', 'damage_confirmation_document', 'cancel_reason', 'note'])]
+#[Fillable(['asset_id', 'borrower_name', 'borrower_unit', 'purpose', 'destination_room_id', 'destination_note', 'borrow_date', 'due_date', 'condition_out', 'approval_number', 'approval_date', 'borrowed_by', 'status', 'return_date', 'return_condition', 'return_room_id', 'received_by', 'cancel_reason', 'note'])]
 class Loan extends Model
 {
     /** @use HasFactory<LoanFactory> */
@@ -38,11 +37,9 @@ class Loan extends Model
             'due_date' => 'date',
             'approval_date' => 'date',
             'return_date' => 'datetime',
-            'damage_confirmed_at' => 'datetime',
             'condition_out' => AssetCondition::class,
             'return_condition' => AssetCondition::class,
             'status' => LoanStatus::class,
-            'damage_confirmation' => DamageConfirmation::class,
         ];
     }
 
@@ -87,14 +84,6 @@ class Loan extends Model
     }
 
     /**
-     * @return BelongsTo<User, $this>
-     */
-    public function damageConfirmedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'damage_confirmed_by');
-    }
-
-    /**
      * @return HasMany<AssetEvent, $this>
      */
     public function events(): HasMany
@@ -131,7 +120,6 @@ class Loan extends Model
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->when(self::flag($filters, 'overdue'), fn ($query) => $query->overdue())
             ->when(self::flag($filters, 'due_today'), fn ($query) => $query->dueToday())
-            ->when(self::flag($filters, 'pending_confirmation'), fn ($query) => $query->where('damage_confirmation', DamageConfirmation::MenungguKonfirmasi->value))
             ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('borrow_date', '>=', $from))
             ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('borrow_date', '<=', $to))
             ->when($filters['asset_id'] ?? null, fn ($query, $assetId) => $query->where('asset_id', $assetId));

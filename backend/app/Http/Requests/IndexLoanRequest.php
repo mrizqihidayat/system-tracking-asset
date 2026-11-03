@@ -31,7 +31,6 @@ class IndexLoanRequest extends FormRequest
             'status' => ['nullable', Rule::enum(LoanStatus::class)],
             'overdue' => ['nullable', 'boolean'],
             'due_today' => ['nullable', 'boolean'],
-            'pending_confirmation' => ['nullable', 'boolean'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
             'asset_id' => ['nullable', 'integer'],

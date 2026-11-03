@@ -3,7 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\AssetCondition;
-use App\Http\Requests\Concerns\ValidatesStatusChoice;
+use App\Enums\AssetStatus;
 use App\Models\Loan;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,8 +11,6 @@ use Illuminate\Validation\Rule;
 
 class ReturnLoanRequest extends FormRequest
 {
-    use ValidatesStatusChoice;
-
     public const RESULT_RETURNED = 'kembali';
 
     public const RESULT_LOST = 'hilang';
@@ -38,7 +36,7 @@ class ReturnLoanRequest extends FormRequest
             'result' => ['nullable', Rule::in([self::RESULT_RETURNED, self::RESULT_LOST])],
             'return_date' => ['nullable', 'date', 'after_or_equal:'.$loan->borrow_date->toDateString(), 'before_or_equal:now'],
             'return_condition' => $lost ? ['prohibited'] : ['required', Rule::enum(AssetCondition::class)],
-            ...($lost ? ['status' => ['prohibited']] : $this->statusChoiceRules()),
+            'status' => $lost ? ['prohibited'] : $this->statusRules(),
             'return_room_id' => $lost ? ['prohibited'] : ['nullable', 'integer', 'exists:rooms,id'],
             'note' => [
                 'nullable',
@@ -60,22 +58,37 @@ class ReturnLoanRequest extends FormRequest
     public function messages(): array
     {
         return [
-            ...$this->statusChoiceMessages(),
+            'status.in' => $this->input('return_condition') === AssetCondition::RusakBerat->value
+                ? 'Rusak Berat hanya bisa Perbaikan atau Tidak Layak Pakai.'
+                : 'Rusak Ringan hanya bisa Tersedia atau Perbaikan.',
             'result.in' => 'Hasil harus kembali atau hilang.',
             'return_date.after_or_equal' => 'Tanggal kembali tidak boleh sebelum tanggal pinjam.',
             'return_date.before_or_equal' => 'Tanggal kembali tidak boleh di masa depan.',
             'note.required' => $this->isLost() ? 'Catatan kehilangan wajib diisi.' : 'Catatan wajib diisi jika kondisi tidak Baik.',
             'return_condition.prohibited' => 'Kondisi tidak diisi jika aset hilang.',
-            'status.prohibited' => $this->isLost() ? 'Status tidak diisi jika aset hilang.' : 'Status hanya bisa dipilih jika kondisi Rusak Ringan.',
+            'status.prohibited' => $this->isLost() ? 'Status tidak diisi jika aset hilang.' : 'Status tidak dipilih jika kondisi Baik.',
             'return_room_id.prohibited' => 'Ruangan tidak diisi jika aset hilang.',
         ];
     }
 
     /**
-     * statusChoiceRules() memakai field "condition"; di sini kondisinya "return_condition".
+     * Pilihan status per kondisi: Rusak Ringan Tersedia/Perbaikan, Rusak Berat Perbaikan/Tidak Layak Pakai,
+     * Baik otomatis Tersedia.
+     *
+     * @return list<mixed>
      */
-    protected function prepareForValidation(): void
+    private function statusRules(): array
     {
-        $this->merge(['condition' => $this->input('return_condition')]);
+        $allowed = match ($this->input('return_condition')) {
+            AssetCondition::RusakRingan->value => [AssetStatus::Tersedia->value, AssetStatus::Perbaikan->value],
+            AssetCondition::RusakBerat->value => [AssetStatus::Perbaikan->value, AssetStatus::TidakLayakPakai->value],
+            default => [],
+        };
+
+        return [
+            'nullable',
+            Rule::in($allowed),
+            Rule::prohibitedIf(fn () => $this->input('return_condition') === AssetCondition::Baik->value),
+        ];
     }
 }

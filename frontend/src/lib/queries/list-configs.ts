@@ -9,7 +9,7 @@ export const listConfigs = {
     filters: ['category_id', 'building_id', 'room_id', 'source_department_id', 'condition', 'status'],
   },
   activeLoans: { prefix: 'aktif_', perPage: 10, fixed: { status: 'Dipinjam' } },
-  loanHistory: { filters: ['status', 'pending_confirmation'], perPage: 10 },
+  loanHistory: { filters: ['status'], perPage: 10 },
   consumables: { filters: ['status'], perPage: 20 },
   supplyRequests: {
     filters: ['status'],

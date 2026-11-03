@@ -1,7 +1,6 @@
 import type { Condition, Room, Status } from './asset'
 
 export type LoanStatus = 'Dipinjam' | 'Dikembalikan' | 'Dibatalkan' | 'Hilang'
-export type DamageConfirmation = 'Menunggu Konfirmasi' | 'Dikonfirmasi'
 
 export interface Loan {
   id: number
@@ -22,10 +21,6 @@ export interface Loan {
   return_date: string | null
   return_condition: Condition | null
   return_room: Room | null
-  damage_confirmation: DamageConfirmation | null
-  damage_confirmed_at: string | null
-  damage_confirmation_note: string | null
-  damage_confirmation_document: string | null
   cancel_reason: string | null
   note: string | null
 }

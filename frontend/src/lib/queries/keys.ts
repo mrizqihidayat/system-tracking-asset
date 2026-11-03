@@ -30,6 +30,7 @@ export const queryKeys = {
     all: ['supply-requests'] as const,
     list: (params: ListParams) => ['supply-requests', 'list', params] as const,
     suggestions: () => ['supply-requests', 'suggestions'] as const,
+    statusImpact: (id: number, status: string) => ['supply-requests', 'status-impact', id, status] as const,
   },
   rooms: {
     all: ['room-readiness'] as const,
@@ -44,6 +45,5 @@ export const queryKeys = {
     categories: () => ['master', 'categories'] as const,
     assetTypes: () => ['master', 'asset-types'] as const,
     requestCatalog: () => ['master', 'request-catalog'] as const,
-    requestMethods: () => ['master', 'request-methods'] as const,
   },
 }

@@ -18,8 +18,8 @@ export const invalidate = {
   loans: (qc: QueryClient) => run(qc, operational),
   /** Stok: daftar stok, checklist (isi dari stok), saran permintaan, dashboard. */
   consumables: (qc: QueryClient) => run(qc, [k.consumables.all, k.rooms.all, k.supplyRequests.all, k.dashboard.all]),
-  /** Permintaan: riwayat, saran, saran cara permintaan, panel dashboard. */
-  supplyRequests: (qc: QueryClient) => run(qc, [k.supplyRequests.all, k.master.requestMethods(), k.dashboard.all]),
+  /** Permintaan: riwayat, saran, panel dashboard. */
+  supplyRequests: (qc: QueryClient) => run(qc, [k.supplyRequests.all, k.dashboard.all]),
   /** Katalog: daftar katalog (master), saran, stok (kolom "minta ke"). */
   catalog: (qc: QueryClient) => run(qc, [k.master.requestCatalog(), k.supplyRequests.all, k.consumables.all, k.rooms.all]),
   /** Standar & hasil cek ruangan (isi dari stok juga mengurangi stok). */

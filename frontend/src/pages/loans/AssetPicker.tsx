@@ -21,7 +21,8 @@ interface Props {
 }
 
 const MIN_CHARS = 2
-const MAX_SUGGESTIONS = 8
+const SEARCH_DELAY_MS = 100
+const PAGE_SIZE = 100
 
 /** "Aset dipinjam": ketik kode (saran aset Tersedia muncul di bawahnya) atau scan QR; hanya aset yang boleh dipinjam yang diterima. */
 export default function AssetPicker({ asset, onPick, error }: Props) {
@@ -36,22 +37,29 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
 
   const query = text.trim()
 
-  // Saran: aset Tersedia yang cocok (nama/kode/S-N/kode lama), dengan jeda agar tidak memanggil API tiap ketikan.
+  // Saran: semua aset Tersedia yang cocok (nama/kode/S-N/kode lama). Ketikan baru membatalkan request sebelumnya.
   useEffect(() => {
     if (query.length < MIN_CHARS) return
-    let cancelled = false
-    const t = setTimeout(() => {
-      api
-        .get<Paginated<AssetListItem>>('/assets', { params: { search: query, status: 'Tersedia', per_page: MAX_SUGGESTIONS } })
-        .then((res) => {
-          if (cancelled) return
-          setSuggestions({ query, items: res.data.data })
-          setActive(-1)
-        })
-        .catch(() => undefined) // saran opsional; Cari/Scan tetap menampilkan error
-    }, 300)
+    const controller = new AbortController()
+    const t = setTimeout(async () => {
+      try {
+        const items: AssetListItem[] = []
+        for (let page = 1, lastPage = 1; page <= lastPage; page++) {
+          const res = await api.get<Paginated<AssetListItem>>('/assets', {
+            params: { search: query, status: 'Tersedia', per_page: PAGE_SIZE, page },
+            signal: controller.signal,
+          })
+          items.push(...res.data.data)
+          lastPage = res.data.meta.last_page
+        }
+        setSuggestions({ query, items })
+        setActive(-1)
+      } catch {
+        // saran opsional; Cari/Scan tetap menampilkan error
+      }
+    }, SEARCH_DELAY_MS)
     return () => {
-      cancelled = true
+      controller.abort()
       clearTimeout(t)
     }
   }, [query])

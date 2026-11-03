@@ -5,7 +5,7 @@ import { api } from '../../lib/api'
 import { CONDITIONS, type Condition } from '../../types/asset'
 import type { Loan } from '../../types/loan'
 import ActionModal from '../assets/modals/ActionModal'
-import ConditionStatusFields, { type ChoiceStatus } from '../assets/modals/ConditionStatusFields'
+import ConditionStatusFields, { type ChoiceStatus, type HeavyDamageStatus } from '../assets/modals/ConditionStatusFields'
 import RoomSelect from './RoomSelect'
 
 interface Props {
@@ -23,6 +23,7 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
   const [date, setDate] = useState(today())
   const [condition, setCondition] = useState<Condition>(loan.asset?.condition ?? 'Baik')
   const [status, setStatus] = useState<ChoiceStatus>('Tersedia')
+  const [heavyStatus, setHeavyStatus] = useState<HeavyDamageStatus>('Perbaikan')
   const [buildingId, setBuildingId] = useState<number | null>(loan.asset?.room?.building_id ?? null)
   const [roomId, setRoomId] = useState<number | null>(loan.asset?.room?.id ?? null)
   const [note, setNote] = useState('')
@@ -40,6 +41,7 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
       payload.return_condition = condition
       payload.return_room_id = roomId
       if (condition === 'Rusak Ringan') payload.status = status
+      if (condition === 'Rusak Berat') payload.status = heavyStatus
     }
     await api.patch(`/loans/${loan.id}/return`, payload)
     toast.success(lost ? 'Aset dilaporkan hilang saat dipinjam.' : `${loan.asset?.code} diterima kembali.`)
@@ -77,6 +79,7 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
                 status={status}
                 onCondition={setCondition}
                 onStatus={setStatus}
+                heavyDamage={{ status: heavyStatus, onChange: setHeavyStatus }}
                 errors={errors}
               />
               <RoomSelect

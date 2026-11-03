@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
-import { AssetCode, Badge } from '../../components/ui/Badge'
+import { AssetCode, Badge, ConditionBadge } from '../../components/ui/Badge'
 import { PageHeader } from '../../components/ui/Page'
 import Button from '../../components/ui/Button'
 import DataTable, { type Column } from '../../components/ui/DataTable'
@@ -17,11 +17,10 @@ import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
 import type { Loan, LoanStatus } from '../../types/loan'
 import CancelLoanModal from './CancelLoanModal'
-import ConfirmDamageModal from './ConfirmDamageModal'
 import LoanForm from './LoanForm'
 import ReturnLoanModal from './ReturnLoanModal'
 
-type ModalState = { kind: 'return' | 'cancel' | 'confirm'; loan: Loan } | null
+type ModalState = { kind: 'return' | 'cancel'; loan: Loan } | null
 
 const statusColor = { Dipinjam: 'blue', Dikembalikan: 'green', Dibatalkan: 'slate', Hilang: 'red' } as const
 
@@ -52,7 +51,6 @@ export default function LoanPage() {
   useErrorToast(active.error, history.error)
 
   const status = historyList.get('status')
-  const pending = historyList.get('pending_confirmation') === '1'
   const search = historyList.searchText
 
   const refresh = () => invalidate.loans(queryClient)
@@ -112,23 +110,11 @@ export default function LoanPage() {
       cell: (l) => (
         <div className="flex flex-col items-end gap-1 md:flex-row md:flex-wrap md:items-center">
           <Badge color={statusColor[l.status]}>{l.status}</Badge>
-          {l.damage_confirmation && (
-            <Badge color={l.damage_confirmation === 'Dikonfirmasi' ? 'green' : 'amber'}>
-              {l.damage_confirmation === 'Dikonfirmasi' ? 'Kerusakan dikonfirmasi' : 'Menunggu konfirmasi'}
-            </Badge>
+          {l.status === 'Dikembalikan' && l.return_condition && l.return_condition !== 'Baik' && (
+            <ConditionBadge condition={l.return_condition} />
           )}
         </div>
       ),
-    },
-    {
-      header: '',
-      className: 'text-right',
-      cell: (l) =>
-        l.damage_confirmation === 'Menunggu Konfirmasi' ? (
-          <Button variant="secondary" className="w-full md:w-auto" onClick={() => setModal({ kind: 'confirm', loan: l })}>
-            Konfirmasi kerusakan
-          </Button>
-        ) : null,
     },
   ]
 
@@ -137,7 +123,7 @@ export default function LoanPage() {
       <PageHeader
         title="Peminjaman & Pengembalian"
         description="Dicatat admin atas nama peminjam. Approval atasan di luar sistem, nomornya dicatat di sini."
-        actions={<ExportButton type="loans" filters={() => ({ status, pending_confirmation: pending ? 1 : '', search: search.trim() })} />}
+        actions={<ExportButton type="loans" filters={() => ({ status, search: search.trim() })} />}
       />
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
@@ -160,8 +146,8 @@ export default function LoanPage() {
             onPageChange={activeList.setPage}
           />
           <p className="text-xs text-slate-500">
-            Saat menerima kembali, admin memilih kondisi aset. Kondisi selain Baik membuat status aset berubah menjadi Perbaikan
-            (Rusak Ringan bisa dipilih Tersedia atau Perbaikan).
+            Saat menerima kembali, admin memilih kondisi aset. Rusak Ringan bisa dipilih Tersedia atau Perbaikan, Rusak Berat
+            bisa dipilih Perbaikan atau Tidak Layak Pakai.
           </p>
         </section>
       </div>
@@ -186,10 +172,6 @@ export default function LoanPage() {
             <option>Dibatalkan</option>
             <option>Hilang</option>
           </Select>
-          <label className="flex min-h-10 items-center gap-2 text-sm">
-            <input type="checkbox" checked={pending} onChange={(e) => historyList.setFilter('pending_confirmation', e.target.checked ? '1' : '')} />
-            Menunggu konfirmasi
-          </label>
         </div>
         <DataTable
           columns={historyColumns}
@@ -208,7 +190,6 @@ export default function LoanPage() {
 
       {modal?.kind === 'return' && <ReturnLoanModal loan={modal.loan} onClose={closeModal} onDone={done} />}
       {modal?.kind === 'cancel' && <CancelLoanModal loan={modal.loan} onClose={closeModal} onDone={done} />}
-      {modal?.kind === 'confirm' && <ConfirmDamageModal loan={modal.loan} onClose={closeModal} onDone={done} />}
     </div>
   )
 }

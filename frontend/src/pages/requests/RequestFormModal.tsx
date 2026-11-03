@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import Combobox from '../../components/ui/Combobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
-import { useDepartments, useRequestMethods, useRooms } from '../../lib/queries/master'
+import { useDepartments, useRooms } from '../../lib/queries/master'
 import type { RequestCatalog, RequestPrefill, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import RoomSelect from '../loans/RoomSelect'
@@ -19,13 +18,14 @@ interface Props {
 
 const today = () => new Date().toLocaleDateString('en-CA')
 const MANUAL = 'manual'
+const REQUEST_METHODS = ['Memo', 'Form', 'Email', 'WhatsApp']
+const OTHER_METHOD = 'Lainnya'
 
 /** Catat permintaan ke unit lain (proses permintaan tetap di luar sistem). */
 export default function RequestFormModal({ catalog, request, prefill, onClose, onDone }: Props) {
   const toast = useToast()
   const departments = useDepartments().data.filter((d) => !d.is_internal)
   const { data: allRooms } = useRooms()
-  const { data: methods } = useRequestMethods()
   const initialCatalog = request ? request.catalog?.id : prefill?.catalog_id
   const [catalogId, setCatalogId] = useState<string>(
     initialCatalog ? String(initialCatalog) : request || prefill?.item_name ? MANUAL : '',
@@ -34,7 +34,14 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
   const [providerId, setProviderId] = useState<number | null>(
     request?.provider_department?.id ?? prefill?.provider_department_id ?? null,
   )
-  const [method, setMethod] = useState(request?.request_method ?? '')
+  // null = mengikuti katalog; pilihan staf disimpan sampai item diganti.
+  const [returnChoice, setReturnChoice] = useState<boolean | null>(request?.must_return ?? null)
+  // Nilai di luar daftar (mis. "Telegram") tampil sebagai Lainnya + isian teks.
+  const initialMethod = request?.request_method ?? ''
+  const knownMethod = REQUEST_METHODS.includes(initialMethod)
+  const [methodChoice, setMethodChoice] = useState(knownMethod ? initialMethod : initialMethod && OTHER_METHOD)
+  const [otherMethod, setOtherMethod] = useState(knownMethod || initialMethod === OTHER_METHOD ? '' : initialMethod)
+  const method = methodChoice === OTHER_METHOD ? otherMethod.trim() : methodChoice
   const [quantity, setQuantity] = useState(String(request?.quantity ?? prefill?.quantity ?? 1))
   const [purpose, setPurpose] = useState(request?.purpose ?? '')
   const [date, setDate] = useState(request?.request_date ?? today())
@@ -49,13 +56,22 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
 
   const manual = catalogId === MANUAL
   const selected = catalog.find((c) => String(c.id) === catalogId)
+  const mustReturn = returnChoice ?? selected?.must_return ?? false
+
+  // Tautan barang stok hanya berlaku selama itemnya tidak diganti di form.
+  const linkedConsumable = request ? request.consumable_id : prefill?.consumable_id
+  const initialName = request?.item_name ?? prefill?.item_name ?? ''
+  const itemUnchanged = (selected?.id ?? null) === (initialCatalog ?? null) && (!manual || itemName.trim() === initialName.trim())
+  const consumableId = itemUnchanged ? (linkedConsumable ?? null) : null
 
   const submit = async () => {
     const payload = {
       catalog_id: selected?.id ?? null,
+      consumable_id: consumableId,
       item_name: manual ? itemName.trim() : null,
       provider_department_id: manual ? providerId : null,
-      request_method: method.trim(),
+      must_return: mustReturn,
+      request_method: method,
       quantity: Number(quantity),
       purpose: purpose.trim() || null,
       request_date: date || null,
@@ -72,14 +88,21 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
     <ActionModal
       title={request ? 'Ubah permintaan' : 'Buat permintaan'}
       submitLabel="Simpan"
-      submitDisabled={!catalogId || !method.trim() || (manual && (!itemName.trim() || !providerId))}
+      submitDisabled={!catalogId || !method || (manual && (!itemName.trim() || !providerId))}
       onClose={onClose}
       onSubmit={submit}
     >
       {(errors) => (
         <>
           <FormField label="Item" required error={errors.catalog_id}>
-            <Select value={catalogId} onChange={(e) => setCatalogId(e.target.value)} error={errors.catalog_id}>
+            <Select
+              value={catalogId}
+              onChange={(e) => {
+                setCatalogId(e.target.value)
+                setReturnChoice(null)
+              }}
+              error={errors.catalog_id}
+            >
               <option value="">Pilih item katalog</option>
               {catalog.map((c) => (
                 <option key={c.id} value={c.id}>{c.item_name} — {c.provider_department?.name}</option>
@@ -92,6 +115,9 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
               {selected.provider_department?.name} · lead time {selected.lead_time_days} hari
               {selected.must_return && ' · perlu dikembalikan'}
             </p>
+          )}
+          {consumableId && initialName && (
+            <p className="-mt-1 text-xs text-slate-500">Barang stok: <b>{initialName}</b></p>
           )}
           {manual && (
             <div className="grid grid-cols-2 gap-3">
@@ -106,15 +132,24 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
               </FormField>
             </div>
           )}
-          <FormField label="Cara permintaan" required error={errors.request_method}>
-            <Combobox
-              value={method}
-              onChange={setMethod}
-              options={methods.map((m) => ({ id: m, label: m }))}
-              placeholder="Memo, Form, Email, WhatsApp…"
-              error={errors.request_method}
-            />
+          <FormField label="Pengembalian barang" required error={errors.must_return}>
+            <Select value={mustReturn ? '1' : '0'} onChange={(e) => setReturnChoice(e.target.value === '1')} error={errors.must_return}>
+              <option value="0">Tidak dikembalikan</option>
+              <option value="1">Dikembalikan</option>
+            </Select>
           </FormField>
+          <FormField label="Cara permintaan" required error={methodChoice === OTHER_METHOD ? undefined : errors.request_method}>
+            <Select value={methodChoice} onChange={(e) => setMethodChoice(e.target.value)} error={methodChoice === OTHER_METHOD ? undefined : errors.request_method}>
+              <option value="">Pilih cara permintaan</option>
+              {REQUEST_METHODS.map((m) => <option key={m}>{m}</option>)}
+              <option>{OTHER_METHOD}</option>
+            </Select>
+          </FormField>
+          {methodChoice === OTHER_METHOD && (
+            <FormField label="Cara lainnya" required error={errors.request_method}>
+              <Input value={otherMethod} onChange={(e) => setOtherMethod(e.target.value)} placeholder="Misal: Telegram" error={errors.request_method} maxLength={50} autoFocus />
+            </FormField>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Jumlah" required error={errors.quantity}>
               <Input type="number" min={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} error={errors.quantity} />

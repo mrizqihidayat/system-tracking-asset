@@ -3,7 +3,7 @@ import type { Paginated } from '../../types/api'
 import type { Asset, AssetEvent, AssetFile, AssetListItem } from '../../types/asset'
 import type { Loan } from '../../types/loan'
 import type { Checklist, ReadinessBuilding } from '../../types/room'
-import type { ConsumableItem, SuggestionGroup, SupplyRequest } from '../../types/supply'
+import type { ConsumableItem, RequestStatus, StatusImpact, SuggestionGroup, SupplyRequest } from '../../types/supply'
 import { api } from '../api'
 import { queryKeys, type ListParams } from './keys'
 
@@ -24,6 +24,13 @@ export const listQueries = {
   consumables: (params: ListParams) => paginated<ConsumableItem>(queryKeys.consumables.list(params), '/consumables', params),
   supplyRequests: (params: ListParams) => paginated<SupplyRequest>(queryKeys.supplyRequests.list(params), '/supply-requests', params),
   suggestions: () => data<SuggestionGroup[]>(queryKeys.supplyRequests.suggestions(), '/supply-requests/suggestions'),
+  /** Dampak status ke stok / Ada ruangan: disimpan sampai data permintaan/stok berubah (lewat invalidasi). */
+  statusImpact: (id: number, status: RequestStatus) =>
+    queryOptions({
+      ...data<StatusImpact>(queryKeys.supplyRequests.statusImpact(id, status), `/supply-requests/${id}/status-impact?status=${status}`),
+      staleTime: Infinity,
+      gcTime: Infinity,
+    }),
   readiness: () => data<ReadinessBuilding[]>(queryKeys.rooms.readiness(), '/room-readiness'),
   checklist: (roomId: number) =>
     queryOptions({
@@ -60,6 +67,7 @@ export const useLoans = (params: ListParams) => useQuery(listQueries.loans(param
 export const useConsumables = (params: ListParams) => useQuery(listQueries.consumables(params))
 export const useSupplyRequests = (params: ListParams) => useQuery(listQueries.supplyRequests(params))
 export const useSuggestions = () => useQuery(listQueries.suggestions())
+export const useStatusImpact = (id: number, status: RequestStatus) => useQuery(listQueries.statusImpact(id, status))
 export const useReadiness = () => useQuery(listQueries.readiness())
 export const useChecklist = (roomId: number | undefined) =>
   useQuery({ ...listQueries.checklist(roomId ?? 0), enabled: !!roomId })

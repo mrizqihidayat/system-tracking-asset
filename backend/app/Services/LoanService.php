@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
-use App\Enums\DamageConfirmation;
 use App\Enums\EventType;
 use App\Enums\LoanStatus;
 use App\Models\Asset;
@@ -70,7 +69,7 @@ class LoanService
 
     /**
      * Terima kembali: kondisi & status aset aturan A6, lokasi asal ikut ruangan penyimpanan.
-     * "Menunggu Konfirmasi" hanya jika kondisi kembali lebih buruk dari kondisi keluar.
+     * Rusak Berat boleh langsung Tidak Layak Pakai (riwayat terpisah, sama dengan catat tidak layak pakai).
      *
      * @param  array{return_date?: ?string, return_condition: string, status?: ?string, return_room_id?: ?int, note?: ?string}  $data
      */
@@ -79,9 +78,11 @@ class LoanService
         return DB::transaction(function () use ($loan, $data, $actor) {
             [$loan, $asset] = $this->lockActive($loan);
 
-            $returnDate = $this->returnDate($data['return_date'] ?? null);
+            $returnDate = $this->returnDate($loan, $data['return_date'] ?? null);
             $condition = AssetCondition::from($data['return_condition']);
-            $status = $condition->resolveStatus(AssetStatus::tryFrom((string) ($data['status'] ?? '')));
+            $chosen = AssetStatus::tryFrom((string) ($data['status'] ?? ''));
+            $unfit = $condition === AssetCondition::RusakBerat && $chosen === AssetStatus::TidakLayakPakai;
+            $status = $unfit ? AssetStatus::TidakLayakPakai : $condition->resolveStatus($chosen);
             $fromRoomId = $asset->room_id;
             $returnRoomId = (int) ($data['return_room_id'] ?? $fromRoomId);
             $note = $data['note'] ?? null;
@@ -92,7 +93,6 @@ class LoanService
                 'return_condition' => $condition,
                 'return_room_id' => $returnRoomId,
                 'received_by' => $actor->id,
-                'damage_confirmation' => $condition->isWorseThan($loan->condition_out) ? DamageConfirmation::MenungguKonfirmasi : null,
                 'note' => $note,
             ]);
 
@@ -117,6 +117,16 @@ class LoanService
                 ]);
             }
 
+            if ($unfit) {
+                $this->events->record($asset, EventType::TidakLayakPakai, $actor, [
+                    'event_date' => $returnDate,
+                    'party' => 'SHD',
+                    'condition' => $condition,
+                    'loan_id' => $loan->id,
+                    'note' => $note,
+                ]);
+            }
+
             return $loan;
         });
     }
@@ -129,7 +139,7 @@ class LoanService
     {
         return DB::transaction(function () use ($loan, $returnDate, $note, $actor) {
             [$loan, $asset] = $this->lockActive($loan);
-            $date = $this->returnDate($returnDate);
+            $date = $this->returnDate($loan, $returnDate);
 
             $loan->update([
                 'status' => LoanStatus::Hilang,
@@ -175,27 +185,6 @@ class LoanService
     /**
      * Konfirmasi kerusakan (dilakukan di luar sistem, staf mencatat hasilnya).
      */
-    public function confirmDamage(Loan $loan, string $note, ?string $document, User $actor): Loan
-    {
-        return DB::transaction(function () use ($loan, $note, $document, $actor) {
-            $loan = Loan::query()->whereKey($loan->getKey())->lockForUpdate()->firstOrFail();
-
-            if ($loan->damage_confirmation !== DamageConfirmation::MenungguKonfirmasi) {
-                throw ValidationException::withMessages(['loan' => 'Transaksi tidak menunggu konfirmasi kerusakan.']);
-            }
-
-            $loan->update([
-                'damage_confirmation' => DamageConfirmation::Dikonfirmasi,
-                'damage_confirmed_at' => now(),
-                'damage_confirmed_by' => $actor->id,
-                'damage_confirmation_note' => $note,
-                'damage_confirmation_document' => $document,
-            ]);
-
-            return $loan;
-        });
-    }
-
     private function ensureBorrowable(Asset $asset): void
     {
         $message = match (true) {
@@ -227,9 +216,18 @@ class LoanService
         return [$loan, $asset];
     }
 
-    private function returnDate(?string $value): CarbonInterface
+    /**
+     * Tanggal pinjam boleh di masa depan: selama belum tiba, transaksi hanya bisa dibatalkan.
+     */
+    private function returnDate(Loan $loan, ?string $value): CarbonInterface
     {
-        return $value ? Carbon::parse($value) : now();
+        $date = $value ? Carbon::parse($value) : now();
+
+        if ($date->copy()->startOfDay()->lt($loan->borrow_date)) {
+            throw ValidationException::withMessages(['return_date' => 'Tanggal pinjam belum tiba. Batalkan peminjaman jika tidak jadi.']);
+        }
+
+        return $date;
     }
 
     /**

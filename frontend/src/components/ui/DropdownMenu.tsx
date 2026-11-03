@@ -12,9 +12,11 @@ interface Props {
   label: string
   align?: 'left' | 'right'
   triggerClassName?: string
+  /** Dipanggil saat menu dibuka (mis. memuat data lebih awal). */
+  onOpen?: () => void
 }
 
-export default function DropdownMenu({ trigger, items, label, align = 'right', triggerClassName = '' }: Props) {
+export default function DropdownMenu({ trigger, items, label, align = 'right', triggerClassName = '', onOpen }: Props) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
 
@@ -39,7 +41,10 @@ export default function DropdownMenu({ trigger, items, label, align = 'right', t
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) onOpen?.()
+          setOpen((v) => !v)
+        }}
         className={`inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-300 hover:bg-slate-50 ${triggerClassName}`}
       >
         {trigger}

@@ -56,7 +56,16 @@ class SupplyRequestController extends Controller
 
         $supplyRequest = $this->requests->changeStatus($supplyRequest, RequestStatus::from($data['status']), $data['note'] ?? null);
 
-        return SupplyRequestResource::make($supplyRequest->load(SupplyRequestResource::RELATIONS));
+        return SupplyRequestResource::make($supplyRequest->load(SupplyRequestResource::RELATIONS))
+            ->additional(['meta' => ['impact' => $supplyRequest->statusImpact]]);
+    }
+
+    /**
+     * Pratinjau dampak perubahan status ke stok / Ada ruangan (status tujuan lewat query).
+     */
+    public function statusImpact(UpdateSupplyRequestStatusRequest $request, SupplyRequest $supplyRequest): JsonResponse
+    {
+        return response()->json(['data' => $this->requests->statusImpact($supplyRequest, RequestStatus::from($request->validated('status')))]);
     }
 
     /**

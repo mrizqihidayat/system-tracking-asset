@@ -22,23 +22,6 @@ enum AssetCondition: string
     }
 
     /**
-     * Tingkat kerusakan: Baik (0) < Rusak Ringan (1) < Rusak Berat (2).
-     */
-    public function severity(): int
-    {
-        return match ($this) {
-            self::Baik => 0,
-            self::RusakRingan => 1,
-            self::RusakBerat => 2,
-        };
-    }
-
-    public function isWorseThan(self $other): bool
-    {
-        return $this->severity() > $other->severity();
-    }
-
-    /**
      * Hanya Rusak Ringan yang statusnya boleh dipilih staf.
      */
     public function allowsStatusChoice(): bool

@@ -10,15 +10,19 @@ use App\Models\RoomStandard;
 use App\Models\SupplyRequest;
 use App\Models\User;
 use App\Support\AppCache;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Permintaan ke unit lain (SPEC §9): catat, ubah status (transisi terkunci), saran permintaan, hapus katalog.
+ * Permintaan ke unit lain (SPEC §9): catat, ubah status (transisi terkunci, ikut mengubah stok / Ada ruangan),
+ * saran permintaan, hapus katalog.
  */
 class SupplyRequestService
 {
+    public function __construct(private ConsumableService $consumables) {}
+
     /**
      * Item & unit penyedia diisi dari katalog bila dikirim; tanggal default hari ini.
      *
@@ -56,23 +60,13 @@ class SupplyRequestService
     {
         return DB::transaction(function () use ($request, $to, $note) {
             $request = $this->lock($request);
-            $from = $request->status;
+            $this->ensureTransition($request, $to);
 
-            $allowed = match ($from) {
-                RequestStatus::Diajukan => [RequestStatus::Diterima, RequestStatus::Dibatalkan],
-                RequestStatus::Diterima => [RequestStatus::Dikembalikan, RequestStatus::Dibatalkan],
-                default => [],
-            };
-
-            if (! in_array($to, $allowed, true)) {
-                throw ValidationException::withMessages(['status' => "Status {$from->value} tidak dapat diubah ke {$to->value}."]);
-            }
-
-            if ($to === RequestStatus::Dikembalikan && ! $request->must_return) {
-                throw ValidationException::withMessages(['status' => 'Barang ini tidak perlu dikembalikan.']);
-            }
+            $effect = $this->stockEffect($request, $to, lock: true);
+            $this->applyEffect($request, $to, $effect);
 
             $request->status = $to;
+            $request->statusImpact = $this->impact($effect);
 
             match ($to) {
                 RequestStatus::Diterima => $request->received_at = now(),
@@ -88,6 +82,167 @@ class SupplyRequestService
 
             return $request;
         });
+    }
+
+    /**
+     * Pratinjau dampak perubahan status ke stok / Ada ruangan (popup sebelum menyimpan).
+     *
+     * @return array{message: string, clamped: bool}
+     */
+    public function statusImpact(SupplyRequest $request, RequestStatus $to): array
+    {
+        $this->ensureTransition($request, $to);
+
+        return $this->impact($this->stockEffect($request, $to));
+    }
+
+    private function ensureTransition(SupplyRequest $request, RequestStatus $to): void
+    {
+        $allowed = match ($request->status) {
+            RequestStatus::Diajukan => [RequestStatus::Diterima, RequestStatus::Dibatalkan],
+            RequestStatus::Diterima => [RequestStatus::Dikembalikan, RequestStatus::Dibatalkan],
+            default => [],
+        };
+
+        if (! in_array($to, $allowed, true)) {
+            throw ValidationException::withMessages(['status' => "Status {$request->status->value} tidak dapat diubah ke {$to->value}."]);
+        }
+
+        if ($to === RequestStatus::Dikembalikan && ! $request->must_return) {
+            throw ValidationException::withMessages(['status' => 'Barang ini tidak perlu dikembalikan.']);
+        }
+    }
+
+    /**
+     * Sasaran & jumlah perubahan. Diterima: barang disimpan SHD → stok, tidak disimpan → Ada standar ruangan terkait.
+     * Dikembalikan/Dibatalkan setelah Diterima: kurangi tujuan yang tercatat, tidak sampai di bawah 0.
+     *
+     * @return array{target: Consumable|RoomStandard, adding: bool, amount: int, current: int, clamped: bool}|null
+     */
+    private function stockEffect(SupplyRequest $request, RequestStatus $to, bool $lock = false): ?array
+    {
+        if ($to === RequestStatus::Diterima) {
+            $target = $this->receiveTarget($request, $lock);
+
+            return $target ? ['target' => $target, 'adding' => true, 'amount' => $request->quantity, 'current' => $this->currentAmount($target), 'clamped' => false] : null;
+        }
+
+        if ($request->status !== RequestStatus::Diterima || $request->applied_to === null) {
+            return null;
+        }
+
+        $target = $request->applied_to === SupplyRequest::APPLIED_TO_STOCK
+            ? $this->find(Consumable::query(), $request->consumable_id, $lock)
+            : $this->find(RoomStandard::query(), $request->room_standard_id, $lock);
+
+        if (! $target) {
+            return null;
+        }
+
+        $current = $this->currentAmount($target);
+
+        return ['target' => $target, 'adding' => false, 'amount' => min($request->quantity, $current), 'current' => $current, 'clamped' => $current < $request->quantity];
+    }
+
+    private function receiveTarget(SupplyRequest $request, bool $lock): Consumable|RoomStandard|null
+    {
+        $consumable = $this->find(Consumable::query(), $request->consumable_id, $lock);
+
+        if (! $consumable) {
+            return null;
+        }
+
+        if ($consumable->is_stored) {
+            return $consumable;
+        }
+
+        if (! $request->room_id) {
+            return null;
+        }
+
+        $standards = RoomStandard::query()->where('room_id', $request->room_id)->where('consumable_id', $consumable->id)->orderBy('id');
+
+        return ($lock ? $standards->lockForUpdate() : $standards)->first();
+    }
+
+    /**
+     * @template TModel of Consumable|RoomStandard
+     *
+     * @param  Builder<TModel>  $query
+     * @return TModel|null
+     */
+    private function find(Builder $query, ?int $id, bool $lock): Consumable|RoomStandard|null
+    {
+        if (! $id) {
+            return null;
+        }
+
+        return ($lock ? $query->lockForUpdate() : $query)->find($id);
+    }
+
+    private function currentAmount(Consumable|RoomStandard $target): int
+    {
+        return $target instanceof Consumable ? $target->quantity : (int) $target->actual_quantity;
+    }
+
+    /**
+     * @param  array{target: Consumable|RoomStandard, adding: bool, amount: int, current: int, clamped: bool}|null  $effect
+     */
+    private function applyEffect(SupplyRequest $request, RequestStatus $to, ?array $effect): void
+    {
+        if ($effect !== null && $effect['amount'] > 0) {
+            $signed = $effect['adding'] ? $effect['amount'] : -$effect['amount'];
+            $target = $effect['target'];
+
+            if ($target instanceof Consumable) {
+                $this->consumables->adjust($target, $signed);
+            } else {
+                $target->update(['actual_quantity' => $effect['current'] + $signed]);
+            }
+        }
+
+        if ($to === RequestStatus::Diterima) {
+            $target = $effect['target'] ?? null;
+            $request->applied_to = match (true) {
+                $target instanceof Consumable => SupplyRequest::APPLIED_TO_STOCK,
+                $target instanceof RoomStandard => SupplyRequest::APPLIED_TO_ROOM,
+                default => null,
+            };
+            $request->room_standard_id = $target instanceof RoomStandard ? $target->id : null;
+        } else {
+            $request->applied_to = null;
+        }
+    }
+
+    /**
+     * @param  array{target: Consumable|RoomStandard, adding: bool, amount: int, current: int, clamped: bool}|null  $effect
+     * @return array{message: string, clamped: bool}
+     */
+    private function impact(?array $effect): array
+    {
+        if ($effect === null) {
+            return ['message' => 'Tidak mengubah stok atau kelengkapan ruangan.', 'clamped' => false];
+        }
+
+        $target = $effect['target'];
+        $subject = $target instanceof Consumable
+            ? "Stok {$target->name}"
+            : "Ada {$target->item_name} di {$target->room->name}";
+
+        if ($effect['adding']) {
+            return ['message' => "{$subject} akan bertambah {$effect['amount']}.", 'clamped' => false];
+        }
+
+        if ($effect['clamped']) {
+            return [
+                'message' => $effect['current'] === 0
+                    ? "{$subject} sudah 0, tidak ada yang dikurangi. Cek manual selisihnya."
+                    : "{$subject} hanya tersisa {$effect['current']}, jadi berkurang {$effect['amount']} sampai 0. Cek manual selisihnya.",
+                'clamped' => true,
+            ];
+        }
+
+        return ['message' => "{$subject} akan berkurang {$effect['amount']}.", 'clamped' => false];
     }
 
     /**
@@ -179,7 +334,8 @@ class SupplyRequestService
             ->filter(fn (RoomStandard $standard) => $standard->canRequest())
             ->map(fn (RoomStandard $standard) => [
                 'source' => 'kekurangan_ruangan',
-                'item_name' => $standard->consumable->catalog?->item_name ?? $standard->consumable->name,
+                'item_name' => $standard->consumable->name,
+                'catalog_name' => $standard->consumable->catalog?->item_name,
                 'quantity' => $standard->shortage(),
                 'catalog_id' => $standard->consumable->catalog_id,
                 'room' => ['id' => $standard->room_id, 'name' => $standard->room->name, 'building' => $standard->room->building->name],
@@ -202,7 +358,8 @@ class SupplyRequestService
             ->get()
             ->map(fn (Consumable $consumable) => [
                 'source' => 'stok',
-                'item_name' => $consumable->catalog?->item_name ?? $consumable->name,
+                'item_name' => $consumable->name,
+                'catalog_name' => $consumable->catalog?->item_name,
                 'quantity' => max($consumable->min_quantity - $consumable->quantity, 1),
                 'catalog_id' => $consumable->catalog_id,
                 'room' => null,
@@ -226,6 +383,11 @@ class SupplyRequestService
             return false;
         }
 
+        // Permintaan tertaut stok dicocokkan per barang (satu katalog bisa dipakai banyak barang).
+        if ($request->consumable_id !== null) {
+            return (int) $request->consumable_id === (int) $item['consumable_id'];
+        }
+
         return $item['catalog_id'] !== null
             ? (int) $request->catalog_id === (int) $item['catalog_id']
             : mb_strtolower($request->item_name) === mb_strtolower($item['item_name']);
@@ -240,8 +402,8 @@ class SupplyRequestService
     }
 
     /**
-     * Snapshot lead time & "perlu dikembalikan" dari katalog (permintaan tanpa katalog: tanpa lead time,
-     * tidak perlu dikembalikan); riwayat tidak berubah saat katalog diedit/dihapus.
+     * Snapshot lead time dari katalog & "perlu dikembalikan" dari pilihan form (default katalog); riwayat tidak
+     * berubah saat katalog diedit/dihapus.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -255,8 +417,14 @@ class SupplyRequestService
             $data['provider_department_id'] = $catalog->provider_department_id;
         }
 
+        // Permintaan tertaut stok memakai nama barang, bukan nama katalog.
+        if (! empty($data['consumable_id'])) {
+            $data['item_name'] = Consumable::query()->whereKey($data['consumable_id'])->value('name');
+        }
+
         $data['lead_time_days'] = $catalog?->lead_time_days;
-        $data['must_return'] = (bool) $catalog?->must_return;
+        // Pilihan di form yang disimpan; jika tidak dikirim mengikuti katalog (tanpa katalog: tidak dikembalikan).
+        $data['must_return'] = (bool) ($data['must_return'] ?? $catalog?->must_return ?? false);
 
         $data['request_date'] = ($data['request_date'] ?? null) ?: today()->toDateString();
 

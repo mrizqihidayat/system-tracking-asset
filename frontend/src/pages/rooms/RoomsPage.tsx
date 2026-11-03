@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { Badge } from '../../components/ui/Badge'
@@ -17,6 +17,7 @@ import { createBuilding, createRoom } from '../../lib/lookups'
 import { invalidate } from '../../lib/queries/invalidate'
 import { queryKeys } from '../../lib/queries/keys'
 import { useChecklist, useReadiness } from '../../lib/queries/lists'
+import { prefetchRoomOptions } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { Checklist, ChecklistResult, RoomStandard } from '../../types/room'
 import NameModal from './NameModal'
@@ -37,11 +38,11 @@ const chipRow = '-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap
 const requestUrl = (roomId: number, s?: RoomStandard) => {
   const p = new URLSearchParams({ room_id: String(roomId) })
   const item = s?.fulfillment?.consumable
-  if (item?.catalog_id) {
-    p.set('catalog_id', String(item.catalog_id))
-  } else if (item) {
+  if (item) {
+    p.set('consumable_id', String(item.id))
     p.set('item_name', item.name)
-    if (item.provider_department) p.set('provider_department_id', String(item.provider_department.id))
+    if (item.catalog_id) p.set('catalog_id', String(item.catalog_id))
+    else if (item.provider_department) p.set('provider_department_id', String(item.provider_department.id))
   }
   if (s?.shortage) p.set('quantity', String(s.shortage))
   return `/permintaan?${p}`
@@ -86,6 +87,9 @@ export default function RoomsPage() {
   const [saving, setSaving] = useState(false)
   const [filling, setFilling] = useState<number | null>(null)
   const [modal, setModal] = useState<'standards' | 'building' | 'room' | null>(null)
+
+  // "Buat permintaan" membuka form berisi gedung & ruangan: datanya disiapkan dari sini.
+  useEffect(() => prefetchRoomOptions(queryClient), [queryClient])
 
   // Slug URL → id dari data yang sudah dimuat (API tetap memakai id).
   const building = buildings?.find((b) => b.slug === buildingSlug)

@@ -42,15 +42,10 @@ class LoanResource extends JsonResource
             'return_date' => $this->return_date?->toIso8601String(),
             'return_condition' => $this->return_condition,
             'return_room' => RoomResource::make($this->whenLoaded('returnRoom')),
-            'damage_confirmation' => $this->damage_confirmation,
-            'damage_confirmed_at' => $this->damage_confirmed_at?->toIso8601String(),
-            'damage_confirmation_note' => $this->damage_confirmation_note,
-            'damage_confirmation_document' => $this->damage_confirmation_document,
             'cancel_reason' => $this->cancel_reason,
             'note' => $this->note,
             'borrowed_by' => $this->userSummary('borrowedBy'),
             'received_by' => $this->userSummary('receivedBy'),
-            'damage_confirmed_by' => $this->userSummary('damageConfirmedBy'),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

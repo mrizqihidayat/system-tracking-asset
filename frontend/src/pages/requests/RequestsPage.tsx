@@ -15,11 +15,12 @@ import { api, errorMessage } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import { invalidate } from '../../lib/queries/invalidate'
 import { listConfigs } from '../../lib/queries/list-configs'
-import { useSuggestions, useSupplyRequests } from '../../lib/queries/lists'
+import { useStatusImpact, useSuggestions, useSupplyRequests } from '../../lib/queries/lists'
 import { useRequestCatalog } from '../../lib/queries/master'
+import { prefetchRoomOptions, prefetchStatusImpacts } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
-import type { CatalogUsage, RequestCatalog, RequestPrefill, RequestStatus, SupplyRequest } from '../../types/supply'
+import type { CatalogUsage, RequestCatalog, RequestPrefill, RequestStatus, StatusImpact, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import CatalogFormModal from './CatalogFormModal'
 import RequestFormModal from './RequestFormModal'
@@ -50,6 +51,13 @@ function Card({ title, action, children }: { title: string; action?: React.React
   )
 }
 
+/** Status tujuan yang tersedia di menu aksi baris permintaan. */
+function nextStatuses(request: SupplyRequest): Exclude<RequestStatus, 'Diajukan'>[] {
+  if (request.status === 'Diajukan') return ['Diterima', 'Dibatalkan']
+  if (request.status === 'Diterima') return request.must_return ? ['Dikembalikan', 'Dibatalkan'] : ['Dibatalkan']
+  return []
+}
+
 function StatusModal({ request, status, onClose, onDone }: {
   request: SupplyRequest
   status: Exclude<RequestStatus, 'Diajukan'>
@@ -58,18 +66,29 @@ function StatusModal({ request, status, onClose, onDone }: {
 }) {
   const toast = useToast()
   const [note, setNote] = useState('')
+  // Dampak biasanya sudah termuat saat menu aksi dibuka; simpan aktif setelah dampaknya tersedia.
+  const { data: impact, error: impactError } = useStatusImpact(request.id, status)
+
   const submit = async () => {
-    await api.patch(`/supply-requests/${request.id}/status`, { status, note: note.trim() || null })
+    const res = await api.patch<{ meta: { impact: StatusImpact } }>(`/supply-requests/${request.id}/status`, { status, note: note.trim() || null })
     toast.success(`Permintaan ditandai ${status}.`)
+    if (res.data.meta.impact.clamped) toast.error(res.data.meta.impact.message)
     onDone()
   }
   return (
-    <ActionModal title={`Tandai ${status}`} submitLabel={`Tandai ${status}`} danger={status === 'Dibatalkan'} onClose={onClose} onSubmit={submit}>
+    <ActionModal title={`Tandai ${status}`} submitLabel={`Tandai ${status}`} danger={status === 'Dibatalkan'} submitDisabled={!impact} onClose={onClose} onSubmit={submit}>
       {(errors) => (
         <>
           <p className="text-sm text-slate-600">
             {request.item_name} × {request.quantity} dari {request.provider_department?.name ?? '-'}.
           </p>
+          {impact ? (
+            <p className={`rounded-lg px-3 py-2.5 text-sm ${impact.clamped ? 'bg-warn-50 text-warn-700' : 'bg-slate-100 text-slate-700'}`}>{impact.message}</p>
+          ) : impactError ? (
+            <p role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">{errorMessage(impactError)}</p>
+          ) : (
+            <p className="text-sm text-slate-500">Memeriksa dampak…</p>
+          )}
           <FormField label="Catatan (opsional)" error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} />
           </FormField>
@@ -91,7 +110,7 @@ export default function RequestsPage() {
   const catalog = catalogQuery.data
   const history = historyQuery.data
   const suggestions = suggestionsQuery.data ?? []
-  // Dari Kelengkapan Ruangan: /permintaan?room_id=&catalog_id=&quantity= (tanpa katalog: item_name=&provider_department_id=) → buka form terisi otomatis.
+  // Dari Kelengkapan Ruangan: /permintaan?room_id=&consumable_id=&item_name=&catalog_id=&quantity= (tanpa katalog: provider_department_id=) → buka form terisi otomatis.
   const [modal, setModal] = useState<ModalState>(() => {
     if (!params.has('room_id') && !params.has('catalog_id')) return null
     const num = (k: string) => (params.get(k) ? Number(params.get(k)) : null)
@@ -101,6 +120,7 @@ export default function RequestsPage() {
       prefill: {
         room_id: num('room_id'),
         catalog_id: num('catalog_id'),
+        consumable_id: num('consumable_id'),
         item_name: params.get('item_name') ?? undefined,
         provider_department_id: num('provider_department_id'),
         quantity: num('quantity') ?? undefined,
@@ -116,17 +136,25 @@ export default function RequestsPage() {
     if (!params.has('room_id') && !params.has('catalog_id')) return
     setParams(
       (p) => {
-        ;['room_id', 'catalog_id', 'item_name', 'provider_department_id', 'quantity'].forEach((k) => p.delete(k))
+        ;['room_id', 'catalog_id', 'consumable_id', 'item_name', 'provider_department_id', 'quantity'].forEach((k) => p.delete(k))
         return p
       },
       { replace: true },
     )
   }, [params, setParams])
 
+  // Form permintaan dari saran/Kelengkapan Ruangan butuh gedung & ruangan: disiapkan saat halaman dibuka.
+  useEffect(() => prefetchRoomOptions(queryClient), [queryClient])
+
   const closeModal = () => setModal(null)
   const done = () => {
     closeModal()
     invalidate.supplyRequests(queryClient)
+  }
+  // Status bisa mengubah stok & Ada ruangan.
+  const statusDone = () => {
+    closeModal()
+    invalidate.rooms(queryClient)
   }
   const catalogDone = () => {
     closeModal()
@@ -194,12 +222,10 @@ export default function RequestsPage() {
     { header: 'Jumlah', sortKey: 'quantity', cell: (r) => <span className="tabular-nums">{r.quantity}</span> },
     {
       header: 'Untuk kegiatan',
-      cell: (r) => (
-        <>
-          {r.purpose ?? '-'}
-          {r.room && <span className="block text-xs text-slate-500">{r.room.name}{r.room.building ? ` (${r.room.building.name})` : ''}</span>}
-        </>
-      ),
+      cell: (r) => {
+        const room = r.room ? `${r.room.name}${r.room.building ? ` (${r.room.building.name})` : ''}` : null
+        return r.purpose && room ? `${r.purpose} di ${room}` : (r.purpose ?? room ?? '-')
+      },
     },
     { header: 'Unit penyedia', cell: (r) => r.provider_department?.name ?? '-' },
     { header: 'Cara permintaan', cell: (r) => r.request_method ?? '-' },
@@ -220,8 +246,17 @@ export default function RequestsPage() {
         if (r.status === 'Diterima' && r.must_return) {
           items.push({ label: 'Tandai Dikembalikan', onClick: () => setModal({ kind: 'status', request: r, status: 'Dikembalikan' }) })
         }
+        if (r.status === 'Diterima') {
+          items.push({ label: 'Tandai Dibatalkan', danger: true, onClick: () => setModal({ kind: 'status', request: r, status: 'Dibatalkan' }) })
+        }
         return items.length ? (
-          <DropdownMenu label="Aksi permintaan" trigger={<EllipsisVertical size={16} />} triggerClassName="px-2.5!" items={items} />
+          <DropdownMenu
+            label="Aksi permintaan"
+            trigger={<EllipsisVertical size={16} />}
+            triggerClassName="px-2.5!"
+            items={items}
+            onOpen={() => prefetchStatusImpacts(queryClient, r.id, nextStatuses(r))}
+          />
         ) : null
       },
     },
@@ -260,6 +295,7 @@ export default function RequestsPage() {
                       <div className="min-w-0">
                         <p className="font-medium">{s.item_name} <span className="font-normal tabular-nums text-slate-500">× {s.quantity}</span></p>
                         <p className="text-xs text-slate-500">
+                          {s.catalog_name && s.catalog_name !== s.item_name && `${s.catalog_name} · `}
                           {s.source === 'stok' ? `Stok ${s.stock_status?.toLowerCase()}` : `Kurang di ${s.room?.name} (${s.room?.building})`}
                           {s.has_open_request && ' · sudah ada permintaan Diajukan'}
                         </p>
@@ -273,7 +309,8 @@ export default function RequestsPage() {
                             request: null,
                             prefill: {
                               catalog_id: s.catalog_id,
-                              item_name: s.catalog_id ? undefined : s.item_name,
+                              consumable_id: s.consumable_id,
+                              item_name: s.item_name,
                               provider_department_id: g.provider_department.id,
                               quantity: s.quantity,
                               room_id: s.room?.id ?? null,
@@ -337,7 +374,7 @@ export default function RequestsPage() {
         <RequestFormModal catalog={catalog} request={modal.request} prefill={modal.prefill} onClose={closeModal} onDone={done} />
       )}
       {modal?.kind === 'catalog' && <CatalogFormModal item={modal.item} onClose={closeModal} onDone={catalogDone} />}
-      {modal?.kind === 'status' && <StatusModal request={modal.request} status={modal.status} onClose={closeModal} onDone={done} />}
+      {modal?.kind === 'status' && <StatusModal request={modal.request} status={modal.status} onClose={closeModal} onDone={statusDone} />}
 
       <ConfirmDialog
         open={deleting !== null}

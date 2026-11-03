@@ -10,7 +10,7 @@ const list = async <T>(url: string, params?: Record<string, unknown>) =>
   (await api.get<{ data: T[] }>(url, { params })).data.data
 
 const master = <T>(queryKey: readonly unknown[], url: string, params?: Record<string, unknown>) =>
-  queryOptions({ queryKey, queryFn: () => list<T>(url, params), staleTime: MASTER_STALE_TIME })
+  queryOptions({ queryKey, queryFn: () => list<T>(url, params), staleTime: MASTER_STALE_TIME, gcTime: MASTER_STALE_TIME })
 
 export const masterQueries = {
   departments: () => master<Department>(queryKeys.master.departments(), '/departments'),
@@ -20,7 +20,6 @@ export const masterQueries = {
   categories: () => master<Category>(queryKeys.master.categories(), '/categories'),
   assetTypes: () => master<AssetType>(queryKeys.master.assetTypes(), '/asset-types'),
   requestCatalog: () => master<RequestCatalog>(queryKeys.master.requestCatalog(), '/request-catalog'),
-  requestMethods: () => master<string>(queryKeys.master.requestMethods(), '/lookups/request-methods'),
 }
 
 const EMPTY: never[] = []
@@ -39,4 +38,3 @@ export const useRooms = (buildingId?: number | null, requireBuilding = false) =>
 export const useCategories = () => useMaster(masterQueries.categories())
 export const useAssetTypes = () => useMaster(masterQueries.assetTypes())
 export const useRequestCatalog = () => useMaster(masterQueries.requestCatalog())
-export const useRequestMethods = () => useMaster(masterQueries.requestMethods())

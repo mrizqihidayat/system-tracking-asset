@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\PaginatesList;
 use App\Http\Requests\CancelLoanRequest;
-use App\Http\Requests\ConfirmDamageRequest;
 use App\Http\Requests\IndexLoanRequest;
 use App\Http\Requests\ReturnLoanRequest;
 use App\Http\Requests\StoreLoanRequest;
@@ -69,18 +68,6 @@ class LoanController extends Controller
         return LoanResource::make($loan->load($this->relations()));
     }
 
-    public function confirmDamage(ConfirmDamageRequest $request, Loan $loan): LoanResource
-    {
-        $loan = $this->loans->confirmDamage(
-            $loan,
-            $request->validated('damage_confirmation_note'),
-            $request->validated('damage_confirmation_document'),
-            $request->user(),
-        );
-
-        return LoanResource::make($loan->load($this->relations()));
-    }
-
     /**
      * @return array<int|string, mixed>
      */
@@ -92,7 +79,6 @@ class LoanController extends Controller
             'returnRoom.building',
             'borrowedBy',
             'receivedBy',
-            'damageConfirmedBy',
         ];
     }
 }

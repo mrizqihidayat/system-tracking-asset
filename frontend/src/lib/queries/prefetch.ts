@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
+import type { RequestStatus } from '../../types/supply'
 import { buildListParams } from '../useListParams'
 import { dashboardQueries } from './dashboard'
 import { listConfigs } from './list-configs'
@@ -21,6 +22,17 @@ const routes: Record<string, (qc: QueryClient) => unknown> = {
   '/permintaan': (qc) => qc.prefetchQuery(listQueries.supplyRequests(buildListParams(empty(), listConfigs.supplyRequests))),
   '/stok': (qc) => qc.prefetchQuery(listQueries.consumables(buildListParams(empty(), listConfigs.consumables))),
   '/pengaturan/data-master': (qc) => qc.prefetchQuery(masterQueries.buildings()),
+}
+
+/** Gedung & ruangan di latar belakang agar dropdown lokasi langsung terisi saat form dibuka. */
+export function prefetchRoomOptions(qc: QueryClient) {
+  qc.prefetchQuery(masterQueries.buildings())
+  qc.prefetchQuery(masterQueries.rooms())
+}
+
+/** Dampak status yang tersedia di menu aksi, dimuat saat menu dibuka agar popup langsung menampilkannya. */
+export function prefetchStatusImpacts(qc: QueryClient, id: number, statuses: RequestStatus[]) {
+  statuses.forEach((status) => qc.prefetchQuery(listQueries.statusImpact(id, status)))
 }
 
 let dwellTimer: ReturnType<typeof setTimeout> | undefined

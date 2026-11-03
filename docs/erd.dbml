@@ -192,15 +192,15 @@ Table loans {
   borrow_date date [not null]
   due_date date [not null]
   condition_out asset_condition [not null, note: 'otomatis dari kondisi aset saat dipinjam']
-  approval_number varchar(100)
-  approval_date date
+  approval_number varchar(100) [note: 'no. / tanggal approval, satu kolom teks bebas di form']
+  approval_date date [note: 'data lama & API; form tidak lagi mengisi']
   borrowed_by bigint [not null, ref: > users.id, note: 'staf pencatat']
   status loan_status [not null, default: 'Dipinjam']
   return_date timestamp
   return_condition asset_condition
   return_room_id bigint [ref: > rooms.id]
   received_by bigint [ref: > users.id]
-  damage_confirmation damage_confirmation
+  damage_confirmation damage_confirmation [note: 'data lama, alur konfirmasi dihapus (T26j)']
   damage_confirmed_at timestamp
   damage_confirmed_by bigint [ref: > users.id]
   damage_confirmation_note text [note: 'wajib saat konfirmasi']
@@ -228,15 +228,18 @@ Table supply_requests {
   id bigint [pk, increment]
   request_date date [not null]
   catalog_id bigint [ref: > request_catalog.id, note: 'ON DELETE SET NULL (katalog boleh dihapus)']
-  item_name varchar(150) [not null]
+  consumable_id bigint [ref: > consumables.id, note: 'barang stok yang diminta; ON DELETE SET NULL']
+  item_name varchar(150) [not null, note: 'nama barang jika tertaut stok']
   quantity int [not null, note: '> 0']
   purpose varchar(255) [note: 'untuk kegiatan']
   room_id bigint [ref: > rooms.id]
   provider_department_id bigint [not null, ref: > departments.id]
   request_method varchar(50) [note: 'cara permintaan per permintaan; teks bebas, saran Memo | Form | Email | WhatsApp | Lainnya; wajib di API, null untuk data lama']
   lead_time_days int [note: 'snapshot dari katalog saat dibuat/diubah (Diajukan); null tanpa katalog']
-  must_return boolean [not null, default: false, note: 'snapshot dari katalog']
+  must_return boolean [not null, default: false, note: 'pilihan di form: Dikembalikan / Tidak dikembalikan; default dari katalog']
   status request_status [not null, default: 'Diajukan']
+  room_standard_id bigint [ref: > room_standards.id, note: 'baris yang ditambah saat Diterima; ON DELETE SET NULL']
+  applied_to varchar(10) [note: 'stok | ruangan: tujuan penambahan saat Diterima, untuk mengurangi kembali; kosong = tidak mengubah apa pun']
   received_at timestamp
   returned_at timestamp
   note text

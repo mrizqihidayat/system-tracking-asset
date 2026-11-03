@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
-use App\Enums\DamageConfirmation;
 use App\Enums\EventType;
 use App\Enums\LoanStatus;
 use App\Models\Asset;
@@ -168,7 +167,7 @@ class AssetSeeder extends Seeder
         $loan = $this->borrow($assets['lpt3'], 'Yusuf Hidayat', 'SIT', 'Workshop digitalisasi', today()->subDays(7), today()->subDays(4), $rooms['Ruang Kelas 2']);
         $this->cancel($loan, today()->subDays(7), 'Kegiatan diundur');
 
-        // Kembali rusak → Perbaikan, menunggu konfirmasi peminjam.
+        // Kembali rusak → Perbaikan.
         $loan = $this->borrow($assets['lpt4'], 'Fajar Nugroho', 'SSO', 'Inspeksi lapangan', today()->subDays(6), today()->subDays(3), null, 'Area Potline');
         $this->giveBack($loan, today()->subDays(2), AssetCondition::RusakRingan, 'Engsel layar retak');
     }
@@ -245,7 +244,6 @@ class AssetSeeder extends Seeder
             'return_condition' => $condition,
             'return_room_id' => $asset->room_id,
             'received_by' => $this->staff->id,
-            'damage_confirmation' => $damaged ? DamageConfirmation::MenungguKonfirmasi : null,
             'note' => $note,
         ]);
 

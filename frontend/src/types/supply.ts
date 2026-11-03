@@ -11,9 +11,17 @@ export interface RequestCatalog {
 
 export type RequestStatus = 'Diajukan' | 'Diterima' | 'Dikembalikan' | 'Dibatalkan'
 
+/** Dampak perubahan status ke stok / Ada ruangan. */
+export interface StatusImpact {
+  message: string
+  clamped: boolean
+}
+
 export interface SupplyRequest {
   id: number
   request_date: string
+  /** Barang stok yang diminta (null bila tanpa tautan atau barangnya sudah dihapus). */
+  consumable_id: number | null
   item_name: string
   quantity: number
   purpose: string | null
@@ -44,6 +52,7 @@ export interface CatalogUsage {
 export interface SuggestionItem {
   source: 'kekurangan_ruangan' | 'stok'
   item_name: string
+  catalog_name: string | null
   quantity: number
   catalog_id: number | null
   room: { id: number; name: string; building: string } | null
@@ -85,6 +94,7 @@ export interface ConsumableUsage {
 /** Isian awal form permintaan (dari saran, query Kelengkapan Ruangan, atau tombol biasa). */
 export interface RequestPrefill {
   catalog_id?: number | null
+  consumable_id?: number | null
   item_name?: string
   provider_department_id?: number | null
   quantity?: number

@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Enums\CountMethod;
-use App\Enums\DamageConfirmation;
 use App\Enums\EventType;
 use App\Enums\LoanStatus;
 use App\Models\Asset;
@@ -50,9 +49,9 @@ class SeederConsistencyTest extends TestCase
         $this->assertSame($activeLoanAssetIds->count(), $activeLoanAssetIds->unique()->count());
     }
 
-    public function test_damaged_return_waits_for_confirmation_and_asset_is_in_repair(): void
+    public function test_damaged_return_puts_asset_in_repair(): void
     {
-        $loan = Loan::where('damage_confirmation', DamageConfirmation::MenungguKonfirmasi)->firstOrFail();
+        $loan = Loan::where('return_condition', AssetCondition::RusakRingan)->firstOrFail();
 
         $this->assertSame(AssetStatus::Perbaikan, $loan->asset->status);
     }
@@ -95,7 +94,6 @@ class SeederConsistencyTest extends TestCase
         $loan = Loan::where('status', LoanStatus::Hilang)->with('asset')->sole();
 
         $this->assertSame(AssetStatus::Hilang, $loan->asset->status);
-        $this->assertNull($loan->damage_confirmation);
         $this->assertSame($loan->borrower_name, $loan->events()->where('event_type', EventType::LaporHilang)->value('party'));
     }
 

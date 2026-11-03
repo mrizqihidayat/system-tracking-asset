@@ -356,20 +356,18 @@ class MasterDataTest extends TestCase
         $this->assertSame(0, $type->fresh()->last_number);
     }
 
-    public function test_request_methods_lookup_merges_defaults_and_used_values(): void
+    public function test_request_methods_lookup_returns_fixed_options_only(): void
     {
         SupplyRequest::factory()->create(['request_method' => 'Telepon']);
-        SupplyRequest::factory()->create(['request_method' => 'whatsapp']);
-        SupplyRequest::factory()->create(['request_method' => 'Memo']);
-        SupplyRequest::factory()->create(['request_method' => null]); // permintaan lama tanpa cara
+        SupplyRequest::factory()->create(['request_method' => 'WA']);
 
         $this->getJson('/api/lookups/request-methods')
             ->assertOk()
-            ->assertExactJson(['data' => ['Memo', 'Form', 'Email', 'WhatsApp', 'Lainnya', 'Telepon']]);
+            ->assertExactJson(['data' => ['Memo', 'Form', 'Email', 'WhatsApp', 'Lainnya']]);
 
         $this->getJson('/api/lookups/request-methods?search=tel')
             ->assertOk()
-            ->assertExactJson(['data' => ['Telepon']]);
+            ->assertExactJson(['data' => []]);
 
         $this->getJson('/api/lookups/request-methods?search=WHATS')
             ->assertOk()
