@@ -66,9 +66,11 @@ export default function ReportModal({ asset, mode, onClose, onDone }: Props) {
               lokasi dan Hapus aset yang masih tersedia.
             </p>
           )}
-          <FormField label="Pihak pelapor (opsional, default SHD)" error={errors.party}>
-            <Input value={party} onChange={(e) => setParty(e.target.value)} error={errors.party} maxLength={150} placeholder="SHD" />
-          </FormField>
+          {mode !== 'hilang' && (
+            <FormField label="Pihak pelapor (opsional, default SHD)" error={errors.party}>
+              <Input value={party} onChange={(e) => setParty(e.target.value)} error={errors.party} maxLength={150} placeholder="SHD" />
+            </FormField>
+          )}
           <FormField label="Catatan" required error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} required />
           </FormField>

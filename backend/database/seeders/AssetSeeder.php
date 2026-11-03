@@ -104,6 +104,8 @@ class AssetSeeder extends Seeder
             'mja3' => ['Meja Peserta', 'Meja Lipat Peserta', 'Chitose', 'Ruang Kelas 2', $sga, 40, null],
             'krs1' => ['Kursi', 'Kursi Kuliah Lipat', 'Chitose', 'Ruang Rapat', $sga, 40, null],
             'krs2' => ['Kursi', 'Kursi Kuliah Lipat', 'Chitose', 'Ruang Rapat', $sga, 40, null],
+            'krs3' => ['Kursi', 'Kursi Kuliah Lipat', 'Chitose', 'Ruang Kelas 1', $sga, 40, null],
+            'krs4' => ['Kursi', 'Kursi Kuliah Lipat', 'Chitose', 'Ruang Kelas 1', $sga, 40, null],
             'ptl1' => ['Papan Tulis', 'Papan Tulis Whiteboard 120x240', 'Sakana', 'Ruang Kelas 1', $shd, 48, null],
             'ptl2' => ['Papan Tulis', 'Papan Tulis Whiteboard 90x180', 'Sakana', 'Ruang Diskusi', $shd, 24, null],
             'flp1' => ['Flipchart', 'Flipchart Stand Magnetik', 'Sakana', 'Ruang Kelas 2', $shd, 24, null],

@@ -1,13 +1,13 @@
+import { Eye, EyeOff } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import bgInalum from '../assets/bg_inalum.webp'
 import logo from '../assets/logo.png'
-import { Brand } from '../components/layout/AppLayout'
 import Button from '../components/ui/Button'
 import { FormField, Input } from '../components/ui/FormField'
 import { api, errorMessage, fieldErrors } from '../lib/api'
 import { getToken, setSession, type AuthUser } from '../lib/auth'
 
-/** Hanya path internal; menolak URL absolut / `//host` (open redirect). */
 function safeNext(next: string | null): string {
   return next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
 }
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -44,23 +45,23 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <aside className="hidden flex-col justify-between bg-rail p-10 text-white lg:flex">
-        <Brand />
-        <div className="max-w-sm">
+      <aside className="relative hidden flex-col justify-center overflow-hidden bg-rail p-10 text-white lg:flex">
+        <img src={bgInalum} alt="" className="absolute inset-0 h-full w-full object-cover object-[46%_center]" />
+        <div className="absolute inset-0 bg-rail/70" />
+        <div className="relative max-w-sm">
           <p className="text-3xl font-bold leading-tight tracking-tight text-balance">
             Aset, peminjaman, dan kelengkapan ruangan pelatihan dalam satu catatan.
           </p>
           <p className="mt-3 text-sm text-[#c4d6e4]">Departemen SHD · PT INALUM</p>
         </div>
-        <p className="text-xs text-[#b5cadb]">Khusus Staf/Admin Aset SHD</p>
       </aside>
 
       <main className="flex items-center justify-center px-4 py-10">
         <form onSubmit={submit} className="w-full max-w-sm space-y-5">
           <div>
             <img src={logo} alt="INALUM" className="h-10 w-auto" />
-            <h1 className="mt-6 text-2xl font-bold tracking-tight">Masuk ke Aset SHD</h1>
-            <p className="mt-1 text-sm text-slate-500">Gunakan akun staf aset yang diberikan admin.</p>
+            <h1 className="mt-6 text-2xl font-bold tracking-tight">Selamat Datang Kembali</h1>
+            <p className="mt-1 text-sm text-slate-500">Masuk untuk melanjutkan ke Sistem Informasi Aset</p>
           </div>
           {message && (
             <div role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
@@ -71,7 +72,25 @@ export default function LoginPage() {
             <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus required />
           </FormField>
           <FormField label="Password" error={errors.password}>
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                className="pr-10 [&::-ms-reveal]:hidden"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-slate-700"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </FormField>
           <Button type="submit" loading={loading} className="w-full">Masuk</Button>
         </form>

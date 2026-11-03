@@ -13,7 +13,7 @@ class StoreRequestCatalogRequest extends FormRequest
     }
 
     /**
-     * request_method teks bebas (A3).
+     * Cara permintaan tidak di katalog; dicatat per permintaan (T26g).
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -22,7 +22,6 @@ class StoreRequestCatalogRequest extends FormRequest
         return [
             'item_name' => ['required', 'string', 'max:150'],
             'provider_department_id' => ['required', 'integer', 'exists:departments,id'],
-            'request_method' => ['required', 'string', 'max:50'],
             'must_return' => ['required', 'boolean'],
             'lead_time_days' => ['required', 'integer', 'min:0', 'max:365'],
             'note' => ['nullable', 'string', 'max:1000'],

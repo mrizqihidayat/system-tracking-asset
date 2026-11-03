@@ -37,6 +37,16 @@ class UpdateConsumableRequest extends StoreConsumableRequest
         return $this->consumable()->id;
     }
 
+    protected function currentIsStored(): bool
+    {
+        return $this->consumable()->is_stored;
+    }
+
+    protected function currentQuantity(): int
+    {
+        return $this->consumable()->quantity;
+    }
+
     protected function currentProviderId(): ?int
     {
         return $this->consumable()->provider_department_id;

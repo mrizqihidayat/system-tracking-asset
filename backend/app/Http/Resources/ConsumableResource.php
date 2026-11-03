@@ -23,12 +23,12 @@ class ConsumableResource extends JsonResource
             'unit' => $this->unit,
             'quantity' => $this->quantity,
             'min_quantity' => $this->min_quantity,
+            'is_stored' => $this->is_stored,
             'status' => $this->status(),
             'provider_department' => DepartmentResource::make($this->whenLoaded('providerDepartment')),
             'catalog' => $this->whenLoaded('catalog', fn () => $this->catalog ? [
                 'id' => $this->catalog->id,
                 'item_name' => $this->catalog->item_name,
-                'request_method' => $this->catalog->request_method,
             ] : null),
             'room' => RoomResource::make($this->whenLoaded('room')),
             'note' => $this->note,

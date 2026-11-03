@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\Department;
 use App\Models\RequestCatalog;
 use App\Models\Room;
+use App\Models\SupplyRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -357,9 +358,10 @@ class MasterDataTest extends TestCase
 
     public function test_request_methods_lookup_merges_defaults_and_used_values(): void
     {
-        RequestCatalog::factory()->create(['request_method' => 'Telepon']);
-        RequestCatalog::factory()->create(['request_method' => 'whatsapp']);
-        RequestCatalog::factory()->create(['request_method' => 'Memo']);
+        SupplyRequest::factory()->create(['request_method' => 'Telepon']);
+        SupplyRequest::factory()->create(['request_method' => 'whatsapp']);
+        SupplyRequest::factory()->create(['request_method' => 'Memo']);
+        SupplyRequest::factory()->create(['request_method' => null]); // permintaan lama tanpa cara
 
         $this->getJson('/api/lookups/request-methods')
             ->assertOk()
@@ -376,9 +378,9 @@ class MasterDataTest extends TestCase
 
     public function test_request_method_accepts_free_text(): void
     {
-        $catalog = RequestCatalog::factory()->create(['request_method' => 'Telepon Ext. 1234']);
+        $request = SupplyRequest::factory()->create(['request_method' => 'Telepon Ext. 1234']);
 
-        $this->assertSame('Telepon Ext. 1234', $catalog->fresh()->request_method);
+        $this->assertSame('Telepon Ext. 1234', $request->fresh()->request_method);
     }
 
     public function test_borrower_units_come_from_departments(): void

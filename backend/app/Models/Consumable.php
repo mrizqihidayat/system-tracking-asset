@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'category', 'unit', 'quantity', 'min_quantity', 'provider_department_id', 'catalog_id', 'room_id', 'note'])]
+#[Fillable(['name', 'category', 'unit', 'quantity', 'min_quantity', 'is_stored', 'provider_department_id', 'catalog_id', 'room_id', 'note'])]
 class Consumable extends Model
 {
     /** @use HasFactory<ConsumableFactory> */
@@ -25,6 +25,7 @@ class Consumable extends Model
     protected $attributes = [
         'quantity' => 0,
         'min_quantity' => 0,
+        'is_stored' => true,
     ];
 
     /**
@@ -35,6 +36,7 @@ class Consumable extends Model
         return [
             'quantity' => 'integer',
             'min_quantity' => 'integer',
+            'is_stored' => 'boolean',
         ];
     }
 
@@ -89,19 +91,24 @@ class Consumable extends Model
         Search::apply($query, $filters['search'] ?? null, ['consumables.name', 'consumables.category']);
     }
 
-    public function status(): ConsumableStatus
+    /**
+     * Null untuk barang yang tidak disimpan SHD (tidak punya status stok).
+     */
+    public function status(): ?ConsumableStatus
     {
-        return ConsumableStatus::fromQuantities($this->quantity, $this->min_quantity);
+        return $this->is_stored ? ConsumableStatus::fromQuantities($this->quantity, $this->min_quantity) : null;
     }
 
     /**
-     * Filter status (rumus sama dengan status(); dipakai ulang T14 & T15).
+     * Filter status (rumus sama dengan status(); dipakai ulang T14 & T15). Hanya barang yang disimpan SHD.
      *
      * @param  Builder<Consumable>  $query
      */
     #[Scope]
     protected function withStatus(Builder $query, ConsumableStatus $status): void
     {
+        $query->where('is_stored', true);
+
         match ($status) {
             ConsumableStatus::Habis => $query->where('quantity', '<=', 0),
             ConsumableStatus::Menipis => $query->where('quantity', '>', 0)->whereColumn('quantity', '<=', 'min_quantity'),

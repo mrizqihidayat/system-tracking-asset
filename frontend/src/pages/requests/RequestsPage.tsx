@@ -19,7 +19,7 @@ import { useSuggestions, useSupplyRequests } from '../../lib/queries/lists'
 import { useRequestCatalog } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
-import type { RequestCatalog, RequestPrefill, RequestStatus, SupplyRequest } from '../../types/supply'
+import type { CatalogUsage, RequestCatalog, RequestPrefill, RequestStatus, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import CatalogFormModal from './CatalogFormModal'
 import RequestFormModal from './RequestFormModal'
@@ -91,17 +91,23 @@ export default function RequestsPage() {
   const catalog = catalogQuery.data
   const history = historyQuery.data
   const suggestions = suggestionsQuery.data ?? []
-  // Dari Kelengkapan Ruangan: /permintaan?room_id=&catalog_id=&quantity= → buka form terisi otomatis.
+  // Dari Kelengkapan Ruangan: /permintaan?room_id=&catalog_id=&quantity= (tanpa katalog: item_name=&provider_department_id=) → buka form terisi otomatis.
   const [modal, setModal] = useState<ModalState>(() => {
     if (!params.has('room_id') && !params.has('catalog_id')) return null
     const num = (k: string) => (params.get(k) ? Number(params.get(k)) : null)
     return {
       kind: 'request',
       request: null,
-      prefill: { room_id: num('room_id'), catalog_id: num('catalog_id'), quantity: num('quantity') ?? undefined },
+      prefill: {
+        room_id: num('room_id'),
+        catalog_id: num('catalog_id'),
+        item_name: params.get('item_name') ?? undefined,
+        provider_department_id: num('provider_department_id'),
+        quantity: num('quantity') ?? undefined,
+      },
     }
   })
-  const [deleting, setDeleting] = useState<RequestCatalog | null>(null)
+  const [deleting, setDeleting] = useState<{ item: RequestCatalog; usage: CatalogUsage } | null>(null)
   const status = list.get('status')
   const search = list.searchText
 
@@ -110,7 +116,7 @@ export default function RequestsPage() {
     if (!params.has('room_id') && !params.has('catalog_id')) return
     setParams(
       (p) => {
-        ;['room_id', 'catalog_id', 'quantity'].forEach((k) => p.delete(k))
+        ;['room_id', 'catalog_id', 'item_name', 'provider_department_id', 'quantity'].forEach((k) => p.delete(k))
         return p
       },
       { replace: true },
@@ -127,11 +133,21 @@ export default function RequestsPage() {
     invalidate.catalog(queryClient)
   }
 
+  // Pemakaian dimuat dulu agar popup menyebut jumlah tautan yang akan dilepas.
+  const askDeleteCatalog = async (item: RequestCatalog) => {
+    try {
+      const r = await api.get<{ data: CatalogUsage }>(`/request-catalog/${item.id}/usage`)
+      setDeleting({ item, usage: r.data.data })
+    } catch (e) {
+      toast.error(errorMessage(e))
+    }
+  }
+
   const removeCatalog = async () => {
     if (!deleting) return
     try {
-      await api.delete(`/request-catalog/${deleting.id}`)
-      toast.success(`"${deleting.item_name}" dihapus dari katalog.`)
+      await api.delete(`/request-catalog/${deleting.item.id}`)
+      toast.success(`"${deleting.item.item_name}" dihapus dari katalog.`)
       setDeleting(null)
       invalidate.catalog(queryClient)
     } catch (e) {
@@ -142,7 +158,6 @@ export default function RequestsPage() {
   const catalogColumns: Column<RequestCatalog>[] = [
     { header: 'Item', mobile: 'title', cell: (c) => <span className="font-medium">{c.item_name}</span> },
     { header: 'Unit penyedia', cell: (c) => c.provider_department?.name ?? '-' },
-    { header: 'Cara permintaan', cell: (c) => c.request_method },
     { header: 'Perlu dikembalikan', cell: (c) => (c.must_return ? 'Ya' : 'Tidak') },
     { header: 'Lead time', cell: (c) => <span className="whitespace-nowrap">{c.lead_time_days} hari</span> },
     {
@@ -156,7 +171,7 @@ export default function RequestsPage() {
           triggerClassName="px-2.5!"
           items={[
             { label: 'Ubah', onClick: () => setModal({ kind: 'catalog', item: c }) },
-            { label: 'Hapus', danger: true, onClick: () => setDeleting(c) },
+            { label: 'Hapus', danger: true, onClick: () => askDeleteCatalog(c) },
           ]}
         />
       ),
@@ -187,6 +202,7 @@ export default function RequestsPage() {
       ),
     },
     { header: 'Unit penyedia', cell: (r) => r.provider_department?.name ?? '-' },
+    { header: 'Cara permintaan', cell: (r) => r.request_method ?? '-' },
     { header: 'Status', mobile: 'badge', cell: (r) => <Badge color={statusColor[r.display_status]}>{r.display_status}</Badge> },
     {
       header: '',
@@ -201,7 +217,7 @@ export default function RequestsPage() {
             { label: 'Tandai Dibatalkan', danger: true, onClick: () => setModal({ kind: 'status', request: r, status: 'Dibatalkan' }) },
           )
         }
-        if (r.status === 'Diterima' && r.catalog?.must_return) {
+        if (r.status === 'Diterima' && r.must_return) {
           items.push({ label: 'Tandai Dikembalikan', onClick: () => setModal({ kind: 'status', request: r, status: 'Dikembalikan' }) })
         }
         return items.length ? (
@@ -331,7 +347,14 @@ export default function RequestsPage() {
         onConfirm={removeCatalog}
         onClose={() => setDeleting(null)}
       >
-        Hapus "{deleting?.item_name}" dari katalog? Item yang sudah dipakai di permintaan atau standar ruangan tidak bisa dihapus.
+        {deleting && deleting.usage.total > 0 ? (
+          <>
+            Item ini dipakai di {deleting.usage.supply_requests} permintaan, {deleting.usage.room_standards} standar ruangan,{' '}
+            {deleting.usage.consumables} stok. Tautannya akan dilepas, riwayat tetap tersimpan.
+          </>
+        ) : (
+          <>Hapus "{deleting?.item.item_name}" dari katalog?</>
+        )}
       </ConfirmDialog>
     </div>
   )

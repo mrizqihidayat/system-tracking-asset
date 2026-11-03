@@ -8,12 +8,15 @@ import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import type { Paginated } from '../../types/api'
-import type { Asset } from '../../types/asset'
+import type { Asset, AssetListItem } from '../../types/asset'
 import { useScanLookup } from '../scan/useScanLookup'
 
+/** Saran memakai baris daftar, Cari/Scan memakai data lengkap; form hanya butuh field bersama ini. */
+export type PickedAsset = Pick<Asset, 'id' | 'code' | 'name' | 'condition' | 'status'>
+
 interface Props {
-  asset: Asset | null
-  onPick: (asset: Asset | null) => void
+  asset: PickedAsset | null
+  onPick: (asset: PickedAsset | null) => void
   error?: string
 }
 
@@ -26,7 +29,7 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
   const { lookup, loading } = useScanLookup()
   const [text, setText] = useState('')
   const [scanning, setScanning] = useState(false)
-  const [suggestions, setSuggestions] = useState<{ query: string; items: Asset[] } | null>(null)
+  const [suggestions, setSuggestions] = useState<{ query: string; items: AssetListItem[] } | null>(null)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
   const box = useRef<HTMLDivElement>(null)
@@ -39,7 +42,7 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
     let cancelled = false
     const t = setTimeout(() => {
       api
-        .get<Paginated<Asset>>('/assets', { params: { search: query, status: 'Tersedia', per_page: MAX_SUGGESTIONS } })
+        .get<Paginated<AssetListItem>>('/assets', { params: { search: query, status: 'Tersedia', per_page: MAX_SUGGESTIONS } })
         .then((res) => {
           if (cancelled) return
           setSuggestions({ query, items: res.data.data })
@@ -64,7 +67,7 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
   const items = query.length >= MIN_CHARS && suggestions?.query === query ? suggestions.items : []
   const showList = open && query.length >= MIN_CHARS && suggestions?.query === query
 
-  const pick = (a: Asset) => {
+  const pick = (a: PickedAsset) => {
     setText('')
     setOpen(false)
     setSuggestions(null)
@@ -102,7 +105,7 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
     }
   }
 
-  const roomLabel = (a: Asset) => (a.room ? `${a.room.name}${a.room.building ? `, ${a.room.building.name}` : ''}` : null)
+  const roomLabel = (a: AssetListItem) => (a.room_name ? `${a.room_name}${a.building_name ? `, ${a.building_name}` : ''}` : null)
 
   return (
     <FormField label="Aset dipinjam" required error={error}>

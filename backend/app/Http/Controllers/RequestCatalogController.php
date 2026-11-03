@@ -46,7 +46,15 @@ class RequestCatalogController extends Controller
     }
 
     /**
-     * Ditolak 422 bila masih dipakai permintaan, stok, atau standar ruangan.
+     * Jumlah permintaan, standar ruangan, dan stok yang memakai item ini (popup sebelum hapus).
+     */
+    public function usage(RequestCatalog $requestCatalog): JsonResponse
+    {
+        return response()->json(['data' => $this->requests->catalogUsage($requestCatalog)]);
+    }
+
+    /**
+     * Hapus walau dipakai: tautan di permintaan, standar ruangan, dan stok dilepas; riwayat tetap.
      */
     public function destroy(RequestCatalog $requestCatalog): JsonResponse
     {

@@ -22,6 +22,20 @@ class RoomStandard extends Model
     public ?int $qrPresentQuantity = null;
 
     /**
+     * Aset yang terhitung "Ada" pada baris QR, diisi bersama $qrPresentQuantity.
+     *
+     * @var list<array{id: int, code: string}>
+     */
+    public array $qrAssets = [];
+
+    /**
+     * Jumlah aset jenis ini di ruangan yang tidak dihitung, per status (Dipinjam/Perbaikan/Hilang).
+     *
+     * @var array<string, int>
+     */
+    public array $qrNotCounted = [];
+
+    /**
      * Jumlah "Ada": QR dari hitungan aset, Manual dari actual_quantity (null = Belum dicek).
      */
     public function presentQuantity(): ?int
@@ -42,6 +56,35 @@ class RoomStandard extends Model
         $present = $this->presentQuantity();
 
         return $present === null ? null : max(0, $this->standard_quantity - $present);
+    }
+
+    /**
+     * Baris Manual tanpa barang stok (data lama atau barangnya sudah dihapus): tanpa aksi sampai dilengkapi.
+     */
+    public function needsCompletion(): bool
+    {
+        return $this->count_method === CountMethod::Manual && $this->consumable_id === null;
+    }
+
+    /**
+     * Kurang dan stok SHD masih ada → Isi dari stok.
+     */
+    public function canFillFromStock(): bool
+    {
+        return $this->hasStockShortage() && $this->consumable->is_stored && $this->consumable->quantity > 0;
+    }
+
+    /**
+     * Kurang dan barang tidak disimpan SHD atau stoknya habis → Buat permintaan ke penyedia.
+     */
+    public function canRequest(): bool
+    {
+        return $this->hasStockShortage() && ! $this->canFillFromStock();
+    }
+
+    private function hasStockShortage(): bool
+    {
+        return $this->count_method === CountMethod::Manual && $this->consumable_id !== null && ($this->shortage() ?? 0) > 0;
     }
 
     /**

@@ -74,6 +74,14 @@ export interface Asset {
   lost_during_loan?: { borrower_name: string; borrower_unit: string; date: string | null; loan_id: number } | null
 }
 
+/** Baris `GET /assets`: hanya kolom tabel; data lengkap dari `GET /assets/{id}`. */
+export interface AssetListItem extends Pick<Asset, 'id' | 'code' | 'name' | 'condition' | 'status'> {
+  category_name: string | null
+  room_name: string | null
+  building_name: string | null
+  source_is_internal: boolean
+}
+
 export interface AssetEvent {
   id: number
   event_type: string

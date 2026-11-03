@@ -135,7 +135,7 @@ export default function ConsumablesPage() {
       header: 'Jumlah',
       className: 'text-center',
       sortKey: 'quantity',
-      cell: (c) => (
+      cell: (c) => !c.is_stored ? '-' : (
         <div className="flex items-center gap-1 md:justify-center">
           <button
             type="button"
@@ -165,8 +165,13 @@ export default function ConsumablesPage() {
         </div>
       ),
     },
-    { header: 'Minimum', className: 'text-center', cell: (c) => <span className="tabular-nums">{c.min_quantity}</span> },
-    { header: 'Status', className: 'text-center', mobile: 'badge', cell: (c) => <Badge color={statusColor[c.status]}>{c.status}</Badge> },
+    { header: 'Minimum', className: 'text-center', cell: (c) => (c.is_stored ? <span className="tabular-nums">{c.min_quantity}</span> : '-') },
+    {
+      header: 'Status',
+      className: 'text-center',
+      mobile: 'badge',
+      cell: (c) => (c.status ? <Badge color={statusColor[c.status]}>{c.status}</Badge> : <span className="whitespace-nowrap text-xs text-slate-500">Tidak disimpan</span>),
+    },
     { header: 'Departemen penyedia', className: 'text-center', cell: (c) => c.provider_department?.name ?? '-' },
     {
       header: 'Lokasi simpan',
@@ -254,7 +259,7 @@ export default function ConsumablesPage() {
         {deleting && deleting.usage.length > 0 ? (
           <>
             Hapus permanen. Barang ini dipakai di standar:{' '}
-            <b>{deleting.usage.map((u) => `${u.room} (${u.building})`).join(', ')}</b>. Tautannya akan dilepas.
+            <b>{deleting.usage.map((u) => `${u.room} (${u.building})`).join(', ')}</b>. Tautannya akan dilepas dan baris standar itu menjadi “Perlu dilengkapi”.
           </>
         ) : (
           'Hapus permanen barang ini? Tindakan ini tidak bisa dibatalkan.'

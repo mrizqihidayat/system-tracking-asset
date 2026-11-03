@@ -207,6 +207,33 @@ class Asset extends Model
     }
 
     /**
+     * Kolom Daftar Aset dalam satu query (subselect, bukan eager load): setiap query tambahan berarti
+     * satu perjalanan lagi ke database.
+     *
+     * @param  Builder<Asset>  $query
+     */
+    #[Scope]
+    protected function forList(Builder $query): void
+    {
+        $query->select(['assets.id', 'assets.code', 'assets.name', 'assets.condition', 'assets.status'])->addSelect([
+            'category_name' => Category::query()
+                ->select('categories.name')
+                ->join('asset_types', 'asset_types.category_id', '=', 'categories.id')
+                ->whereColumn('asset_types.id', 'assets.asset_type_id'),
+            'room_name' => Room::query()
+                ->select('rooms.name')
+                ->whereColumn('rooms.id', 'assets.room_id'),
+            'building_name' => Building::query()
+                ->select('buildings.name')
+                ->join('rooms', 'rooms.building_id', '=', 'buildings.id')
+                ->whereColumn('rooms.id', 'assets.room_id'),
+            'source_is_internal' => Department::query()
+                ->select('departments.is_internal')
+                ->whereColumn('departments.id', 'assets.source_department_id'),
+        ]);
+    }
+
+    /**
      * Filter Daftar Aset (SPEC §5); dipakai daftar & laporan. Tidak Layak Pakai tetap ikut.
      *
      * @param  Builder<Asset>  $query

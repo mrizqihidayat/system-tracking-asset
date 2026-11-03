@@ -28,14 +28,18 @@ class AppCache
     ];
 
     /**
-     * @template T
-     *
-     * @param  Closure(): T  $callback
-     * @return T
+     * @param  Closure(): mixed  $callback  hasil harus bisa di-JSON-kan (array/resource)
+     * @return mixed array hasil decode JSON
      */
     public static function remember(string $group, string $key, Closure $callback): mixed
     {
-        return Cache::remember(self::key($group, $key), self::TTL[$group], $callback);
+        // Simpan sebagai array JSON biasa: resource/model bersarang tidak boleh ikut di-serialize karena
+        // store file/database membaca ulang dengan serializable_classes = false (objek jadi incomplete).
+        return Cache::remember(
+            self::key($group, $key),
+            self::TTL[$group],
+            fn () => json_decode(json_encode($callback(), JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR),
+        );
     }
 
     public static function flush(string ...$groups): void

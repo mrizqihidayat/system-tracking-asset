@@ -36,8 +36,6 @@ interface Props<T> {
   /** Urutan aktif: `kunci` naik, `-kunci` turun, kosong = bawaan. */
   sort?: string
   onSortChange?: (sort: string) => void
-  /** Dipanggil saat baris disorot/difokus (mis. prefetch detail). */
-  onRowHover?: (row: T) => void
 }
 
 /** Klik berulang: naik → turun → urutan bawaan. */
@@ -61,7 +59,7 @@ function SortHeader({ label, sortKey, sort, onSortChange }: { label: string; sor
 
 export default function DataTable<T>({
   columns, rows, rowKey, loading, fetching, emptyText = 'Belum ada data.', meta, unit = 'data', onPageChange,
-  sort, onSortChange, onRowHover,
+  sort, onSortChange,
 }: Props<T>) {
   const skeleton = loading && rows.length === 0
   const empty = !skeleton && rows.length === 0 ? emptyText : null
@@ -102,12 +100,7 @@ export default function DataTable<T>({
               <tr><td colSpan={columns.length} className="px-4 py-10 text-center text-slate-500">{empty}</td></tr>
             ) : (
               rows.map((row) => (
-                <tr
-                  key={rowKey(row)}
-                  className="transition-colors hover:bg-slate-50"
-                  onMouseEnter={onRowHover && (() => onRowHover(row))}
-                  onFocus={onRowHover && (() => onRowHover(row))}
-                >
+                <tr key={rowKey(row)} className="transition-colors hover:bg-slate-50">
                   {columns.map((c, i) => (
                     <td key={`${c.header}-${i}`} className={`px-4 py-3 align-middle ${c.className ?? ''}`}>{c.cell(row)}</td>
                   ))}
@@ -125,12 +118,7 @@ export default function DataTable<T>({
           <li className="px-4 py-10 text-center text-sm text-slate-500">{empty}</li>
         ) : (
           rows.map((row) => (
-            <li
-              key={rowKey(row)}
-              className="space-y-2.5 px-4 py-3.5 text-sm"
-              onTouchStart={onRowHover && (() => onRowHover(row))}
-              onFocus={onRowHover && (() => onRowHover(row))}
-            >
+            <li key={rowKey(row)} className="space-y-2.5 px-4 py-3.5 text-sm">
               {(titleCols.length > 0 || badgeCols.length > 0) && (
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">

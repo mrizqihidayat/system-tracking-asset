@@ -20,7 +20,6 @@ class RequestCatalogResource extends JsonResource
             'id' => $this->id,
             'item_name' => $this->item_name,
             'provider_department' => DepartmentResource::make($this->whenLoaded('providerDepartment')),
-            'request_method' => $this->request_method,
             'must_return' => $this->must_return,
             'lead_time_days' => $this->lead_time_days,
             'note' => $this->note,

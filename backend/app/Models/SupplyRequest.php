@@ -14,11 +14,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['request_date', 'catalog_id', 'item_name', 'quantity', 'purpose', 'room_id', 'provider_department_id', 'status', 'received_at', 'returned_at', 'note', 'created_by'])]
+#[Fillable(['request_date', 'catalog_id', 'item_name', 'quantity', 'purpose', 'room_id', 'provider_department_id', 'request_method', 'lead_time_days', 'must_return', 'status', 'received_at', 'returned_at', 'note', 'created_by'])]
 class SupplyRequest extends Model
 {
     /** @use HasFactory<SupplyRequestFactory> */
     use HasFactory;
+
+    /**
+     * Saran awal cara permintaan; request_method teks bebas per permintaan (log jalur pengiriman).
+     */
+    public const DEFAULT_REQUEST_METHODS = ['Memo', 'Form', 'Email', 'WhatsApp', 'Lainnya'];
 
     /**
      * @var array<string, mixed>
@@ -35,6 +40,8 @@ class SupplyRequest extends Model
         return [
             'request_date' => 'date',
             'quantity' => 'integer',
+            'lead_time_days' => 'integer',
+            'must_return' => 'boolean',
             'status' => RequestStatus::class,
             'received_at' => 'datetime',
             'returned_at' => 'datetime',
@@ -74,17 +81,17 @@ class SupplyRequest extends Model
     }
 
     /**
-     * Batas respons = tanggal permintaan + lead time katalog; null tanpa katalog.
+     * Batas respons = tanggal permintaan + snapshot lead time; null tanpa lead time (tanpa katalog).
      */
     public function responseDueDate(): ?Carbon
     {
-        return $this->catalog === null
+        return $this->lead_time_days === null
             ? null
-            : $this->request_date->copy()->addDays($this->catalog->lead_time_days);
+            : $this->request_date->copy()->addDays($this->lead_time_days);
     }
 
     /**
-     * "Belum direspons" (dihitung, tidak disimpan): Diajukan yang melewati lead time katalog.
+     * "Belum direspons" (dihitung, tidak disimpan): Diajukan yang melewati snapshot lead time.
      * Permintaan tanpa katalog tidak punya lead time, jadi tidak pernah dihitung.
      */
     public function isUnresponded(): bool
@@ -133,13 +140,12 @@ class SupplyRequest extends Model
     #[Scope]
     protected function unresponded(Builder $query): void
     {
-        $query->where('supply_requests.status', RequestStatus::Diajukan->value)
-            ->whereHas('catalog', function ($catalog) {
-                $dueDate = DB::connection()->getDriverName() === 'sqlite'
-                    ? "date(supply_requests.request_date, '+' || request_catalog.lead_time_days || ' days')"
-                    : 'supply_requests.request_date + request_catalog.lead_time_days';
+        $dueDate = DB::connection()->getDriverName() === 'sqlite'
+            ? "date(supply_requests.request_date, '+' || supply_requests.lead_time_days || ' days')"
+            : 'supply_requests.request_date + supply_requests.lead_time_days';
 
-                $catalog->whereRaw("{$dueDate} < ?", [today()->toDateString()]);
-            });
+        $query->where('supply_requests.status', RequestStatus::Diajukan->value)
+            ->whereNotNull('supply_requests.lead_time_days')
+            ->whereRaw("{$dueDate} < ?", [today()->toDateString()]);
     }
 }

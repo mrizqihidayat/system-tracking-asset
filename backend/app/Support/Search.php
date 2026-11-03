@@ -29,7 +29,7 @@ class Search
             return $query;
         }
 
-        $pattern = '%'.addcslashes(mb_strtolower($search), '%_\\').'%';
+        $pattern = '%'.preg_replace('/[!%_]/', '!$0', mb_strtolower($search)).'%';
 
         return $query->where(function ($query) use ($columns, $pattern, $orWhere) {
             foreach ((array) $columns as $column) {
@@ -42,8 +42,12 @@ class Search
         });
     }
 
+    /**
+     * Escape memakai `!`, bukan backslash: PDO pgsql (PHP 8.3) membaca `'\'` sebagai string yang
+     * belum ditutup sehingga placeholder sesudahnya tidak terhitung (HY093).
+     */
     public static function likeSql(string $column): string
     {
-        return "lower({$column}) like ? escape '\\'";
+        return "lower({$column}) like ? escape '!'";
     }
 }

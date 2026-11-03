@@ -2,13 +2,12 @@
 
 namespace App\Http\Resources;
 
-use App\Enums\CountMethod;
 use App\Models\RoomStandard;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Baris checklist: Standar, Ada, Selisih, Hasil, Ambil dari / Minta ke.
+ * Baris checklist: Standar, Ada, Selisih, Hasil, Pemenuhan.
  * Baris QR wajib melewati RoomReadinessService::fillQrCounts() lebih dulu.
  *
  * @mixin RoomStandard
@@ -34,52 +33,41 @@ class RoomStandardResource extends JsonResource
                 'name' => $this->assetType->name,
                 'code' => $this->assetType->code,
             ] : null),
+            'assets' => $this->qrAssets,
+            'not_counted' => (object) $this->qrNotCounted,
             'present_quantity' => $present,
             'difference' => $present === null ? null : $present - $this->standard_quantity,
             'shortage' => $this->shortage(),
             'result' => $this->checklistResult()->value,
             'fulfillment' => $this->fulfillment(),
-            'can_fill_from_stock' => $this->count_method === CountMethod::Manual
-                && $this->consumable_id !== null
-                && ($this->shortage() ?? 0) > 0,
+            'needs_completion' => $this->needsCompletion(),
+            'can_fill_from_stock' => $this->canFillFromStock(),
+            'can_request' => $this->canRequest(),
         ];
     }
 
     /**
-     * Kolom "Ambil dari / Minta ke".
+     * Kolom "Pemenuhan": barang stok yang ditautkan beserta penyedia & katalognya.
      *
      * @return array<string, mixed>|null
      */
     private function fulfillment(): ?array
     {
-        if ($this->consumable_id) {
-            return [
-                'type' => 'stok_shd',
-                'consumable' => [
-                    'id' => $this->consumable->id,
-                    'name' => $this->consumable->name,
-                    'unit' => $this->consumable->unit,
-                    'quantity' => $this->consumable->quantity,
-                ],
-            ];
+        if (! $this->consumable_id) {
+            return null;
         }
 
-        if ($this->fulfillment_note) {
-            return ['type' => 'ambil_dari', 'note' => $this->fulfillment_note];
-        }
-
-        if ($this->catalog_id) {
-            return [
-                'type' => 'minta_ke',
-                'catalog' => [
-                    'id' => $this->catalog->id,
-                    'item_name' => $this->catalog->item_name,
-                    'provider_department' => DepartmentResource::make($this->catalog->providerDepartment),
-                    'request_method' => $this->catalog->request_method,
-                ],
-            ];
-        }
-
-        return null;
+        return [
+            'type' => 'stok',
+            'consumable' => [
+                'id' => $this->consumable->id,
+                'name' => $this->consumable->name,
+                'unit' => $this->consumable->unit,
+                'quantity' => $this->consumable->quantity,
+                'is_stored' => $this->consumable->is_stored,
+                'catalog_id' => $this->consumable->catalog_id,
+                'provider_department' => DepartmentResource::make($this->consumable->providerDepartment),
+            ],
+        ];
     }
 }

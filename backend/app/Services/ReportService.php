@@ -196,7 +196,7 @@ class ReportService
             ReportColumn::text('Gedung', 20), ReportColumn::text('Ruangan', 22), ReportColumn::text('Item', 28),
             ReportColumn::text('Sumber', 14), ReportColumn::text('Metode', 10), ReportColumn::int('Standar'),
             ReportColumn::int('Ada'), ReportColumn::int('Selisih'), ReportColumn::text('Hasil', 12),
-            ReportColumn::text('Ambil dari / Minta ke', 36),
+            ReportColumn::text('Pemenuhan', 36),
         ];
 
         $summary = $this->summary(['Gedung' => $this->nameOf(Building::class, $filters['building_id'] ?? null)]);
@@ -231,10 +231,10 @@ class ReportService
     private function fulfillment(RoomStandard $standard): ?string
     {
         return match (true) {
-            $standard->consumable !== null => "Stok SHD: {$standard->consumable->name}",
-            $standard->fulfillment_note !== null => "Ambil dari: {$standard->fulfillment_note}",
-            $standard->catalog !== null => "Minta ke {$standard->catalog->providerDepartment->name}: {$standard->catalog->item_name}",
-            default => null,
+            $standard->needsCompletion() => 'Perlu dilengkapi',
+            $standard->consumable === null => null,
+            $standard->consumable->is_stored => "Stok: {$standard->consumable->name}",
+            default => "Minta ke {$standard->consumable->providerDepartment->name}: {$standard->consumable->name}",
         };
     }
 
@@ -255,7 +255,7 @@ class ReportService
                 $request->purpose,
                 $request->room ? "{$request->room->building->name} / {$request->room->name}" : null,
                 $request->providerDepartment->name,
-                $request->catalog?->request_method,
+                $request->request_method,
                 $request->isUnresponded() ? 'Belum direspons' : $request->status->value,
                 $request->responseDueDate(),
                 $request->received_at,
@@ -300,7 +300,7 @@ class ReportService
                 $consumable->unit,
                 $consumable->quantity,
                 $consumable->min_quantity,
-                $consumable->status()->value,
+                $consumable->status()?->value ?? 'Tidak disimpan',
                 $consumable->providerDepartment->name,
                 $consumable->room ? "{$consumable->room->building->name} / {$consumable->room->name}" : null,
                 $consumable->note,

@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions, useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import type { Paginated } from '../../types/api'
-import type { Asset, AssetEvent, AssetFile } from '../../types/asset'
+import type { Asset, AssetEvent, AssetFile, AssetListItem } from '../../types/asset'
 import type { Loan } from '../../types/loan'
 import type { Checklist, ReadinessBuilding } from '../../types/room'
 import type { ConsumableItem, SuggestionGroup, SupplyRequest } from '../../types/supply'
@@ -19,7 +19,7 @@ const data = <T>(queryKey: readonly unknown[], url: string) =>
   queryOptions({ queryKey, queryFn: async () => (await api.get<{ data: T }>(url)).data.data })
 
 export const listQueries = {
-  assets: (params: ListParams) => paginated<Asset>(queryKeys.assets.list(params), '/assets', params),
+  assets: (params: ListParams) => paginated<AssetListItem>(queryKeys.assets.list(params), '/assets', params),
   loans: (params: ListParams) => paginated<Loan>(queryKeys.loans.list(params), '/loans', params),
   consumables: (params: ListParams) => paginated<ConsumableItem>(queryKeys.consumables.list(params), '/consumables', params),
   supplyRequests: (params: ListParams) => paginated<SupplyRequest>(queryKeys.supplyRequests.list(params), '/supply-requests', params),

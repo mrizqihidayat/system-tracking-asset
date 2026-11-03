@@ -16,6 +16,7 @@ class StoreSupplyRequestRequest extends FormRequest
 
     /**
      * Dengan katalog: nama item & unit penyedia boleh dikosongkan (diisi dari katalog).
+     * Cara permintaan wajib per permintaan (teks bebas dengan saran).
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -29,6 +30,7 @@ class StoreSupplyRequestRequest extends FormRequest
             'purpose' => ['nullable', 'string', 'max:255'],
             'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
             'provider_department_id' => ['required_without:catalog_id', 'nullable', 'integer', 'exists:departments,id'],
+            'request_method' => ['required', 'string', 'max:50'],
             'note' => ['nullable', 'string', 'max:1000'],
         ];
     }

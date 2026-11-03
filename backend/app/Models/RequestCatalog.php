@@ -11,16 +11,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Table('request_catalog')]
-#[Fillable(['item_name', 'provider_department_id', 'request_method', 'must_return', 'lead_time_days', 'note'])]
+#[Fillable(['item_name', 'provider_department_id', 'must_return', 'lead_time_days', 'note'])]
 class RequestCatalog extends Model
 {
     /** @use HasFactory<RequestCatalogFactory> */
     use HasFactory;
-
-    /**
-     * Saran awal cara permintaan; request_method tetap teks bebas (staf bisa mengetik cara baru).
-     */
-    public const DEFAULT_REQUEST_METHODS = ['Memo', 'Form', 'Email', 'WhatsApp', 'Lainnya'];
 
     /**
      * @return array<string, string>

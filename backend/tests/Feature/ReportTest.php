@@ -228,7 +228,7 @@ class ReportTest extends TestCase
         Room::factory()->create(['building_id' => $building->id, 'name' => 'Gudang']);
         $other = Room::factory()->create(['name' => 'Ruang Lain']);
 
-        $catalog = RequestCatalog::factory()->create(['provider_department_id' => $this->deptA->id, 'item_name' => 'Tisu']);
+        $tisu = Consumable::factory()->create(['name' => 'Tisu', 'quantity' => 0, 'min_quantity' => 0, 'is_stored' => false, 'provider_department_id' => $this->deptA->id]);
 
         RoomStandard::factory()->create([
             'room_id' => $short->id, 'item_name' => 'Spidol', 'source_department_id' => $this->shd->id,
@@ -236,7 +236,7 @@ class ReportTest extends TestCase
         ]);
         RoomStandard::factory()->create([
             'room_id' => $short->id, 'item_name' => 'Tisu', 'source_department_id' => $this->deptA->id,
-            'standard_quantity' => 3, 'count_method' => CountMethod::Manual, 'actual_quantity' => null, 'catalog_id' => $catalog->id,
+            'standard_quantity' => 3, 'count_method' => CountMethod::Manual, 'actual_quantity' => null, 'consumable_id' => $tisu->id,
         ]);
         RoomStandard::factory()->create([
             'room_id' => $ok->id, 'item_name' => 'Kursi', 'source_department_id' => $this->shd->id,
@@ -267,7 +267,7 @@ class ReportTest extends TestCase
 
         $detail = collect($this->dataRows($sheets['Detail']))->keyBy(2);
         $this->assertCount(3, $detail);
-        $this->assertSame(['IHS', 'Kelas 1', 'Spidol', 'SHD', 'Manual', 5, 2, -3, 'Kurang', ''], $detail['Spidol']);
+        $this->assertSame(['IHS', 'Kelas 1', 'Spidol', 'SHD', 'Manual', 5, 2, -3, 'Kurang', 'Perlu dilengkapi'], $detail['Spidol']);
         $this->assertSame('Belum dicek', $detail['Tisu'][8]);
         $this->assertSame('', $detail['Tisu'][6]);
         $this->assertSame('Minta ke Dept A: Tisu', $detail['Tisu'][9]);
@@ -283,12 +283,12 @@ class ReportTest extends TestCase
     {
         $creator = User::factory()->create(['name' => 'Pencatat']);
         $catalog = RequestCatalog::factory()->create([
-            'provider_department_id' => $this->deptA->id, 'lead_time_days' => 2, 'request_method' => 'Memo',
+            'provider_department_id' => $this->deptA->id, 'lead_time_days' => 2,
         ]);
 
         SupplyRequest::factory()->create([
             'item_name' => 'Tisu', 'quantity' => 5, 'catalog_id' => $catalog->id, 'provider_department_id' => $this->deptA->id,
-            'request_date' => today()->subDays(5), 'created_by' => $creator->id,
+            'request_date' => today()->subDays(5), 'created_by' => $creator->id, 'request_method' => 'Memo',
         ]);
         SupplyRequest::factory()->create([
             'item_name' => 'Kabel', 'provider_department_id' => $this->deptA->id, 'status' => RequestStatus::Diterima,

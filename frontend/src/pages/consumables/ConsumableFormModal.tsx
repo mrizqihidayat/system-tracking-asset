@@ -29,6 +29,8 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const [buildingId, setBuildingId] = useState<number | null>(item?.room?.building_id ?? null)
   const [roomId, setRoomId] = useState<number | null>(item?.room?.id ?? null)
   const [note, setNote] = useState(item?.note ?? '')
+  const [isStored, setIsStored] = useState(item?.is_stored ?? true)
+  const hasQuantity = (item?.quantity ?? 0) > 0
 
   useEffect(() => {
     if (item) {
@@ -46,7 +48,8 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
       name: name.trim(),
       category: category.trim() || null,
       unit: unit.trim(),
-      min_quantity: Number(minQuantity),
+      is_stored: isStored,
+      min_quantity: isStored ? Number(minQuantity) : 0,
       provider_department_id: providerId,
       catalog_id: catalogOptions.some((c) => c.id === catalogId) ? catalogId : null,
       room_id: roomId,
@@ -55,7 +58,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
     if (item) {
       await api.put(`/consumables/${item.id}`, payload)
     } else {
-      await api.post('/consumables', { ...payload, quantity: Number(quantity) })
+      await api.post('/consumables', { ...payload, quantity: isStored ? Number(quantity) : 0 })
     }
     toast.success(item ? 'Data barang diperbarui.' : 'Barang ditambahkan.')
     onDone()
@@ -79,25 +82,41 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
               <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Misal: ATK" error={errors.category} maxLength={100} />
             </FormField>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input type="checkbox" checked={isStored} disabled={isStored && hasQuantity} onChange={(e) => setIsStored(e.target.checked)} />
+              Disimpan SHD
+            </label>
+            <p className="mt-1 text-xs text-slate-500">
+              {isStored && hasQuantity
+                ? 'Tidak bisa dimatikan selama jumlahnya masih ada.'
+                : 'Matikan untuk barang unit lain yang tidak disimpan SHD (mis. tisu): kekurangan di ruangan langsung jadi permintaan ke penyedianya.'}
+            </p>
+            {errors.is_stored && <p className="mt-1 text-xs font-medium text-bad-700">{errors.is_stored}</p>}
+          </div>
+          <div className={`grid gap-3 ${isStored ? 'grid-cols-3' : 'grid-cols-1'}`}>
             <FormField label="Satuan" required error={errors.unit}>
               <Input value={unit} onChange={(e) => setUnit(e.target.value)} error={errors.unit} maxLength={20} />
             </FormField>
-            <FormField label={item ? 'Jumlah' : 'Jumlah awal'} required={!item} error={errors.quantity}>
-              <Input
-                type="number"
-                min={0}
-                value={item ? item.quantity : quantity}
-                disabled={!!item}
-                onChange={(e) => setQuantity(e.target.value)}
-                error={errors.quantity}
-              />
-            </FormField>
-            <FormField label="Minimum" required error={errors.min_quantity}>
-              <Input type="number" min={0} value={minQuantity} onChange={(e) => setMinQuantity(e.target.value)} error={errors.min_quantity} />
-            </FormField>
+            {isStored && (
+              <>
+                <FormField label={item ? 'Jumlah' : 'Jumlah awal'} required={!item} error={errors.quantity}>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={item ? item.quantity : quantity}
+                    disabled={!!item}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    error={errors.quantity}
+                  />
+                </FormField>
+                <FormField label="Minimum" required error={errors.min_quantity}>
+                  <Input type="number" min={0} value={minQuantity} onChange={(e) => setMinQuantity(e.target.value)} error={errors.min_quantity} />
+                </FormField>
+              </>
+            )}
           </div>
-          {item && <p className="-mt-1 text-xs text-slate-500">Jumlah diubah lewat tombol − / + atau klik angka di tabel.</p>}
+          {item && isStored && <p className="-mt-1 text-xs text-slate-500">Jumlah diubah lewat tombol − / + atau klik angka di tabel.</p>}
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Minta ke (unit penyedia)" required error={errors.provider_department_id}>
               <Select value={providerId ?? ''} onChange={(e) => setProviderId(Number(e.target.value) || null)} error={errors.provider_department_id}>

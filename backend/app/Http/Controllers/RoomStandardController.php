@@ -27,7 +27,7 @@ class RoomStandardController extends Controller
 
     public function store(StoreRoomStandardRequest $request, Room $room): JsonResponse
     {
-        $standard = $room->standards()->create($request->validated());
+        $standard = $room->standards()->create($request->standardData());
 
         return RoomStandardResource::make($this->prepare($standard))->response()->setStatusCode(201);
     }
@@ -42,7 +42,7 @@ class RoomStandardController extends Controller
             'consumable_id' => null,
             'fulfillment_note' => null,
             'catalog_id' => null,
-            ...$request->validated(),
+            ...$request->standardData(),
         ];
 
         if ($data['count_method'] !== $roomStandard->count_method->value) {

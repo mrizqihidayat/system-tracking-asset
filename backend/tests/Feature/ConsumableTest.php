@@ -223,6 +223,56 @@ class ConsumableTest extends TestCase
         $this->assertSame(0, $item->fresh()->quantity);
     }
 
+    public function test_not_stored_item_has_no_status_and_no_stock_warning(): void
+    {
+        $this->consumable(['name' => 'Spidol', 'quantity' => 0, 'min_quantity' => 5]);
+
+        $id = $this->postJson('/api/consumables', $this->payload(['name' => 'Tisu', 'quantity' => 0, 'min_quantity' => 9, 'is_stored' => false]))
+            ->assertCreated()
+            ->assertJsonPath('data.is_stored', false)
+            ->assertJsonPath('data.status', null)
+            ->assertJsonPath('data.min_quantity', 0)
+            ->json('data.id');
+
+        $this->getJson('/api/consumables?status=Habis')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Spidol');
+        $this->getJson('/api/consumables')->assertOk()->assertJsonCount(2, 'data');
+        $this->getJson('/api/dashboard/cards')->assertOk()->assertJsonPath('data.low_stock.habis', 1);
+
+        $this->patchJson("/api/consumables/{$id}/quantity", ['quantity' => 3])->assertJsonValidationErrors('quantity');
+        $this->patchJson("/api/consumables/{$id}/quantity", ['adjustment' => 1])->assertJsonValidationErrors('quantity');
+        $this->assertSame(0, Consumable::find($id)->quantity);
+    }
+
+    public function test_item_with_quantity_cannot_be_marked_not_stored(): void
+    {
+        $this->postJson('/api/consumables', $this->payload(['is_stored' => false]))->assertJsonValidationErrors('is_stored');
+
+        $item = $this->consumable(['quantity' => 4]);
+        $this->putJson("/api/consumables/{$item->id}", ['is_stored' => false])->assertJsonValidationErrors('is_stored');
+        $this->assertTrue($item->fresh()->is_stored);
+
+        $item->update(['quantity' => 0, 'min_quantity' => 7]);
+        $this->putJson("/api/consumables/{$item->id}", ['is_stored' => false])
+            ->assertOk()
+            ->assertJsonPath('data.is_stored', false)
+            ->assertJsonPath('data.min_quantity', 0);
+    }
+
+    public function test_changing_provider_updates_source_of_room_standards(): void
+    {
+        $item = $this->consumable();
+        $other = Department::factory()->create(['name' => 'SIT']);
+        $standard = RoomStandard::factory()->create([
+            'source_department_id' => $this->sga->id, 'count_method' => CountMethod::Manual, 'consumable_id' => $item->id,
+        ]);
+        $unrelated = RoomStandard::factory()->create(['source_department_id' => $this->sga->id]);
+
+        $this->putJson("/api/consumables/{$item->id}", ['provider_department_id' => $other->id])->assertOk();
+
+        $this->assertSame($other->id, $standard->fresh()->source_department_id);
+        $this->assertSame($this->sga->id, $unrelated->fresh()->source_department_id);
+    }
+
     public function test_usage_and_hard_delete_detach_room_standards(): void
     {
         $item = $this->consumable(['name' => 'Pulpen']);

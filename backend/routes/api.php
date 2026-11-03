@@ -104,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/room-standards/{roomStandard}/fill-from-stock', [RoomStandardController::class, 'fillFromStock'])->whereNumber('roomStandard');
 
     // Permintaan ke unit lain (SPEC §9); tanpa hapus permintaan (batal lewat status)
+    Route::get('/request-catalog/{requestCatalog}/usage', [RequestCatalogController::class, 'usage'])->whereNumber('requestCatalog');
     Route::apiResource('request-catalog', RequestCatalogController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->parameters(['request-catalog' => 'requestCatalog'])

@@ -1,6 +1,6 @@
 import { TriangleAlert } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AssetCode } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -11,13 +11,14 @@ import { PageHeader } from '../../components/ui/Page'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import AssetFilesManager from './AssetFilesManager'
+import NewAssetTypeModal from './modals/NewAssetTypeModal'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
 import { createBuilding, createDepartment, createRoom } from '../../lib/lookups'
 import { invalidate } from '../../lib/queries/invalidate'
 import { assetQueries } from '../../lib/queries/lists'
 import { useAssetTypes, useBuildings, useDepartments, useRooms } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
-import { CONDITIONS, type Asset, type CodePreview, type Condition } from '../../types/asset'
+import { CONDITIONS, type Asset, type AssetType, type CodePreview, type Condition } from '../../types/asset'
 
 interface FormState {
   asset_type_id: number | null
@@ -44,6 +45,8 @@ const empty: FormState = {
 }
 
 const orNull = (v: string) => (v.trim() === '' ? null : v.trim())
+
+const typeOption = (t: AssetType) => ({ id: t.id, label: `${t.name} (${t.code}) — ${t.category?.name ?? ''}` })
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -74,6 +77,11 @@ export default function AssetFormPage() {
   const { data: rooms, error: roomsError } = useRooms(form.building_id, true)
   useErrorToast(typesError, departmentsError, buildingsError, roomsError)
   const [preview, setPreview] = useState<{ typeId: number; data: CodePreview } | null>(null)
+  const [newType, setNewType] = useState<{
+    name: string
+    resolve: (option: ReturnType<typeof typeOption>) => void
+    reject: () => void
+  } | null>(null)
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -126,10 +134,7 @@ export default function AssetFormPage() {
   }, [typeChanged, form.asset_type_id, id, toast])
   const activePreview = typeChanged && preview?.typeId === form.asset_type_id ? preview.data : null
 
-  const typeOptions = useMemo(
-    () => types.map((t) => ({ id: t.id, label: `${t.name} (${t.code}) — ${t.category?.name ?? ''}` })),
-    [types],
-  )
+  const typeOptions = useMemo(() => types.map(typeOption), [types])
   const departmentOptions = departments.map((d) => ({ id: d.id, label: d.name }))
   const buildingOptions = buildings.map((b) => ({ id: b.id, label: b.name }))
   const roomOptions = form.building_id ? rooms.map((r) => ({ id: r.id, label: r.name })) : []
@@ -158,6 +163,18 @@ export default function AssetFormPage() {
       const r = await createRoom(form.building_id!, name)
       return { id: r.id, label: r.name }
     })
+  /** Nama yang sudah ada langsung dipilih; selain itu menunggu popup (batal = teks ketikan tetap). */
+  const addType = (name: string) => {
+    const existing = types.find((t) => t.name.toLowerCase() === name.toLowerCase())
+    if (existing) return Promise.resolve(typeOption(existing))
+    return new Promise<ReturnType<typeof typeOption>>((resolve, reject) =>
+      setNewType({ name, resolve, reject: () => reject(new Error('Dibatalkan')) }),
+    )
+  }
+  const cancelNewType = useCallback(() => {
+    newType?.reject()
+    setNewType(null)
+  }, [newType])
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -242,7 +259,8 @@ export default function AssetFormPage() {
               value={form.asset_type_id}
               options={typeOptions}
               onChange={(v) => set('asset_type_id', v)}
-              placeholder="Ketik untuk mencari jenis…"
+              onCreate={editing ? undefined : addType}
+              placeholder={editing ? 'Ketik untuk mencari jenis…' : 'Ketik untuk mencari atau menambah jenis…'}
               error={errors.asset_type_id}
             />
           </FormField>
@@ -365,6 +383,16 @@ export default function AssetFormPage() {
       </div>
     </form>
     {editing && original && <AssetFilesManager assetId={original.id} />}
+    {newType && (
+      <NewAssetTypeModal
+        initialName={newType.name}
+        onClose={cancelNewType}
+        onCreated={(t) => {
+          newType.resolve(typeOption(t))
+          setNewType(null)
+        }}
+      />
+    )}
     </div>
   )
 }

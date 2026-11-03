@@ -163,7 +163,10 @@ flowchart TD
     B --> C{Pilih aksi}
 
     C -- Atur standar --> S1[Pilih / tambah gedung] --> S2[Pilih / tambah ruangan]
-    S2 --> S6[Input perlengkapan, sumber, jumlah standar, cara hitung QR/Manual, pemenuhan: stok SHD / ambil dari / minta ke]
+    S2 --> S5{Pilih tipe}
+    S5 -- Aset --> S6[Pilih jenis aset & sumber, nama, jumlah standar]
+    S5 -- Stok Habis Pakai --> S8[Pilih barang dari Stok, nama, jumlah standar; sumber otomatis dari penyedia]
+    S8 --> S7
     S6 --> S7[(Simpan standar)] --> B
 
     C -- Cek ruangan --> K1[Pilih gedung & ruangan] --> K2[Checklist: standar, ada, selisih]
@@ -172,13 +175,14 @@ flowchart TD
     K4 --> K5[(Simpan hasil cek + waktu & staf; item Manual kosong = Belum dicek, bukan kurang)]
     K5 --> K6{Ada kekurangan?}
     K6 -- Tidak --> B
-    K6 -- Ya --> K7{Cara pemenuhan}
-    K7 -- Stok SHD --> F1[Klik Isi dari stok] --> F2[(Isi = min kekurangan, stok; stok berkurang, Ada bertambah)]
+    K6 -- Ya --> K7{Tipe & stok}
+    K7 -- Aset --> K8[Tanpa aksi] --> B
+    K7 -- Baris lama tanpa barang stok --> K11[Perlu dilengkapi: edit baris & pilih tipe] --> S5
+    K7 -- Stok masih ada --> F1[Klik Isi dari stok] --> F2[(Isi = min kekurangan, stok; stok berkurang, Ada bertambah)]
     F2 --> F3{Masih kurang?}
     F3 -- Tidak --> B
-    F3 -- Ya --> F4[Sisa tetap tercatat kurang, stok habis masuk saran permintaan] --> B
-    K7 -- Ambil dari --> K8[Tampilkan lokasi pengambilan] --> B
-    K7 -- Minta ke unit lain --> K9[Tampilkan unit penyedia & tombol Buat permintaan] --> K10[[Permintaan]]
+    F3 -- Ya --> F4[Sisa tetap tercatat kurang; stok 0 berganti ke Buat permintaan] --> B
+    K7 -- Tidak disimpan SHD / stok 0 --> K9[Tampilkan unit penyedia & tombol Buat permintaan] --> K10[[Permintaan]]
 
     C -- Kembali --> Z([Selesai])
 ```
@@ -190,10 +194,10 @@ flowchart TD
     A([Mulai]) --> B[Katalog perlengkapan unit lain + riwayat permintaan]
     B --> C{Pilih aksi}
 
-    C -- Kelola katalog --> K1[Input item, unit penyedia, cara permintaan, perlu dikembalikan, lead time] --> K2[(Simpan katalog)] --> B
+    C -- Kelola katalog --> K1[Input item, unit penyedia, perlu dikembalikan, lead time] --> K2[(Simpan katalog)] --> B
 
     C -- Buat permintaan --> P1[Pilih item katalog / dari saran kekurangan]
-    P1 --> P2[Input tanggal, jumlah, kegiatan, ruangan terkait]
+    P1 --> P2[Input cara permintaan, tanggal, jumlah, kegiatan, ruangan terkait]
     P2 --> P3[(Simpan status Diajukan)]
     P3 --> P4[Staf mengirim permintaan di luar sistem] --> B
 
@@ -211,9 +215,9 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Daftar barang habis pakai milik SHD + status]
+    A([Mulai]) --> B[Daftar barang habis pakai + status; barang tidak disimpan SHD tanpa status]
     B --> C{Pilih aksi}
-    C -- Tambah / Ubah --> T1[Input nama unik, kategori, satuan, jumlah awal, minimum, minta ke, katalog dari unit yang sama, lokasi simpan] --> T2[(Simpan)] --> CEK
+    C -- Tambah / Ubah --> T1[Input nama unik, kategori, satuan, disimpan SHD, jumlah awal & minimum jika disimpan, minta ke, katalog dari unit yang sama, lokasi simpan] --> T2[(Simpan)] --> CEK
     C -- Ubah jumlah --> J0{Cara}
     J0 -- Set langsung --> J1[Input jumlah baru >= 0]
     J0 -- Tambah / kurang --> J2[Input penyesuaian +/-]
@@ -223,10 +227,10 @@ flowchart TD
     R0[Isi dari stok di Kelengkapan Ruangan] --> R1[(Stok berkurang otomatis, tidak pernah negatif)] --> CEK
     C -- Hapus --> H0[Ambil usage: ruangan yang standarnya memakai barang ini]
     H0 --> H1{Dipakai di standar?}
-    H1 -- Ya --> H2[Peringatan: hapus permanen, tautan standar akan dilepas]
+    H1 -- Ya --> H2[Peringatan: hapus permanen, tautan dilepas, standar menjadi Perlu dilengkapi]
     H1 -- Tidak --> H3[Konfirmasi hapus permanen]
     H2 & H3 --> H4[(Hard delete; consumable_id di standar terkait dikosongkan, standar tetap utuh)] --> B
-    CEK{Jumlah <= minimum?}
+    CEK{Disimpan SHD & jumlah <= minimum?}
     CEK -- Tidak --> S1[Status Aman] --> B
     CEK -- Ya --> S2[Status Menipis/Habis] --> S3[Peringatan dashboard + masuk saran permintaan ke unit 'minta ke'] --> B
     C -- Kembali --> Z([Selesai])

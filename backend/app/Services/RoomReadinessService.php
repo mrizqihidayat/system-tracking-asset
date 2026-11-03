@@ -31,7 +31,7 @@ class RoomReadinessService
         AssetStatus::TidakLayakPakai,
     ];
 
-    public const RELATIONS = ['sourceDepartment', 'assetType', 'consumable', 'catalog.providerDepartment'];
+    public const RELATIONS = ['sourceDepartment', 'assetType', 'consumable.providerDepartment'];
 
     public function __construct(private ConsumableService $consumables) {}
 
@@ -44,7 +44,8 @@ class RoomReadinessService
     }
 
     /**
-     * Isi jumlah "Ada" baris QR dengan satu query (dikelompokkan per ruangan & jenis aset).
+     * Isi jumlah "Ada", kode aset, dan jumlah aset yang tidak dihitung pada baris QR dengan satu query
+     * (dikelompokkan per ruangan & jenis aset). Tidak Layak Pakai tidak diambil: tidak ditampilkan sama sekali.
      *
      * @param  Collection<int, RoomStandard>  $standards
      * @return Collection<int, RoomStandard>
@@ -57,18 +58,25 @@ class RoomReadinessService
             return $standards;
         }
 
-        $counts = Asset::query()
+        $assets = Asset::query()
             ->whereIn('room_id', $qr->pluck('room_id')->unique()->values())
             ->whereIn('asset_type_id', $qr->pluck('asset_type_id')->filter()->unique()->values())
-            ->whereNotIn('status', array_map(fn (AssetStatus $s) => $s->value, self::EXCLUDED_STATUSES))
-            ->groupBy('room_id', 'asset_type_id')
-            ->select('room_id', 'asset_type_id', DB::raw('count(*) as total'))
+            ->where('status', '!=', AssetStatus::TidakLayakPakai->value)
+            ->orderBy('code')
+            ->select('id', 'code', 'status', 'room_id', 'asset_type_id')
             ->toBase()
             ->get()
-            ->mapWithKeys(fn ($row) => ["{$row->room_id}:{$row->asset_type_id}" => (int) $row->total]);
+            ->groupBy(fn ($asset) => "{$asset->room_id}:{$asset->asset_type_id}");
+
+        $excluded = array_map(fn (AssetStatus $s) => $s->value, self::EXCLUDED_STATUSES);
 
         foreach ($qr as $standard) {
-            $standard->qrPresentQuantity = $counts["{$standard->room_id}:{$standard->asset_type_id}"] ?? 0;
+            [$notCounted, $counted] = ($assets["{$standard->room_id}:{$standard->asset_type_id}"] ?? collect())
+                ->partition(fn ($asset) => in_array($asset->status, $excluded, true));
+
+            $standard->qrPresentQuantity = $counted->count();
+            $standard->qrAssets = $counted->map(fn ($asset) => ['id' => (int) $asset->id, 'code' => $asset->code])->values()->all();
+            $standard->qrNotCounted = $notCounted->countBy('status')->all();
         }
 
         return $standards;
@@ -201,6 +209,11 @@ class RoomReadinessService
             }
 
             $consumable = $standard->consumable()->lockForUpdate()->firstOrFail();
+
+            if (! $consumable->is_stored) {
+                throw ValidationException::withMessages(['standard' => "{$consumable->name} tidak disimpan SHD. Buat permintaan ke penyedianya."]);
+            }
+
             $filled = min($shortage, $consumable->quantity);
 
             if ($filled <= 0) {

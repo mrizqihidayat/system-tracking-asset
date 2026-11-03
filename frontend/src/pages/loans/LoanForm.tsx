@@ -7,7 +7,7 @@ import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
 import { useDepartments } from '../../lib/queries/master'
 import type { Asset } from '../../types/asset'
-import AssetPicker from './AssetPicker'
+import AssetPicker, { type PickedAsset } from './AssetPicker'
 import RoomSelect from './RoomSelect'
 
 const today = () => new Date().toLocaleDateString('en-CA')
@@ -30,7 +30,7 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
   const toast = useToast()
   const [params, setParams] = useSearchParams()
   const presetId = params.get('asset_id')
-  const [asset, setAsset] = useState<Asset | null>(null)
+  const [asset, setAsset] = useState<PickedAsset | null>(null)
   const [form, setForm] = useState(emptyForm)
   const { data: departments } = useDepartments()
   const [errors, setErrors] = useState<Record<string, string>>({})

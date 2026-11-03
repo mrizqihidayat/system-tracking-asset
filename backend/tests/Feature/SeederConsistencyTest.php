@@ -14,8 +14,8 @@ use App\Models\AssetType;
 use App\Models\Consumable;
 use App\Models\Department;
 use App\Models\Loan;
-use App\Models\RequestCatalog;
 use App\Models\RoomStandard;
+use App\Models\SupplyRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -36,8 +36,8 @@ class SeederConsistencyTest extends TestCase
     {
         $this->assertSame(1, Department::where('is_internal', true)->count());
         $this->assertSame(3, Department::where('is_internal', false)->count());
-        $this->assertEqualsWithDelta(25, Asset::count(), 3);
-        $this->assertEqualsWithDelta(10, Consumable::count(), 2);
+        $this->assertEqualsWithDelta(30, Asset::count(), 3);
+        $this->assertEqualsWithDelta(14, Consumable::count(), 2);
     }
 
     public function test_asset_status_matches_active_loans(): void
@@ -76,7 +76,7 @@ class SeederConsistencyTest extends TestCase
         });
 
         $this->assertSame(0, Asset::whereNull('public_token')->count());
-        $this->assertTrue(RequestCatalog::where('request_method', 'WhatsApp')->exists());
+        $this->assertTrue(SupplyRequest::where('request_method', 'WhatsApp')->exists());
     }
 
     public function test_asset_service_scenarios_are_seeded(): void
@@ -127,24 +127,23 @@ class SeederConsistencyTest extends TestCase
 
     public function test_room_standards_follow_fulfillment_rules(): void
     {
-        $shd = Department::where('is_internal', true)->value('id');
-
-        RoomStandard::all()->each(function (RoomStandard $standard) use ($shd) {
-            $fulfillments = collect([$standard->consumable_id, $standard->fulfillment_note, $standard->catalog_id])->filter();
-
-            $this->assertLessThanOrEqual(1, $fulfillments->count());
+        RoomStandard::with('consumable')->get()->each(function (RoomStandard $standard) {
+            $this->assertFalse($standard->needsCompletion(), "{$standard->item_name} perlu dilengkapi");
+            $this->assertNull($standard->fulfillment_note);
+            $this->assertNull($standard->catalog_id);
 
             if ($standard->count_method === CountMethod::Qr) {
                 $this->assertNotNull($standard->asset_type_id);
-            }
-
-            if ($standard->catalog_id !== null) {
-                $this->assertNotSame($shd, $standard->source_department_id);
-            }
-
-            if ($standard->consumable_id !== null || $standard->fulfillment_note !== null) {
-                $this->assertSame($shd, $standard->source_department_id);
+                $this->assertNull($standard->consumable_id);
+            } else {
+                $this->assertSame($standard->consumable->provider_department_id, $standard->source_department_id);
             }
         });
+
+        Consumable::where('is_stored', false)->get()->each(function (Consumable $consumable) {
+            $this->assertSame(0, $consumable->quantity);
+            $this->assertSame(0, $consumable->min_quantity);
+        });
+        $this->assertNotEmpty(Consumable::where('is_stored', false)->count());
     }
 }

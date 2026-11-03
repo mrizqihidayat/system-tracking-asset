@@ -32,12 +32,14 @@ class RequestSeeder extends Seeder
         ];
 
         $items = [];
+        $methods = [];
 
+        // Cara permintaan dicatat per permintaan; di data contoh mengikuti kebiasaan per item.
         foreach ($catalog as $name => [$department, $method, $mustReturn, $leadTime, $note]) {
+            $methods[$name] = $method;
             $items[$name] = RequestCatalog::create([
                 'item_name' => $name,
                 'provider_department_id' => $departments[$department],
-                'request_method' => $method,
                 'must_return' => $mustReturn,
                 'lead_time_days' => $leadTime,
                 'note' => $note,
@@ -63,6 +65,9 @@ class RequestSeeder extends Seeder
                 'purpose' => $purpose,
                 'room_id' => $room === null ? null : $rooms[$room],
                 'provider_department_id' => $items[$item]->provider_department_id,
+                'request_method' => $methods[$item],
+                'lead_time_days' => $items[$item]->lead_time_days,
+                'must_return' => $items[$item]->must_return,
                 'status' => $status,
                 'received_at' => $receivedAgo === null ? null : now()->subDays($receivedAgo),
                 'returned_at' => $returnedAgo === null ? null : now()->subDays($returnedAgo),

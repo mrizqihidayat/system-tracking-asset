@@ -60,7 +60,7 @@ class ConsumableController extends Controller
 
     public function update(UpdateConsumableRequest $request, Consumable $consumable): ConsumableResource
     {
-        $consumable->update($request->validated());
+        $consumable = $this->consumables->update($consumable, $request->validated());
 
         return ConsumableResource::make($consumable->load(self::RELATIONS));
     }

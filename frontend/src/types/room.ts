@@ -27,13 +27,19 @@ export interface ReadinessBuilding {
   rooms: ReadinessRoom[]
 }
 
-export type Fulfillment =
-  | { type: 'stok_shd'; consumable: { id: number; name: string; unit: string; quantity: number } }
-  | { type: 'ambil_dari'; note: string }
-  | {
-      type: 'minta_ke'
-      catalog: { id: number; item_name: string; provider_department: Department | null; request_method: string | null }
-    }
+/** Baris tipe Stok Habis Pakai: barang yang ditautkan beserta penyedia & katalognya. */
+export interface Fulfillment {
+  type: 'stok'
+  consumable: {
+    id: number
+    name: string
+    unit: string
+    quantity: number
+    is_stored: boolean
+    catalog_id: number | null
+    provider_department: Department | null
+  }
+}
 
 export interface RoomStandard {
   id: number
@@ -43,12 +49,19 @@ export interface RoomStandard {
   standard_quantity: number
   count_method: CountMethod
   asset_type: { id: number; name: string; code: string } | null
+  /** Baris aset: aset yang terhitung "Ada". */
+  assets: { id: number; code: string }[]
+  /** Baris aset: jumlah aset jenis ini di ruangan yang tidak dihitung, per status. */
+  not_counted: Partial<Record<'Dipinjam' | 'Perbaikan' | 'Hilang', number>>
   present_quantity: number | null
   difference: number | null
   shortage: number | null
   result: ChecklistResult
   fulfillment: Fulfillment | null
+  /** Baris Manual tanpa barang stok: tanpa aksi sampai dilengkapi. */
+  needs_completion: boolean
   can_fill_from_stock: boolean
+  can_request: boolean
 }
 
 export interface Checklist {
@@ -58,18 +71,4 @@ export interface Checklist {
     last_checked_by: string | null
     summary: ReadinessSummary
   }
-}
-
-export interface Consumable {
-  id: number
-  name: string
-  unit: string
-  quantity: number
-}
-
-export interface CatalogItem {
-  id: number
-  item_name: string
-  provider_department: Department | null
-  request_method: string | null
 }

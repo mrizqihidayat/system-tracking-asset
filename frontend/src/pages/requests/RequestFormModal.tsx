@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import Combobox from '../../components/ui/Combobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
-import { useDepartments, useRooms } from '../../lib/queries/master'
+import { useDepartments, useRequestMethods, useRooms } from '../../lib/queries/master'
 import type { RequestCatalog, RequestPrefill, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import RoomSelect from '../loans/RoomSelect'
@@ -24,6 +25,7 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
   const toast = useToast()
   const departments = useDepartments().data.filter((d) => !d.is_internal)
   const { data: allRooms } = useRooms()
+  const { data: methods } = useRequestMethods()
   const initialCatalog = request ? request.catalog?.id : prefill?.catalog_id
   const [catalogId, setCatalogId] = useState<string>(
     initialCatalog ? String(initialCatalog) : request || prefill?.item_name ? MANUAL : '',
@@ -32,6 +34,7 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
   const [providerId, setProviderId] = useState<number | null>(
     request?.provider_department?.id ?? prefill?.provider_department_id ?? null,
   )
+  const [method, setMethod] = useState(request?.request_method ?? '')
   const [quantity, setQuantity] = useState(String(request?.quantity ?? prefill?.quantity ?? 1))
   const [purpose, setPurpose] = useState(request?.purpose ?? '')
   const [date, setDate] = useState(request?.request_date ?? today())
@@ -52,6 +55,7 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
       catalog_id: selected?.id ?? null,
       item_name: manual ? itemName.trim() : null,
       provider_department_id: manual ? providerId : null,
+      request_method: method.trim(),
       quantity: Number(quantity),
       purpose: purpose.trim() || null,
       request_date: date || null,
@@ -68,7 +72,7 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
     <ActionModal
       title={request ? 'Ubah permintaan' : 'Buat permintaan'}
       submitLabel="Simpan"
-      submitDisabled={!catalogId || (manual && (!itemName.trim() || !providerId))}
+      submitDisabled={!catalogId || !method.trim() || (manual && (!itemName.trim() || !providerId))}
       onClose={onClose}
       onSubmit={submit}
     >
@@ -85,7 +89,7 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
           </FormField>
           {selected && (
             <p className="-mt-1 text-xs text-slate-500">
-              {selected.provider_department?.name} · via {selected.request_method} · lead time {selected.lead_time_days} hari
+              {selected.provider_department?.name} · lead time {selected.lead_time_days} hari
               {selected.must_return && ' · perlu dikembalikan'}
             </p>
           )}
@@ -102,6 +106,15 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
               </FormField>
             </div>
           )}
+          <FormField label="Cara permintaan" required error={errors.request_method}>
+            <Combobox
+              value={method}
+              onChange={setMethod}
+              options={methods.map((m) => ({ id: m, label: m }))}
+              placeholder="Memo, Form, Email, WhatsApp…"
+              error={errors.request_method}
+            />
+          </FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Jumlah" required error={errors.quantity}>
               <Input type="number" min={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} error={errors.quantity} />

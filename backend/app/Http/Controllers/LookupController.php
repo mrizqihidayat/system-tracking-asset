@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
-use App\Models\RequestCatalog;
+use App\Models\SupplyRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,18 +25,18 @@ class LookupController extends Controller
     }
 
     /**
-     * Saran cara permintaan: default dulu, lalu nilai yang pernah dipakai di katalog.
+     * Saran cara permintaan: default dulu, lalu nilai yang pernah dipakai di permintaan.
      * Tanpa duplikat (tidak membedakan huruf besar/kecil), maks. 20.
      */
     public function requestMethods(Request $request): JsonResponse
     {
-        $used = $this->applySearch(RequestCatalog::query(), $request->query('search'), 'request_method')
+        $used = $this->applySearch(SupplyRequest::query()->whereNotNull('request_method'), $request->query('search'), 'request_method')
             ->distinct()
             ->orderBy('request_method')
             ->pluck('request_method');
 
         $search = mb_strtolower(trim((string) $request->query('search', '')));
-        $defaults = collect(RequestCatalog::DEFAULT_REQUEST_METHODS)
+        $defaults = collect(SupplyRequest::DEFAULT_REQUEST_METHODS)
             ->filter(fn (string $method): bool => $search === '' || str_contains(mb_strtolower($method), $search));
 
         $methods = $defaults->concat($used)

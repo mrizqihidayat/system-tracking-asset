@@ -4,7 +4,6 @@ export interface RequestCatalog {
   id: number
   item_name: string
   provider_department: Department | null
-  request_method: string
   must_return: boolean
   lead_time_days: number
   note: string | null
@@ -22,10 +21,24 @@ export interface SupplyRequest {
   is_unresponded: boolean
   display_status: RequestStatus | 'Belum direspons'
   response_due_date: string | null
-  catalog: { id: number; item_name: string; request_method: string; must_return: boolean; lead_time_days: number } | null
+  /** Tautan katalog (null bila tanpa katalog atau katalognya sudah dihapus). Lead time & must_return = snapshot. */
+  catalog: { id: number; item_name: string; must_return: boolean; lead_time_days: number | null } | null
+  /** Lewat jalur apa permintaan dikirim; null untuk permintaan lama (sebelum T26g). */
+  request_method: string | null
+  /** Snapshot dari katalog saat permintaan dibuat/diubah (tetap walau katalog diedit/dihapus). */
+  lead_time_days: number | null
+  must_return: boolean
   provider_department: Department | null
   room: Room | null
   note: string | null
+}
+
+/** Pemakaian item katalog (popup sebelum hapus). */
+export interface CatalogUsage {
+  supply_requests: number
+  room_standards: number
+  consumables: number
+  total: number
 }
 
 export interface SuggestionItem {
@@ -53,9 +66,11 @@ export interface ConsumableItem {
   unit: string
   quantity: number
   min_quantity: number
-  status: ConsumableStatus
+  is_stored: boolean
+  /** null = tidak disimpan SHD (tidak punya status stok). */
+  status: ConsumableStatus | null
   provider_department: Department | null
-  catalog: { id: number; item_name: string; request_method: string } | null
+  catalog: { id: number; item_name: string } | null
   room: Room | null
   note: string | null
 }

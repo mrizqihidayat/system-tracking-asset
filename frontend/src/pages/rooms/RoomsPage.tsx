@@ -36,9 +36,42 @@ const chipRow = '-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap
 
 const requestUrl = (roomId: number, s?: RoomStandard) => {
   const p = new URLSearchParams({ room_id: String(roomId) })
-  if (s?.fulfillment?.type === 'minta_ke') p.set('catalog_id', String(s.fulfillment.catalog.id))
+  const item = s?.fulfillment?.consumable
+  if (item?.catalog_id) {
+    p.set('catalog_id', String(item.catalog_id))
+  } else if (item) {
+    p.set('item_name', item.name)
+    if (item.provider_department) p.set('provider_department_id', String(item.provider_department.id))
+  }
   if (s?.shortage) p.set('quantity', String(s.shortage))
   return `/permintaan?${p}`
+}
+
+const MAX_ASSET_CODES = 3
+const NOT_COUNTED_LABELS = { Dipinjam: 'sedang dipinjam', Perbaikan: 'dalam perbaikan', Hilang: 'hilang' } as const
+
+/** Kode aset yang terhitung "Ada" (klik menuju detail) + keterangan aset yang tidak dihitung. */
+function AssetCodes({ standard }: { standard: RoomStandard }) {
+  const shown = standard.assets.slice(0, MAX_ASSET_CODES)
+  const hidden = standard.assets.slice(MAX_ASSET_CODES)
+  const notCounted = (Object.keys(NOT_COUNTED_LABELS) as (keyof typeof NOT_COUNTED_LABELS)[])
+    .filter((status) => standard.not_counted[status])
+    .map((status) => `${standard.not_counted[status]} ${NOT_COUNTED_LABELS[status]}`)
+
+  return (
+    <span className="block text-xs text-slate-500">
+      {shown.length === 0
+        ? 'Belum ada aset'
+        : shown.map((a, i) => (
+            <span key={a.id}>
+              {i > 0 && ', '}
+              <Link to={`/daftar-aset/${a.id}`} className="hover:text-brand-700 hover:underline">{a.code}</Link>
+            </span>
+          ))}
+      {hidden.length > 0 && <span title={hidden.map((a) => a.code).join(', ')}> +{hidden.length}</span>}
+      {notCounted.length > 0 && <span className="block text-warn-700">{notCounted.join(' · ')}</span>}
+    </span>
+  )
 }
 
 export default function RoomsPage() {
@@ -153,22 +186,13 @@ export default function RoomsPage() {
     }
   }
 
-  // Kalimat banner: "Kekurangan dapat diambil dari X, diisi dari stok SHD, atau diminta ke unit penyedia."
+  // Kalimat banner: "Kekurangan dapat diisi dari stok atau diminta ke unit penyedia."
+  const hasRequestable = shortages.some((s) => s.can_request)
   const ways = [
-    ...new Set(
-      shortages.map((s) =>
-        s.fulfillment?.type === 'ambil_dari'
-          ? `diambil dari ${s.fulfillment.note}`
-          : s.fulfillment?.type === 'stok_shd'
-            ? 'diisi dari stok SHD'
-            : s.fulfillment?.type === 'minta_ke'
-              ? 'diminta ke unit penyedia'
-              : null,
-      ),
-    ),
-  ].filter(Boolean) as string[]
-  const waysText = ways.length ? ` Kekurangan dapat ${ways.slice(0, -1).join(', ')}${ways.length > 1 ? ' atau ' : ''}${ways.at(-1)}.` : ''
-  const hasRequestable = shortages.some((s) => s.fulfillment?.type === 'minta_ke' || !s.source_department?.is_internal)
+    ...(shortages.some((s) => s.can_fill_from_stock) ? ['diisi dari stok'] : []),
+    ...(hasRequestable ? ['diminta ke unit penyedia'] : []),
+  ]
+  const waysText = ways.length ? ` Kekurangan dapat ${ways.join(' atau ')}.` : ''
 
   const columns: Column<RoomStandard>[] = [
     {
@@ -177,9 +201,13 @@ export default function RoomsPage() {
       cell: (s) => (
         <>
           <span className="font-medium">{s.item_name}</span>
-          <span className="block text-xs text-slate-500">
-            {s.count_method === 'QR' ? `Otomatis QR · ${s.asset_type?.name ?? '-'}` : 'Dicek manual'}
-          </span>
+          {s.needs_completion ? (
+            <span className="block text-xs font-medium text-warn-700">Perlu dilengkapi</span>
+          ) : s.count_method === 'QR' ? (
+            <AssetCodes standard={s} />
+          ) : (
+            <span className="block text-xs text-slate-500">Stok Habis Pakai</span>
+          )}
         </>
       ),
     },
@@ -217,17 +245,22 @@ export default function RoomsPage() {
     },
     { header: 'Hasil', mobile: 'badge', cell: (s) => <Badge color={resultColor[s.result]}>{s.result}</Badge> },
     {
-      header: 'Ambil dari / Minta ke',
+      header: 'Pemenuhan',
       cell: (s) => {
-        const f = s.fulfillment
-        const text =
-          f?.type === 'stok_shd'
-            ? `Stok SHD: ${f.consumable.name} (${f.consumable.quantity} ${f.consumable.unit})`
-            : f?.type === 'ambil_dari'
-              ? f.note
-              : f?.type === 'minta_ke'
-                ? `${f.catalog.provider_department?.name ?? 'Unit lain'}`
-                : '-'
+        if (s.needs_completion) {
+          return (
+            <button type="button" className="text-xs font-semibold text-brand-700 hover:underline" onClick={() => setModal('standards')}>
+              Lengkapi
+            </button>
+          )
+        }
+        const item = s.fulfillment?.consumable
+        const provider = item?.provider_department?.name ?? 'unit penyedia'
+        const text = !item
+          ? '-'
+          : !item.is_stored
+            ? `Minta ke ${provider}`
+            : `Stok: ${item.name} (${item.quantity} ${item.unit})`
         return (
           <div className="space-y-1">
             <span className="block text-xs text-slate-600">{text}</span>
@@ -236,7 +269,7 @@ export default function RoomsPage() {
                 Isi dari stok
               </Button>
             )}
-            {s.result === 'Kurang' && f?.type === 'minta_ke' && roomId && (
+            {s.can_request && roomId && (
               <Link to={requestUrl(roomId, s)} className="block text-xs font-semibold text-brand-700 hover:underline">Buat permintaan</Link>
             )}
           </div>
@@ -332,7 +365,7 @@ export default function RoomsPage() {
           />
           {manualRows.length > 0 && (
             <p className="text-xs text-slate-500">
-              Isi kolom Ada untuk baris manual, lalu klik “Simpan hasil cek”. Baris QR dihitung otomatis dari aset di ruangan ini.
+              Isi kolom Ada untuk barang stok, lalu klik “Simpan hasil cek”. Baris aset dihitung otomatis dari aset di ruangan ini.
             </p>
           )}
         </section>

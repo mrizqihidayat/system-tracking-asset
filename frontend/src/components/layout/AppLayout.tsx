@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import icon from '../../assets/icon.png'
 import { api } from '../../lib/api'
-import { prefetchRoute } from '../../lib/queries/prefetch'
+import { cancelRoutePrefetch, prefetchRouteOnDwell } from '../../lib/queries/prefetch'
 import { clearSession, getUser } from '../../lib/auth'
 
 // Isi modul mengikuti SPEC §3. Scan QR dibuka dari tombol di Dashboard (keputusan pengguna), tidak di menu.
@@ -45,6 +45,13 @@ export default function AppLayout() {
 
   const user = getUser()
 
+  const prefetchProps = (to: string) => ({
+    onMouseEnter: () => prefetchRouteOnDwell(queryClient, to),
+    onMouseLeave: cancelRoutePrefetch,
+    onFocus: () => prefetchRouteOnDwell(queryClient, to),
+    onBlur: cancelRoutePrefetch,
+  })
+
   const logout = async () => {
     try {
       await api.post('/logout')
@@ -81,8 +88,7 @@ export default function AppLayout() {
               to={to}
               end={to === '/'}
               onClick={() => setOpen(false)}
-              onMouseEnter={() => prefetchRoute(queryClient, to)}
-              onFocus={() => prefetchRoute(queryClient, to)}
+              {...prefetchProps(to)}
               className={itemClass}
             >
               <Icon size={18} className="shrink-0" />
@@ -101,8 +107,7 @@ export default function AppLayout() {
           <NavLink
             to="/pengaturan/data-master"
             onClick={() => setOpen(false)}
-            onMouseEnter={() => prefetchRoute(queryClient, '/pengaturan/data-master')}
-            onFocus={() => prefetchRoute(queryClient, '/pengaturan/data-master')}
+            {...prefetchProps('/pengaturan/data-master')}
             className={itemClass}
           >
             <Settings size={18} className="shrink-0" />

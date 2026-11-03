@@ -1,5 +1,4 @@
 import { Plus, Search, SlidersHorizontal } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
@@ -15,17 +14,15 @@ import { openInNewTab } from '../../lib/blob'
 import { listConfigs } from '../../lib/queries/list-configs'
 import { useAssets } from '../../lib/queries/lists'
 import { useBuildings, useCategories, useDepartments, useRooms } from '../../lib/queries/master'
-import { prefetchAsset } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
-import { CONDITIONS, STATUSES, type Asset } from '../../types/asset'
+import { CONDITIONS, STATUSES, type AssetListItem } from '../../types/asset'
 
 const FILTERS = [...listConfigs.assets.filters, 'search']
 const MAX_LABELS = 120
 
 export default function AssetListPage() {
   const toast = useToast()
-  const queryClient = useQueryClient()
   const list = useListParams(listConfigs.assets)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [printing, setPrinting] = useState(false)
@@ -71,7 +68,7 @@ export default function AssetListPage() {
     }
   }
 
-  const columns: Column<Asset>[] = [
+  const columns: Column<AssetListItem>[] = [
     {
       header: 'Pilih',
       className: 'w-10',
@@ -91,20 +88,20 @@ export default function AssetListPage() {
         </Link>
       ),
     },
-    { header: 'Kategori', cell: (a) => a.asset_type?.category?.name ?? '-' },
+    { header: 'Kategori', cell: (a) => a.category_name ?? '-' },
     {
       header: 'Lokasi',
       cell: (a) =>
-        a.room ? (
+        a.room_name ? (
           <>
-            {a.room.name}
-            <span className="block text-xs text-slate-500">{a.room.building?.name}</span>
+            {a.room_name}
+            <span className="block text-xs text-slate-500">{a.building_name}</span>
           </>
         ) : (
           '-'
         ),
     },
-    { header: 'Sumber', cell: (a) => (a.source_department?.is_internal ? 'Milik SHD' : 'Unit lain') },
+    { header: 'Sumber', cell: (a) => (a.source_is_internal ? 'Milik SHD' : 'Unit lain') },
     { header: 'Kondisi', sortKey: 'condition', cell: (a) => <span className="whitespace-nowrap">{a.condition}</span> },
     { header: 'Status', mobile: 'badge', sortKey: 'status', cell: (a) => <StatusBadge status={a.status} /> },
     {
@@ -219,7 +216,7 @@ export default function AssetListPage() {
           <Select value={list.get('source_department_id')} onChange={(e) => setFilter('source_department_id', e.target.value)}>
             <option value="">Semua sumber</option>
             {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.is_internal ? `${d.name} (Milik SHD)` : d.name}</option>
+              <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </Select>,
         )}
@@ -260,12 +257,11 @@ export default function AssetListPage() {
         loading={assets.isPending}
         fetching={assets.isPlaceholderData}
         unit="aset"
-        emptyText={hasFilter ? 'Tidak ada aset yang cocok dengan filter.' : 'Belum ada aset.'}
+        emptyText={assets.isError ? 'Gagal memuat daftar aset. Coba lagi.' : hasFilter ? 'Tidak ada aset yang cocok dengan filter.' : 'Belum ada aset.'}
         meta={result?.meta}
         onPageChange={list.setPage}
         sort={list.sort}
         onSortChange={list.setSort}
-        onRowHover={(a) => prefetchAsset(queryClient, a.id)}
       />
     </div>
   )

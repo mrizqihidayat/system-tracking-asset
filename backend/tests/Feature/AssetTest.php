@@ -17,6 +17,7 @@ use App\Models\Loan;
 use App\Models\Room;
 use App\Models\RoomStandard;
 use App\Models\User;
+use App\Support\Search;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -193,6 +194,27 @@ class AssetTest extends TestCase
         $this->getJson('/api/assets?search=shd-prj')->assertJsonCount(1, 'data');
         $this->getJson('/api/assets?per_page=2')->assertJsonCount(2, 'data')->assertJsonPath('meta.last_page', 2);
         $this->getJson('/api/assets?status=Rusak')->assertUnprocessable()->assertJsonValidationErrors('status');
+    }
+
+    public function test_search_treats_special_characters_as_plain_text(): void
+    {
+        $this->createAsset(['name' => 'Kabel 100% Tembaga']);
+        $this->createAsset(['name' => 'Kabel_HDMI']);
+        $this->createAsset(['name' => 'Awas! Panas']);
+        $this->createAsset(['name' => 'Folder C:\\Data']);
+        $this->createAsset(['name' => 'Meja']);
+
+        foreach (['%' => 'Kabel 100% Tembaga', '_' => 'Kabel_HDMI', '!' => 'Awas! Panas', '\\' => 'Folder C:\\Data'] as $search => $name) {
+            $this->getJson('/api/assets?search='.urlencode($search))->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', $name);
+        }
+
+        $this->getJson('/api/assets?search=KABEL')->assertOk()->assertJsonCount(2, 'data');
+    }
+
+    /** Test berjalan di sqlite yang tidak mengalami HY093 PDO pgsql, jadi SQL-nya dijaga langsung. */
+    public function test_search_sql_has_no_backslash(): void
+    {
+        $this->assertStringNotContainsString('\\', Search::likeSql('assets.name'));
     }
 
     public function test_index_shows_current_loan_location(): void

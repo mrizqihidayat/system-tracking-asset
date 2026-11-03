@@ -4,11 +4,16 @@ namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
 use App\Models\Asset;
+use App\Models\AssetType;
+use App\Models\Building;
 use App\Models\Category;
 use App\Models\Consumable;
+use App\Models\Department;
+use App\Models\RequestCatalog;
 use App\Models\Room;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -51,6 +56,45 @@ class ListPerformanceTest extends TestCase
         $this->getJson('/api/consumables?sort=-quantity')->assertOk()->assertJsonPath('data.0.name', 'Spidol');
     }
 
+    public function test_asset_list_uses_two_queries_regardless_of_row_count(): void
+    {
+        Asset::factory()->count(5)->create();
+
+        $this->assertSame(2, $this->queryCount('/api/assets'));
+        $this->assertSame(2, $this->queryCount('/api/assets?search=shd&status=Tersedia&sort=-name'));
+    }
+
+    public function test_asset_list_returns_only_table_columns(): void
+    {
+        $room = Room::factory()->for(Building::factory()->create(['name' => 'Gedung A']))->create(['name' => 'Ruang 1']);
+        $category = Category::factory()->create(['name' => 'Elektronik']);
+        $type = AssetType::factory()->for($category)->create();
+        $source = Department::factory()->create(['is_internal' => false]);
+        $asset = Asset::factory()->create([
+            'asset_type_id' => $type->id,
+            'room_id' => $room->id,
+            'source_department_id' => $source->id,
+        ]);
+
+        $row = $this->getJson('/api/assets')
+            ->assertOk()
+            ->assertJsonPath('data.0.category_name', 'Elektronik')
+            ->assertJsonPath('data.0.room_name', 'Ruang 1')
+            ->assertJsonPath('data.0.building_name', 'Gedung A')
+            ->assertJsonPath('data.0.source_is_internal', false)
+            ->json('data.0');
+
+        $this->assertSame(
+            ['id', 'code', 'name', 'category_name', 'room_name', 'building_name', 'source_is_internal', 'condition', 'status'],
+            array_keys($row),
+        );
+
+        $this->getJson("/api/assets/{$asset->id}")
+            ->assertOk()
+            ->assertJsonPath('data.room.name', 'Ruang 1')
+            ->assertJsonStructure(['data' => ['current_location', 'active_loan', 'brand'], 'meta' => ['actions']]);
+    }
+
     public function test_unknown_sort_is_rejected(): void
     {
         $this->getJson('/api/assets?sort=public_token')->assertUnprocessable()->assertJsonValidationErrors('sort');
@@ -78,6 +122,23 @@ class ListPerformanceTest extends TestCase
         $this->postJson('/api/categories', ['name' => 'Furnitur'])->assertCreated();
 
         $this->getJson('/api/categories')->assertOk()->assertJsonCount(2, 'data');
+    }
+
+    public function test_cached_lists_keep_nested_relations_when_store_serializes(): void
+    {
+        // Seperti store file/database: nilai di-serialize dan dibaca ulang dengan serializable_classes = false.
+        config(['cache.stores.array.serialize' => true, 'cache.serializable_classes' => false]);
+        Cache::purge('array');
+
+        $room = Room::factory()->create();
+        $provider = Department::factory()->create(['name' => 'SGA']);
+        RequestCatalog::factory()->create(['provider_department_id' => $provider->id]);
+
+        foreach ([1, 2] as $call) {
+            $this->getJson('/api/rooms')->assertOk()->assertJsonPath('data.0.building.name', $room->building->name);
+            $this->getJson('/api/request-catalog')->assertOk()->assertJsonPath('data.0.provider_department.name', 'SGA');
+            $this->getJson('/api/dashboard/panels')->assertOk();
+        }
     }
 
     public function test_master_search_is_not_served_from_cache(): void

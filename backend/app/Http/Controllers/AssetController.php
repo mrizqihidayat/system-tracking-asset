@@ -13,6 +13,7 @@ use App\Http\Requests\ReportAssetRequest;
 use App\Http\Requests\StoreAssetRequest;
 use App\Http\Requests\StoreAssetServiceRequest;
 use App\Http\Requests\UpdateAssetRequest;
+use App\Http\Resources\AssetListResource;
 use App\Http\Resources\AssetResource;
 use App\Models\Asset;
 use App\Models\AssetType;
@@ -27,7 +28,7 @@ class AssetController extends Controller
     use PaginatesList;
 
     /**
-     * Relasi untuk daftar & detail (lokasi asal + lokasi peminjaman saat ini).
+     * Relasi untuk detail (lokasi asal + lokasi peminjaman saat ini). Daftar memakai Asset::forList().
      */
     private const RELATIONS = [
         'assetType.category',
@@ -47,13 +48,13 @@ class AssetController extends Controller
     {
         $filters = $request->validated();
 
-        $query = Asset::query()->with(self::RELATIONS)->filter($filters);
+        $query = Asset::query()->forList()->filter($filters);
 
         $assets = $this->paginateList(
             $query, $filters, IndexAssetRequest::SORTABLE, fn ($query) => $query->orderBy('code'), IndexAssetRequest::DEFAULT_PER_PAGE,
         );
 
-        return AssetResource::collection($assets);
+        return AssetListResource::collection($assets);
     }
 
     public function store(StoreAssetRequest $request): JsonResponse

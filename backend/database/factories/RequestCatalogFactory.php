@@ -21,7 +21,6 @@ class RequestCatalogFactory extends Factory
         return [
             'item_name' => fake()->words(2, true),
             'provider_department_id' => Department::factory(),
-            'request_method' => 'Memo',
             'must_return' => false,
             'lead_time_days' => fake()->numberBetween(1, 7),
         ];

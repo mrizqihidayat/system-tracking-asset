@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Muat RELATIONS agar is_unresponded & response_due_date (butuh catalog) terisi.
+ * is_unresponded & response_due_date dari snapshot lead time (tidak butuh katalog).
  *
  * @mixin SupplyRequest
  */
@@ -28,6 +28,9 @@ class SupplyRequestResource extends JsonResource
             'item_name' => $this->item_name,
             'quantity' => $this->quantity,
             'purpose' => $this->purpose,
+            'request_method' => $this->request_method,
+            'lead_time_days' => $this->lead_time_days,
+            'must_return' => $this->must_return,
             'status' => $this->status->value,
             'is_unresponded' => $unresponded,
             'display_status' => $unresponded ? 'Belum direspons' : $this->status->value,
@@ -35,9 +38,8 @@ class SupplyRequestResource extends JsonResource
             'catalog' => $this->whenLoaded('catalog', fn () => $this->catalog ? [
                 'id' => $this->catalog->id,
                 'item_name' => $this->catalog->item_name,
-                'request_method' => $this->catalog->request_method,
-                'must_return' => $this->catalog->must_return,
-                'lead_time_days' => $this->catalog->lead_time_days,
+                'must_return' => $this->must_return,
+                'lead_time_days' => $this->lead_time_days,
             ] : null),
             'provider_department' => DepartmentResource::make($this->whenLoaded('providerDepartment')),
             'room' => RoomResource::make($this->whenLoaded('room')),

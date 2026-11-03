@@ -19,8 +19,6 @@ use Illuminate\Validation\ValidationException;
  */
 class SupplyRequestService
 {
-    public function __construct(private RoomReadinessService $readiness) {}
-
     /**
      * Item & unit penyedia diisi dari katalog bila dikirim; tanggal default hari ini.
      *
@@ -52,7 +50,7 @@ class SupplyRequestService
     }
 
     /**
-     * Diajukan → Diterima | Dibatalkan; Diterima → Dikembalikan (hanya jika katalog "perlu dikembalikan") | Dibatalkan.
+     * Diajukan → Diterima | Dibatalkan; Diterima → Dikembalikan (hanya jika snapshot "perlu dikembalikan") | Dibatalkan.
      */
     public function changeStatus(SupplyRequest $request, RequestStatus $to, ?string $note = null): SupplyRequest
     {
@@ -70,7 +68,7 @@ class SupplyRequestService
                 throw ValidationException::withMessages(['status' => "Status {$from->value} tidak dapat diubah ke {$to->value}."]);
             }
 
-            if ($to === RequestStatus::Dikembalikan && ! $request->catalog?->must_return) {
+            if ($to === RequestStatus::Dikembalikan && ! $request->must_return) {
                 throw ValidationException::withMessages(['status' => 'Barang ini tidak perlu dikembalikan.']);
             }
 
@@ -93,23 +91,35 @@ class SupplyRequestService
     }
 
     /**
-     * Hapus item katalog; ditolak bila masih dipakai (permintaan, stok, standar ruangan).
+     * Pemakaian item katalog (popup sebelum hapus).
+     *
+     * @return array{supply_requests: int, room_standards: int, consumables: int, total: int}
+     */
+    public function catalogUsage(RequestCatalog $catalog): array
+    {
+        $usage = [
+            'supply_requests' => $catalog->supplyRequests()->count(),
+            'room_standards' => $catalog->roomStandards()->count(),
+            'consumables' => $catalog->consumables()->count(),
+        ];
+
+        return $usage + ['total' => array_sum($usage)];
+    }
+
+    /**
+     * Hapus item katalog walau dipakai: tautan catalog_id di permintaan, standar ruangan, dan stok dilepas
+     * dalam satu transaksi. Riwayat permintaan tetap utuh (item, unit, cara, lead time, must_return tersimpan).
      */
     public function deleteCatalog(RequestCatalog $catalog): void
     {
         DB::transaction(function () use ($catalog) {
             $catalog = RequestCatalog::query()->whereKey($catalog->getKey())->lockForUpdate()->firstOrFail();
 
-            $used = collect([
-                'permintaan' => $catalog->supplyRequests()->count(),
-                'barang habis pakai' => $catalog->consumables()->count(),
-                'standar ruangan' => $catalog->roomStandards()->count(),
-            ])->filter()->map(fn (int $count, string $label) => "{$count} {$label}");
+            $catalog->supplyRequests()->update(['catalog_id' => null]);
+            $catalog->roomStandards()->update(['catalog_id' => null]);
+            $catalog->consumables()->update(['catalog_id' => null]);
 
-            if ($used->isNotEmpty()) {
-                throw ValidationException::withMessages(['id' => 'Item katalog masih dipakai: '.$used->implode(', ').'.']);
-            }
-
+            // Observer katalog (deleted) mengosongkan cache master & ops yang memuat tautan tadi.
             $catalog->delete();
         });
     }
@@ -132,8 +142,12 @@ class SupplyRequestService
     {
         $open = SupplyRequest::query()->where('status', RequestStatus::Diajukan->value)->get();
 
-        $items = $this->roomSuggestions()
-            ->concat($this->stockSuggestions())
+        $rooms = $this->roomSuggestions();
+        // Barang yang sudah muncul dari kekurangan ruangan tidak diulang sebagai saran stok.
+        $stock = $this->stockSuggestions()->whereNotIn('consumable_id', $rooms->pluck('consumable_id'));
+
+        $items = $rooms
+            ->concat($stock)
             ->map(function (array $item) use ($open) {
                 $item['has_open_request'] = $open->contains(fn (SupplyRequest $request) => $this->matches($request, $item));
 
@@ -156,24 +170,22 @@ class SupplyRequestService
      */
     private function roomSuggestions(): Collection
     {
-        $standards = RoomStandard::query()
-            ->whereNotNull('catalog_id')
-            ->with(['catalog.providerDepartment', 'room.building'])
+        return RoomStandard::query()
+            ->whereNotNull('consumable_id')
+            ->with(['consumable.catalog', 'consumable.providerDepartment', 'room.building'])
             ->orderBy('room_id')
             ->orderBy('id')
-            ->get();
-
-        return $this->readiness->fillQrCounts($standards)
-            ->filter(fn (RoomStandard $standard) => ($standard->shortage() ?? 0) > 0)
+            ->get()
+            ->filter(fn (RoomStandard $standard) => $standard->canRequest())
             ->map(fn (RoomStandard $standard) => [
                 'source' => 'kekurangan_ruangan',
-                'item_name' => $standard->catalog->item_name,
+                'item_name' => $standard->consumable->catalog?->item_name ?? $standard->consumable->name,
                 'quantity' => $standard->shortage(),
-                'catalog_id' => $standard->catalog_id,
+                'catalog_id' => $standard->consumable->catalog_id,
                 'room' => ['id' => $standard->room_id, 'name' => $standard->room->name, 'building' => $standard->room->building->name],
                 'room_standard_id' => $standard->id,
-                'consumable_id' => null,
-                'provider_department' => $this->department($standard->catalog->providerDepartment),
+                'consumable_id' => $standard->consumable_id,
+                'provider_department' => $this->department($standard->consumable->providerDepartment),
             ])
             ->values();
     }
@@ -228,16 +240,23 @@ class SupplyRequestService
     }
 
     /**
+     * Snapshot lead time & "perlu dikembalikan" dari katalog (permintaan tanpa katalog: tanpa lead time,
+     * tidak perlu dikembalikan); riwayat tidak berubah saat katalog diedit/dihapus.
+     *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private function resolve(array $data): array
     {
-        if (! empty($data['catalog_id'])) {
-            $catalog = RequestCatalog::query()->findOrFail($data['catalog_id']);
+        $catalog = empty($data['catalog_id']) ? null : RequestCatalog::query()->findOrFail($data['catalog_id']);
+
+        if ($catalog) {
             $data['item_name'] = ($data['item_name'] ?? null) ?: $catalog->item_name;
             $data['provider_department_id'] = $catalog->provider_department_id;
         }
+
+        $data['lead_time_days'] = $catalog?->lead_time_days;
+        $data['must_return'] = (bool) $catalog?->must_return;
 
         $data['request_date'] = ($data['request_date'] ?? null) ?: today()->toDateString();
 
