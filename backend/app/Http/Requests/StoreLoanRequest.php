@@ -27,7 +27,7 @@ class StoreLoanRequest extends FormRequest
             'purpose' => ['required', 'string', 'max:255'],
             'destination_room_id' => ['nullable', 'integer', 'exists:rooms,id'],
             'destination_note' => ['nullable', 'string', 'max:255'],
-            'borrow_date' => ['nullable', 'date'],
+            'borrow_date' => ['nullable', 'date', 'before_or_equal:today'],
             'due_date' => ['required', 'date', 'after_or_equal:'.($this->input('borrow_date') ?: 'today')],
             'approval_number' => ['nullable', 'string', 'max:100'],
             'approval_date' => ['nullable', 'date'],
@@ -41,6 +41,7 @@ class StoreLoanRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'borrow_date.before_or_equal' => 'Tanggal pinjam tidak boleh di masa depan.',
             'due_date.after_or_equal' => 'Rencana kembali tidak boleh sebelum tanggal pinjam.',
             'condition_out.prohibited' => 'Kondisi saat keluar diisi otomatis dari kondisi aset.',
         ];

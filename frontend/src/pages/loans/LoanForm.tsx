@@ -119,7 +119,7 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Tanggal pinjam" error={errors.borrow_date}>
-            <Input type="date" value={form.borrow_date} onChange={(e) => set('borrow_date', e.target.value)} error={errors.borrow_date} />
+            <Input type="date" value={form.borrow_date} max={today()} onChange={(e) => set('borrow_date', e.target.value)} error={errors.borrow_date} />
           </FormField>
           <FormField label="Rencana kembali" required error={errors.due_date}>
             <Input type="date" value={form.due_date} min={form.borrow_date || undefined} onChange={(e) => set('due_date', e.target.value)} error={errors.due_date} />

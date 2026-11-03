@@ -100,7 +100,7 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - (Ide setelah demo, keputusan pengguna) Tanggal rencana dikembalikan untuk permintaan yang harus dikembalikan beserta peringatan jika lewat.
 - (Ide setelah demo, keputusan pengguna) Popup jumlah yang datang (diterima sebagian) saat menandai permintaan Diterima; sekarang Diterima dianggap penuh sesuai jumlah permintaan.
 - (Ide setelah demo, keputusan pengguna) Fitur pemesanan aset: status terpisah, pengecekan bentrok tanggal, aset baru `Dipinjam` saat diserahkan.
-- (Keputusan pengguna) Tanggal pinjam tidak dibatasi ke masa depan: aset langsung `Dipinjam` sejak dicatat dan jumlah Ada ruangan langsung turun; sebelum tanggalnya tiba hanya bisa dibatalkan (SPEC §7).
+- (Keputusan pengguna) Tanggal pinjam tetap dibatasi sampai hari ini (SPEC §7), karena status aset langsung `Dipinjam` saat dicatat. Pembatasan sempat terhapus di commit e91b0ab dan dikembalikan.
 - (T26e/T26g/T26h) Migration `2026_10_30_000001` (index) dan `2026_10_30_000002` (cara permintaan per permintaan) sudah dijalankan di Supabase (batch 3–4). `2026_10_30_000003_catalog_set_null_and_request_snapshot` belum: jalankan `php artisan migrate` bersamaan dengan kode T26h (kode T26h membaca kolom snapshot baru).
 - (T26e) Cache memakai `CACHE_STORE` (lokal `file`). Saat deploy pilih `redis`/`file`; store `database` tetap jalan tetapi setiap baca cache = satu query ke Supabase.
 - (T26e) Invalidasi cache lewat event model; perubahan lewat query builder massal (`Model::query()->update()`) tidak memicu observer. Saat ini semua mass update diikuti simpan/hapus model yang diamati; kode baru perlu menjaga hal yang sama (TTL 10 mnt/1 jam jadi jaring pengaman).

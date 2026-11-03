@@ -78,7 +78,7 @@ class LoanService
         return DB::transaction(function () use ($loan, $data, $actor) {
             [$loan, $asset] = $this->lockActive($loan);
 
-            $returnDate = $this->returnDate($loan, $data['return_date'] ?? null);
+            $returnDate = $this->returnDate($data['return_date'] ?? null);
             $condition = AssetCondition::from($data['return_condition']);
             $chosen = AssetStatus::tryFrom((string) ($data['status'] ?? ''));
             $unfit = $condition === AssetCondition::RusakBerat && $chosen === AssetStatus::TidakLayakPakai;
@@ -139,7 +139,7 @@ class LoanService
     {
         return DB::transaction(function () use ($loan, $returnDate, $note, $actor) {
             [$loan, $asset] = $this->lockActive($loan);
-            $date = $this->returnDate($loan, $returnDate);
+            $date = $this->returnDate($returnDate);
 
             $loan->update([
                 'status' => LoanStatus::Hilang,
@@ -216,18 +216,9 @@ class LoanService
         return [$loan, $asset];
     }
 
-    /**
-     * Tanggal pinjam boleh di masa depan: selama belum tiba, transaksi hanya bisa dibatalkan.
-     */
-    private function returnDate(Loan $loan, ?string $value): CarbonInterface
+    private function returnDate(?string $value): CarbonInterface
     {
-        $date = $value ? Carbon::parse($value) : now();
-
-        if ($date->copy()->startOfDay()->lt($loan->borrow_date)) {
-            throw ValidationException::withMessages(['return_date' => 'Tanggal pinjam belum tiba. Batalkan peminjaman jika tidak jadi.']);
-        }
-
-        return $date;
+        return $value ? Carbon::parse($value) : now();
     }
 
     /**

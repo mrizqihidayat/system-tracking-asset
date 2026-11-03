@@ -131,36 +131,15 @@ class LoanTest extends TestCase
         $this->assertSame(1, Loan::where('status', LoanStatus::Dipinjam)->count());
     }
 
-    public function test_future_borrow_date_marks_asset_borrowed_and_can_only_be_cancelled_until_it_arrives(): void
-    {
-        $asset = $this->asset();
-        $borrowDate = today()->addDays(3);
-
-        $id = $this->postJson('/api/loans', $this->borrowPayload($asset, ['borrow_date' => $borrowDate->toDateString(), 'due_date' => today()->addDays(5)->toDateString()]))
-            ->assertCreated()
-            ->assertJsonPath('data.borrow_date', $borrowDate->toDateString())
-            ->json('data.id');
-
-        $this->assertSame(AssetStatus::Dipinjam, $asset->fresh()->status);
-
-        $this->patchJson("/api/loans/{$id}/return", ['return_condition' => 'Baik'])
-            ->assertJsonValidationErrors(['return_date' => 'Tanggal pinjam belum tiba. Batalkan peminjaman jika tidak jadi.']);
-        $this->patchJson("/api/loans/{$id}/return", ['result' => 'hilang', 'note' => 'Hilang'])
-            ->assertJsonValidationErrors('return_date');
-        $this->assertSame(AssetStatus::Dipinjam, $asset->fresh()->status);
-
-        $this->travelTo($borrowDate->copy()->addHour());
-        $this->patchJson("/api/loans/{$id}/return", ['return_condition' => 'Baik'])->assertOk();
-        $this->assertSame(AssetStatus::Tersedia, $asset->fresh()->status);
-    }
-
     public function test_borrow_date_rules(): void
     {
         $asset = $this->asset();
 
-        $this->postJson('/api/loans', $this->borrowPayload($asset, ['borrow_date' => today()->addDays(3)->toDateString(), 'due_date' => today()->addDays(2)->toDateString()]))
+        $this->postJson('/api/loans', $this->borrowPayload($asset, ['borrow_date' => today()->addDay()->toDateString(), 'due_date' => today()->addDays(2)->toDateString()]))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['due_date' => 'Rencana kembali tidak boleh sebelum tanggal pinjam.']);
+            ->assertJsonValidationErrors(['borrow_date' => 'Tanggal pinjam tidak boleh di masa depan.']);
+
+        $this->assertSame(AssetStatus::Tersedia, $asset->fresh()->status);
 
         $this->postJson('/api/loans', $this->borrowPayload($asset, ['borrow_date' => today()->subDays(2)->toDateString(), 'due_date' => today()->subDays(3)->toDateString()]))
             ->assertUnprocessable()
