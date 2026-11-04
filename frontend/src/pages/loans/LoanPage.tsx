@@ -1,7 +1,7 @@
 import { EllipsisVertical, Search } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { AssetCode, Badge, ConditionBadge } from '../../components/ui/Badge'
 import { PageHeader } from '../../components/ui/Page'
@@ -9,6 +9,8 @@ import Button from '../../components/ui/Button'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu from '../../components/ui/DropdownMenu'
 import { Input, Select } from '../../components/ui/FormField'
+import { useToast } from '../../components/ui/toast-context'
+import { api, errorMessage } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import { invalidate } from '../../lib/queries/invalidate'
 import { listConfigs } from '../../lib/queries/list-configs'
@@ -43,6 +45,9 @@ const assetCell = (l: Loan) => (
 
 export default function LoanPage() {
   const queryClient = useQueryClient()
+  const toast = useToast()
+  const [params, setParams] = useSearchParams()
+  const returnLoanId = params.get('return_loan_id')
   const [modal, setModal] = useState<ModalState>(null)
   const activeList = useListParams(listConfigs.activeLoans)
   const historyList = useListParams(listConfigs.loanHistory)
@@ -52,6 +57,29 @@ export default function LoanPage() {
 
   const status = historyList.get('status')
   const search = historyList.searchText
+
+  // ?return_loan_id=<id> (dari hasil scan): buka modal terima kembali. Tabel berhalaman, jadi datanya diambil sendiri.
+  useEffect(() => {
+    if (!returnLoanId) return
+    let cancelled = false
+    api
+      .get<{ data: Loan }>(`/loans/${encodeURIComponent(returnLoanId)}`)
+      .then((res) => {
+        if (cancelled) return
+        const loan = res.data.data
+        if (loan.status === 'Dipinjam') setModal({ kind: 'return', loan })
+        else toast.error(`Peminjaman ${loan.asset?.code ?? ''} sudah berstatus ${loan.status}, tidak ada yang perlu diterima kembali.`)
+      })
+      .catch((e) => {
+        if (!cancelled) toast.error(errorMessage(e))
+      })
+      .finally(() => {
+        if (!cancelled) setParams((p) => (p.delete('return_loan_id'), p), { replace: true })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [returnLoanId, setParams, toast])
 
   const refresh = () => invalidate.loans(queryClient)
   const closeModal = () => setModal(null)
@@ -125,6 +153,8 @@ export default function LoanPage() {
         description="Dicatat admin atas nama peminjam. Approval atasan di luar sistem, nomornya dicatat di sini."
         actions={<ExportButton type="loans" filters={() => ({ status, search: search.trim() })} />}
       />
+
+      {returnLoanId && <p role="status" className="text-sm text-slate-500">Memuat peminjaman…</p>}
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <LoanForm onSaved={refresh} />

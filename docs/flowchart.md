@@ -1,13 +1,12 @@
 # Flowchart — Sistem Informasi Aset SHD
 
-Disusun dari kode frontend & backend per 4 November 2026 (termasuk T26m).
+Disusun dari kode frontend & backend per 4 November 2026 (termasuk T26n).
 
 Tempel tiap blok ke mermaid.live atau draw.io (Arrange → Insert → Advanced → Mermaid).
 
 Simbol:
 - Silinder `[( )]` = proses sistem/database.
 - Kotak ganda `[[ ]]` = lanjut ke bagian lain.
-- Merah dengan tanda ⚠ = perilaku web saat ini yang belum sesuai SPEC (lihat Catatan di `docs/TASKS.md`).
 
 ## 1. Alur Utama
 
@@ -139,9 +138,11 @@ flowchart TD
     Q3 -- Hanya melihat --> Z
     Q3 -- Menekan aksi --> Q4{Sudah login?}
     Q4 -- Belum --> Q5[Login, lalu kembali otomatis] --> Q6
-    Q4 -- Sudah --> Q6{Aksi yang dipilih}
-    Q6 -- Pinjam / Terima kembali --> BUG1[⚠ Form tidak terbuka, halaman kosong] --> Z
-    Q6 -- Aksi lain --> FA
+    Q4 -- Sudah --> Q6{Aksi masih berlaku untuk status aset terkini?}
+    Q6 -- Tidak --> Q6a[Popup hasil dengan pesan alasannya, mis. aset tidak punya peminjaman aktif] --> D
+    Q6 -- Ya, Pinjam --> P
+    Q6 -- Ya, Terima kembali --> R
+    Q6 -- Ya, aksi lain --> FA
 
     A1 -- Tombol Scan QR di Dashboard --> B[Arahkan kamera atau ketik kode; jika kamera gagal, ketik kode]
     B --> C{Aset ditemukan dari kode, kode lama, atau token?}
@@ -158,8 +159,12 @@ flowchart TD
     G -- Tutup --> B
     G -- Buka detail aset --> DA[[Detail Aset]]
     G -- Pinjam --> P[[Peminjaman: form terisi aset]]
-    G -- Terima kembali --> BUG2[⚠ Halaman Peminjaman terbuka dengan pesan aset tidak dapat dipinjam; staf mencari baris di tabel Sedang dipinjam] --> R[[Peminjaman: terima kembali]]
+    G -- Terima kembali --> G1{Ada peminjaman aktif?}
+    G1 -- Tidak --> G2[Pesan Aset ini tidak punya peminjaman aktif, popup tetap terbuka] --> D
+    G1 -- Ya --> R[[Peminjaman: modal terima kembali terbuka]]
     G -- Aksi lain --> FA{Form aksi}
+
+    FA -- Batal --> D
 
     FA -- Pindah lokasi --> F1[Pilih / tambah gedung & ruangan tujuan, catatan opsional] --> F1a[(Update lokasi asal, riwayat Pindah Lokasi)] --> H
     FA -- Catat kerusakan / kehilangan / tidak layak pakai --> F2[[Form & aturan sama dengan Detail Aset]] --> H
@@ -171,9 +176,6 @@ flowchart TD
     H[(Muat ulang data aset)] --> D
 
     Z([Selesai])
-
-    classDef masalah fill:#fde8e8,stroke:#c0392b,color:#7b1c1c
-    class BUG1,BUG2 masalah
 ```
 
 ## 5. Peminjaman
@@ -193,7 +195,11 @@ flowchart TD
     P5 -- Tidak --> P4
     P5 -- Ya --> P6[(Transaksi Dipinjam, status aset Dipinjam, riwayat Dipinjam)] --> B
 
-    C -- Terima kembali --> R1[Klik Terima kembali pada baris Sedang dipinjam]
+    C -- Terima kembali --> R0{Dibuka dari}
+    R0 -- Baris Sedang dipinjam --> R1[Modal terima kembali]
+    R0 -- Hasil scan --> R0a{Peminjaman masih aktif?}
+    R0a -- Tidak --> R0b[Pesan peminjaman sudah selesai atau tidak ditemukan, tanpa modal] --> B
+    R0a -- Ya --> R1
     R1 --> R1a{Hasil}
     R1a -- Hilang saat dipinjam --> H1[Input tanggal & catatan wajib] --> H2[(Transaksi Hilang, status aset Hilang, riwayat Lapor Hilang pihak = peminjam)] --> B
     R1a -- Kembali --> R2[Input tanggal, kondisi, gedung & ruangan penyimpanan default lokasi asal]

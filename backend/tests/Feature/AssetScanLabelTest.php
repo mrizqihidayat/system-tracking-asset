@@ -90,6 +90,42 @@ class AssetScanLabelTest extends TestCase
             ->assertJsonPath('data.current_location.on_loan', true);
     }
 
+    public function test_scan_by_token_of_borrowed_asset_gives_active_loan_with_data_for_return_form(): void
+    {
+        $this->asset->update(['status' => AssetStatus::Dipinjam, 'condition' => 'Rusak Ringan']);
+        $loan = Loan::factory()->for($this->asset)->create(['condition_out' => 'Baik', 'borrow_date' => '2026-10-01']);
+
+        $this->getJson("/api/assets/scan/{$this->asset->public_token}")
+            ->assertOk()
+            ->assertJsonPath('data.active_loan.id', $loan->id);
+
+        $this->getJson("/api/loans/{$loan->id}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Dipinjam')
+            ->assertJsonPath('data.asset.code', 'SHD-PRJ-001')
+            ->assertJsonPath('data.asset.condition', 'Rusak Ringan')
+            ->assertJsonPath('data.asset.room.id', $this->asset->room_id)
+            ->assertJsonPath('data.asset.room.building_id', $this->asset->room->building_id)
+            ->assertJsonPath('data.condition_out', 'Baik')
+            ->assertJsonPath('data.borrow_date', '2026-10-01');
+    }
+
+    public function test_scan_after_return_has_no_active_loan_and_no_return_action(): void
+    {
+        $this->asset->update(['status' => AssetStatus::Dipinjam]);
+        $loan = Loan::factory()->for($this->asset)->create();
+        $this->patchJson("/api/loans/{$loan->id}/return", ['return_condition' => 'Baik'])->assertOk();
+
+        $this->getJson("/api/assets/scan/{$this->asset->public_token}")
+            ->assertOk()
+            ->assertJsonPath('data.active_loan', null)
+            ->assertJsonPath('meta.actions', ['pinjam', 'pindah_lokasi', 'catat_kerusakan', 'catat_kehilangan', 'catat_tidak_layak_pakai']);
+
+        $this->getJson("/api/loans/{$loan->id}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Dikembalikan');
+    }
+
     public function test_scan_unknown_or_deleted_asset_returns_404(): void
     {
         $this->getJson('/api/assets/scan/SHD-XXX-999')

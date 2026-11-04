@@ -12,7 +12,7 @@ import type { Asset } from '../../types/asset'
 import FoundModal from '../assets/modals/FoundModal'
 import MoveLocationModal from '../assets/modals/MoveLocationModal'
 import ReportModal, { type ReportMode } from '../assets/modals/ReportModal'
-import { SCAN_ACTIONS } from './scanActions'
+import { borrowUrl, resolveScanAction, SCAN_ACTIONS } from './scanActions'
 
 const reportModes: Record<string, ReportMode> = {
   catat_kerusakan: 'rusak',
@@ -47,12 +47,12 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export default function AssetActionPanel({ asset, actions, matchedBy, initialAction, onClose, onChanged }: Props) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [action, setAction] = useState<string | null>(
-    initialAction && actions.includes(initialAction) ? initialAction : null,
-  )
+  const initial = initialAction ? resolveScanAction(initialAction, asset, actions) : null
+  // action hanya terisi untuk aksi yang punya form, jadi popup tidak tertutup tanpa form pengganti.
+  const [action, setAction] = useState(initial?.kind === 'form' ? initial.action : null)
+  const [notice, setNotice] = useState(initial?.kind === 'unavailable' ? initial.message : '')
   const [offerLoan, setOfferLoan] = useState(false)
 
-  const loanUrl = `/peminjaman?asset_id=${asset.id}`
   const back = () => setAction(null)
   const done = () => {
     setAction(null)
@@ -61,8 +61,10 @@ export default function AssetActionPanel({ asset, actions, matchedBy, initialAct
   }
 
   const run = (key: string) => {
-    if (key === 'pinjam' || key === 'terima_kembali') navigate(loanUrl)
-    else setAction(key)
+    const target = resolveScanAction(key, asset, actions)
+    setNotice(target.kind === 'unavailable' ? target.message : '')
+    if (target.kind === 'page') navigate(target.url)
+    if (target.kind === 'form') setAction(target.action)
   }
 
   const loc = asset.current_location
@@ -88,6 +90,11 @@ export default function AssetActionPanel({ asset, actions, matchedBy, initialAct
           <StatusBadge status={asset.status} />
           <ConditionBadge condition={asset.condition} />
         </div>
+        {notice && (
+          <div role="alert" className="mb-3 rounded-lg bg-warn-50 px-3 py-2.5 text-sm text-warn-700">
+            {notice}
+          </div>
+        )}
         {matchedBy === 'previous_code' && (
           <div role="alert" className="mb-3 rounded-lg bg-warn-50 px-3 py-2.5 text-sm text-warn-700">
             Kode yang dipindai adalah kode lama. Kode aset saat ini: <b>{asset.code}</b>.
@@ -134,7 +141,7 @@ export default function AssetActionPanel({ asset, actions, matchedBy, initialAct
         open={offerLoan}
         title="Aset ditemukan"
         confirmLabel="Langsung pinjamkan"
-        onConfirm={() => navigate(loanUrl)}
+        onConfirm={() => navigate(borrowUrl(asset.id))}
         onClose={() => setOfferLoan(false)}
       >
         {asset.code} kini berstatus Tersedia. Ingin langsung mencatat peminjamannya?
