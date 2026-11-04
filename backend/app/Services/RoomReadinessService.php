@@ -31,7 +31,7 @@ class RoomReadinessService
         AssetStatus::TidakLayakPakai,
     ];
 
-    public const RELATIONS = ['sourceDepartment', 'assetType', 'consumable.providerDepartment'];
+    public const RELATIONS = ['sourceDepartment', 'assetType', 'consumable.providerDepartment', 'catalog'];
 
     public function __construct(private ConsumableService $consumables) {}
 
@@ -209,11 +209,6 @@ class RoomReadinessService
             }
 
             $consumable = $standard->consumable()->lockForUpdate()->firstOrFail();
-
-            if (! $consumable->is_stored) {
-                throw ValidationException::withMessages(['standard' => "{$consumable->name} tidak disimpan SHD. Buat permintaan ke penyedianya."]);
-            }
-
             $filled = min($shortage, $consumable->quantity);
 
             if ($filled <= 0) {

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ConsumableStatus;
+use App\Enums\RequestStatus;
 use App\Support\Search;
 use Database\Factories\ConsumableFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -12,8 +13,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['name', 'category', 'unit', 'quantity', 'min_quantity', 'is_stored', 'provider_department_id', 'catalog_id', 'room_id', 'note'])]
+#[Fillable(['name', 'category', 'unit', 'quantity', 'min_quantity', 'storage_location', 'provider_department_id', 'catalog_id', 'note'])]
 class Consumable extends Model
 {
     /** @use HasFactory<ConsumableFactory> */
@@ -25,7 +27,6 @@ class Consumable extends Model
     protected $attributes = [
         'quantity' => 0,
         'min_quantity' => 0,
-        'is_stored' => true,
     ];
 
     /**
@@ -36,7 +37,6 @@ class Consumable extends Model
         return [
             'quantity' => 'integer',
             'min_quantity' => 'integer',
-            'is_stored' => 'boolean',
         ];
     }
 
@@ -57,11 +57,13 @@ class Consumable extends Model
     }
 
     /**
-     * @return BelongsTo<Room, $this>
+     * Permintaan Diajukan terbaru untuk barang ini (tautan "Diajukan · tanggal" di daftar stok).
+     *
+     * @return HasOne<SupplyRequest, $this>
      */
-    public function room(): BelongsTo
+    public function openRequest(): HasOne
     {
-        return $this->belongsTo(Room::class);
+        return $this->hasOne(SupplyRequest::class)->ofMany(['id' => 'max'], fn ($query) => $query->where('status', RequestStatus::Diajukan->value));
     }
 
     /**
@@ -84,31 +86,24 @@ class Consumable extends Model
         $query
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->withStatus(ConsumableStatus::from($status)))
             ->when($filters['category'] ?? null, fn ($query, $category) => $query->whereRaw('lower(category) = ?', [mb_strtolower($category)]))
-            ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id))
-            ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id))
-            ->when($filters['building_id'] ?? null, fn ($query, $id) => $query->whereHas('room', fn ($room) => $room->where('building_id', $id)));
+            ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id));
 
         Search::apply($query, $filters['search'] ?? null, ['consumables.name', 'consumables.category']);
     }
 
-    /**
-     * Null untuk barang yang tidak disimpan SHD (tidak punya status stok).
-     */
-    public function status(): ?ConsumableStatus
+    public function status(): ConsumableStatus
     {
-        return $this->is_stored ? ConsumableStatus::fromQuantities($this->quantity, $this->min_quantity) : null;
+        return ConsumableStatus::fromQuantities($this->quantity, $this->min_quantity);
     }
 
     /**
-     * Filter status (rumus sama dengan status(); dipakai ulang T14 & T15). Hanya barang yang disimpan SHD.
+     * Filter status (rumus sama dengan status(); dipakai ulang T14 & T15).
      *
      * @param  Builder<Consumable>  $query
      */
     #[Scope]
     protected function withStatus(Builder $query, ConsumableStatus $status): void
     {
-        $query->where('is_stored', true);
-
         match ($status) {
             ConsumableStatus::Habis => $query->where('quantity', '<=', 0),
             ConsumableStatus::Menipis => $query->where('quantity', '>', 0)->whereColumn('quantity', '<=', 'min_quantity'),

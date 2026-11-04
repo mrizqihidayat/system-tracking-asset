@@ -26,6 +26,7 @@ class SupplyRequestResource extends JsonResource
             'id' => $this->id,
             'request_date' => $this->request_date->toDateString(),
             'consumable_id' => $this->consumable_id,
+            'room_standard_id' => $this->room_standard_id,
             'item_name' => $this->item_name,
             'quantity' => $this->quantity,
             'purpose' => $this->purpose,

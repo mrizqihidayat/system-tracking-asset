@@ -27,19 +27,24 @@ export interface ReadinessBuilding {
   rooms: ReadinessRoom[]
 }
 
-/** Baris tipe Stok Habis Pakai: barang yang ditautkan beserta penyedia & katalognya. */
-export interface Fulfillment {
-  type: 'stok'
-  consumable: {
-    id: number
-    name: string
-    unit: string
-    quantity: number
-    is_stored: boolean
-    catalog_id: number | null
-    provider_department: Department | null
-  }
-}
+/** Stok Habis Pakai: barang beserta penyedia & katalognya. Barang unit lain: penyedia & katalognya. */
+export type Fulfillment =
+  | {
+      type: 'stok'
+      consumable: {
+        id: number
+        name: string
+        unit: string
+        quantity: number
+        catalog_id: number | null
+        provider_department: Department | null
+      }
+    }
+  | {
+      type: 'unit_lain'
+      catalog: { id: number; item_name: string } | null
+      provider_department: Department | null
+    }
 
 export interface RoomStandard {
   id: number
@@ -58,7 +63,7 @@ export interface RoomStandard {
   shortage: number | null
   result: ChecklistResult
   fulfillment: Fulfillment | null
-  /** Baris Manual tanpa barang stok: tanpa aksi sampai dilengkapi. */
+  /** Baris SHD tanpa barang stok: tanpa aksi sampai dilengkapi. */
   needs_completion: boolean
   can_fill_from_stock: boolean
   can_request: boolean

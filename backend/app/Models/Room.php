@@ -74,12 +74,4 @@ class Room extends Model
     {
         return $this->hasMany(RoomStandard::class);
     }
-
-    /**
-     * @return HasMany<Consumable, $this>
-     */
-    public function consumables(): HasMany
-    {
-        return $this->hasMany(Consumable::class);
-    }
 }

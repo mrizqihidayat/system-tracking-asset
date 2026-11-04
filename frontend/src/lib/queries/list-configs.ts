@@ -12,7 +12,7 @@ export const listConfigs = {
   loanHistory: { filters: ['status'], perPage: 10 },
   consumables: { filters: ['status'], perPage: 20 },
   supplyRequests: {
-    filters: ['status'],
+    filters: ['status', 'id'],
     perPage: 10,
     // "Belum direspons" adalah status tampilan; API memakai flag unresponded.
     toApi: ({ status, ...rest }) => (status === 'Belum direspons' ? { ...rest, unresponded: 1 } : status ? { ...rest, status } : rest),

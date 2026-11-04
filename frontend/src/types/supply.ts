@@ -22,6 +22,8 @@ export interface SupplyRequest {
   request_date: string
   /** Barang stok yang diminta (null bila tanpa tautan atau barangnya sudah dihapus). */
   consumable_id: number | null
+  /** Baris standar Barang unit lain yang ditambah saat Diterima. */
+  room_standard_id: number | null
   item_name: string
   quantity: number
   purpose: string | null
@@ -56,6 +58,7 @@ export interface SuggestionItem {
   quantity: number
   catalog_id: number | null
   room: { id: number; name: string; building: string } | null
+  room_standard_id: number | null
   consumable_id: number | null
   stock_status?: string
   has_open_request: boolean
@@ -75,12 +78,12 @@ export interface ConsumableItem {
   unit: string
   quantity: number
   min_quantity: number
-  is_stored: boolean
-  /** null = tidak disimpan SHD (tidak punya status stok). */
-  status: ConsumableStatus | null
+  status: ConsumableStatus
   provider_department: Department | null
   catalog: { id: number; item_name: string } | null
-  room: Room | null
+  storage_location: string | null
+  /** Permintaan Diajukan terbaru untuk barang ini. */
+  open_request?: { id: number; created_at: string | null } | null
   note: string | null
 }
 
@@ -95,6 +98,7 @@ export interface ConsumableUsage {
 export interface RequestPrefill {
   catalog_id?: number | null
   consumable_id?: number | null
+  room_standard_id?: number | null
   item_name?: string
   provider_department_id?: number | null
   quantity?: number

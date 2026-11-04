@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
+import Combobox from '../../components/ui/Combobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
-import { useDepartments, useRequestCatalog } from '../../lib/queries/master'
+import { useDepartments, useRequestCatalog, useStorageLocations } from '../../lib/queries/master'
 import type { ConsumableItem, ConsumableUsage } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
-import RoomSelect from '../loans/RoomSelect'
 
 interface Props {
   item: ConsumableItem | null
@@ -18,6 +18,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const toast = useToast()
   const { data: departments } = useDepartments()
   const { data: catalog } = useRequestCatalog()
+  const { data: locations } = useStorageLocations()
   const [usedIn, setUsedIn] = useState<ConsumableUsage[]>([])
   const [name, setName] = useState(item?.name ?? '')
   const [category, setCategory] = useState(item?.category ?? '')
@@ -26,11 +27,8 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const [minQuantity, setMinQuantity] = useState(String(item?.min_quantity ?? 0))
   const [providerId, setProviderId] = useState<number | null>(item?.provider_department?.id ?? null)
   const [catalogId, setCatalogId] = useState<number | null>(item?.catalog?.id ?? null)
-  const [buildingId, setBuildingId] = useState<number | null>(item?.room?.building_id ?? null)
-  const [roomId, setRoomId] = useState<number | null>(item?.room?.id ?? null)
+  const [location, setLocation] = useState(item?.storage_location ?? '')
   const [note, setNote] = useState(item?.note ?? '')
-  const [isStored, setIsStored] = useState(item?.is_stored ?? true)
-  const hasQuantity = (item?.quantity ?? 0) > 0
 
   useEffect(() => {
     if (item) {
@@ -48,17 +46,16 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
       name: name.trim(),
       category: category.trim() || null,
       unit: unit.trim(),
-      is_stored: isStored,
-      min_quantity: isStored ? Number(minQuantity) : 0,
+      min_quantity: Number(minQuantity),
       provider_department_id: providerId,
       catalog_id: catalogOptions.some((c) => c.id === catalogId) ? catalogId : null,
-      room_id: roomId,
+      storage_location: location.trim() || null,
       note: note.trim() || null,
     }
     if (item) {
       await api.put(`/consumables/${item.id}`, payload)
     } else {
-      await api.post('/consumables', { ...payload, quantity: isStored ? Number(quantity) : 0 })
+      await api.post('/consumables', { ...payload, quantity: Number(quantity) })
     }
     toast.success(item ? 'Data barang diperbarui.' : 'Barang ditambahkan.')
     onDone()
@@ -82,41 +79,25 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
               <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Misal: ATK" error={errors.category} maxLength={100} />
             </FormField>
           </div>
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <input type="checkbox" checked={isStored} disabled={isStored && hasQuantity} onChange={(e) => setIsStored(e.target.checked)} />
-              Disimpan SHD
-            </label>
-            <p className="mt-1 text-xs text-slate-500">
-              {isStored && hasQuantity
-                ? 'Tidak bisa dimatikan selama jumlahnya masih ada.'
-                : 'Matikan untuk barang unit lain yang tidak disimpan SHD (mis. tisu): kekurangan di ruangan langsung jadi permintaan ke penyedianya.'}
-            </p>
-            {errors.is_stored && <p className="mt-1 text-xs font-medium text-bad-700">{errors.is_stored}</p>}
-          </div>
-          <div className={`grid gap-3 ${isStored ? 'grid-cols-3' : 'grid-cols-1'}`}>
+          <div className="grid grid-cols-3 gap-3">
             <FormField label="Satuan" required error={errors.unit}>
               <Input value={unit} onChange={(e) => setUnit(e.target.value)} error={errors.unit} maxLength={20} />
             </FormField>
-            {isStored && (
-              <>
-                <FormField label={item ? 'Jumlah' : 'Jumlah awal'} required={!item} error={errors.quantity}>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={item ? item.quantity : quantity}
-                    disabled={!!item}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    error={errors.quantity}
-                  />
-                </FormField>
-                <FormField label="Minimum" required error={errors.min_quantity}>
-                  <Input type="number" min={0} value={minQuantity} onChange={(e) => setMinQuantity(e.target.value)} error={errors.min_quantity} />
-                </FormField>
-              </>
-            )}
+            <FormField label={item ? 'Jumlah' : 'Jumlah awal'} required={!item} error={errors.quantity}>
+              <Input
+                type="number"
+                min={0}
+                value={item ? item.quantity : quantity}
+                disabled={!!item}
+                onChange={(e) => setQuantity(e.target.value)}
+                error={errors.quantity}
+              />
+            </FormField>
+            <FormField label="Minimum" required error={errors.min_quantity}>
+              <Input type="number" min={0} value={minQuantity} onChange={(e) => setMinQuantity(e.target.value)} error={errors.min_quantity} />
+            </FormField>
           </div>
-          {item && isStored && <p className="-mt-1 text-xs text-slate-500">Jumlah diubah lewat tombol − / + atau klik angka di tabel.</p>}
+          {item && <p className="-mt-1 text-xs text-slate-500">Jumlah diubah lewat tombol − / + atau klik angka di tabel.</p>}
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Minta ke (unit penyedia)" required error={errors.provider_department_id}>
               <Select value={providerId ?? ''} onChange={(e) => setProviderId(Number(e.target.value) || null)} error={errors.provider_department_id}>
@@ -131,17 +112,15 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
               </Select>
             </FormField>
           </div>
-          <RoomSelect
-            buildingLabel="Gedung simpan (opsional)"
-            roomLabel="Ruangan simpan (opsional)"
-            buildingId={buildingId}
-            roomId={roomId}
-            onChange={(b, r) => {
-              setBuildingId(b)
-              setRoomId(r)
-            }}
-            error={errors.room_id}
-          />
+          <FormField label="Lokasi simpan (opsional)" error={errors.storage_location}>
+            <Combobox
+              value={location}
+              onChange={setLocation}
+              options={locations.map((l) => ({ id: l, label: l }))}
+              placeholder="Misal: Main Office SHD"
+              error={errors.storage_location}
+            />
+          </FormField>
           <FormField label="Catatan (opsional)" error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} />
           </FormField>

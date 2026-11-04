@@ -320,29 +320,26 @@ class SupplyRequestTest extends TestCase
     {
         $room = Room::factory()->create(['name' => 'Ruang 1']);
         $catalog = $this->catalog();
-        $notStored = fn (string $name, ?int $catalogId = null) => Consumable::factory()->create([
-            'name' => $name, 'quantity' => 0, 'min_quantity' => 0, 'is_stored' => false,
-            'provider_department_id' => $this->deptA->id, 'catalog_id' => $catalogId,
-        ]);
-        $standard = fn (Consumable $consumable, ?int $actual) => RoomStandard::factory()->create([
+        $standard = fn (string $name, ?int $actual, ?int $catalogId = null) => RoomStandard::factory()->create([
             'room_id' => $room->id,
+            'item_name' => $name,
             'source_department_id' => $this->deptA->id,
             'standard_quantity' => 5,
             'count_method' => CountMethod::Manual,
             'actual_quantity' => $actual,
-            'consumable_id' => $consumable->id,
+            'catalog_id' => $catalogId,
         ]);
 
-        // Kurang 3 → masuk saran.
-        $standard($notStored('Tisu', $catalog->id), 2);
+        // Barang unit lain kurang 3 → masuk saran.
+        $standard('Tisu', 2, $catalog->id);
         // Belum dicek → tidak masuk.
-        $standard($notStored('Kursi'), null);
+        $standard('Kursi', null);
         // Sesuai → tidak masuk.
-        $standard($notStored('Meja'), 5);
-        // Baris lama tanpa barang stok → tidak masuk sampai dilengkapi.
+        $standard('Meja', 5);
+        // Baris SHD tanpa barang stok → tidak masuk sampai dilengkapi.
         RoomStandard::factory()->create([
-            'room_id' => $room->id, 'source_department_id' => $this->deptA->id, 'standard_quantity' => 5,
-            'count_method' => CountMethod::Manual, 'actual_quantity' => 0, 'catalog_id' => $this->catalog(['item_name' => 'Lama'])->id,
+            'room_id' => $room->id, 'source_department_id' => $this->shd->id, 'standard_quantity' => 5,
+            'count_method' => CountMethod::Manual, 'actual_quantity' => 0,
         ]);
 
         Consumable::factory()->create(['name' => 'Spidol', 'quantity' => 0, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
@@ -397,17 +394,14 @@ class SupplyRequestTest extends TestCase
     {
         $room = Room::factory()->create();
         $catalog = $this->catalog();
-        $tisu = Consumable::factory()->create([
-            'name' => 'Tisu', 'quantity' => 0, 'min_quantity' => 0, 'is_stored' => false,
-            'provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id,
-        ]);
         RoomStandard::factory()->create([
             'room_id' => $room->id,
+            'item_name' => 'Tisu',
             'source_department_id' => $this->deptA->id,
             'standard_quantity' => 5,
             'count_method' => CountMethod::Manual,
             'actual_quantity' => 0,
-            'consumable_id' => $tisu->id,
+            'catalog_id' => $catalog->id,
         ]);
         Consumable::factory()->create(['name' => 'Spidol', 'quantity' => 0, 'min_quantity' => 5, 'provider_department_id' => $this->deptA->id]);
 
@@ -436,16 +430,16 @@ class SupplyRequestTest extends TestCase
 
     // ---------- status mengubah stok / Ada ruangan ----------
 
-    private function notStoredStandard(int $actual = 0): array
+    private function otherUnitStandard(int $actual = 0): RoomStandard
     {
-        $room = Room::factory()->create(['name' => 'Ruang Kelas 1']);
-        $tisu = Consumable::factory()->create(['name' => 'Tisu', 'quantity' => 0, 'min_quantity' => 0, 'is_stored' => false, 'provider_department_id' => $this->deptA->id]);
-        $standard = RoomStandard::factory()->create([
-            'room_id' => $room->id, 'item_name' => 'Tisu', 'source_department_id' => $this->deptA->id, 'standard_quantity' => 2,
-            'count_method' => CountMethod::Manual, 'actual_quantity' => $actual, 'consumable_id' => $tisu->id,
+        return RoomStandard::factory()->create([
+            'room_id' => Room::factory()->create(['name' => 'Ruang Kelas 1'])->id,
+            'item_name' => 'Tisu',
+            'source_department_id' => $this->deptA->id,
+            'standard_quantity' => 2,
+            'count_method' => CountMethod::Manual,
+            'actual_quantity' => $actual,
         ]);
-
-        return [$room, $tisu, $standard];
     }
 
     private function setStatus(SupplyRequest $request, string $status): TestResponse
@@ -491,12 +485,24 @@ class SupplyRequestTest extends TestCase
             ->assertJsonPath('data.catalog.item_name', 'ATK Isi Ulang');
     }
 
-    public function test_received_not_stored_item_adds_room_quantity_and_clears_suggestion(): void
+    public function test_received_other_unit_item_adds_room_quantity_and_clears_suggestion(): void
     {
-        [$room, $tisu, $standard] = $this->notStoredStandard();
-        $request = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => $room->id, 'item_name' => 'Tisu', 'quantity' => 2]);
+        $standard = $this->otherUnitStandard();
 
         $this->assertNotEmpty($this->getJson('/api/supply-requests/suggestions')->json('data'));
+
+        // Nama & ruangan mengikuti baris standar yang ditautkan.
+        $id = $this->postJson('/api/supply-requests', [
+            'room_standard_id' => $standard->id, 'item_name' => 'Lain', 'provider_department_id' => $this->deptA->id, 'quantity' => 2, 'request_method' => 'Memo',
+        ])->assertCreated()
+            ->assertJsonPath('data.item_name', 'Tisu')
+            ->assertJsonPath('data.room.id', $standard->room_id)
+            ->assertJsonPath('data.room_standard_id', $standard->id)
+            ->json('data.id');
+        $request = SupplyRequest::findOrFail($id);
+
+        $items = $this->getJson('/api/supply-requests/suggestions')->json('data.0.items');
+        $this->assertTrue($items[0]['has_open_request']);
 
         $this->getJson("/api/supply-requests/{$request->id}/status-impact?status=Diterima")
             ->assertOk()
@@ -508,8 +514,16 @@ class SupplyRequestTest extends TestCase
             ->assertJsonPath('meta.impact.message', 'Ada Tisu di Ruang Kelas 1 akan bertambah 2.');
 
         $this->assertSame(2, $standard->fresh()->actual_quantity);
-        $this->assertSame(0, $tisu->fresh()->quantity);
         $this->assertSame([], $this->getJson('/api/supply-requests/suggestions')->json('data'));
+    }
+
+    public function test_history_can_be_filtered_by_id(): void
+    {
+        $first = $this->supplyRequest();
+        $this->supplyRequest();
+
+        $this->getJson("/api/supply-requests?id={$first->id}")->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $first->id);
+        $this->getJson('/api/supply-requests?id=abc')->assertJsonValidationErrors('id');
     }
 
     public function test_received_stored_item_adds_stock_only(): void
@@ -532,9 +546,9 @@ class SupplyRequestTest extends TestCase
 
     public function test_returned_or_cancelled_after_received_reverses_and_stops_at_zero(): void
     {
-        [$room, $tisu, $standard] = $this->notStoredStandard();
+        $standard = $this->otherUnitStandard();
         $catalog = $this->catalog(['must_return' => true]);
-        $returned = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => $room->id, 'quantity' => 3, 'must_return' => true, 'catalog_id' => $catalog->id]);
+        $returned = $this->supplyRequest(['room_standard_id' => $standard->id, 'room_id' => $standard->room_id, 'quantity' => 3, 'must_return' => true, 'catalog_id' => $catalog->id]);
 
         $this->setStatus($returned, 'Diterima')->assertOk();
         $this->assertSame(3, $standard->fresh()->actual_quantity);
@@ -555,27 +569,23 @@ class SupplyRequestTest extends TestCase
 
     public function test_cancel_before_received_and_unlinked_requests_change_nothing(): void
     {
-        [$room, $tisu, $standard] = $this->notStoredStandard(1);
+        $standard = $this->otherUnitStandard(1);
+        $room = $standard->room;
 
-        $cancelled = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => $room->id, 'quantity' => 2]);
+        $cancelled = $this->supplyRequest(['room_standard_id' => $standard->id, 'room_id' => $room->id, 'quantity' => 2]);
         $this->setStatus($cancelled, 'Dibatalkan')->assertOk()->assertJsonPath('meta.impact.message', 'Tidak mengubah stok atau kelengkapan ruangan.');
 
         $unlinked = $this->supplyRequest(['room_id' => $room->id, 'item_name' => 'Tisu', 'quantity' => 2]);
         $this->setStatus($unlinked, 'Diterima')->assertOk();
         $this->setStatus($unlinked, 'Dibatalkan')->assertOk();
 
-        // Tidak disimpan SHD tanpa standar di ruangan itu.
-        $otherRoom = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => Room::factory()->create()->id, 'quantity' => 2]);
-        $this->setStatus($otherRoom, 'Diterima')->assertOk();
-        $this->assertNull($otherRoom->fresh()->applied_to);
-
         $this->assertSame(1, $standard->fresh()->actual_quantity);
     }
 
     public function test_reverse_is_skipped_when_target_was_deleted(): void
     {
-        [$room, $tisu, $standard] = $this->notStoredStandard();
-        $request = $this->supplyRequest(['consumable_id' => $tisu->id, 'room_id' => $room->id, 'quantity' => 2]);
+        $standard = $this->otherUnitStandard();
+        $request = $this->supplyRequest(['room_standard_id' => $standard->id, 'room_id' => $standard->room_id, 'quantity' => 2]);
         $this->setStatus($request, 'Diterima')->assertOk();
 
         $this->deleteJson("/api/room-standards/{$standard->id}")->assertOk();

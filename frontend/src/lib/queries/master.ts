@@ -20,6 +20,7 @@ export const masterQueries = {
   categories: () => master<Category>(queryKeys.master.categories(), '/categories'),
   assetTypes: () => master<AssetType>(queryKeys.master.assetTypes(), '/asset-types'),
   requestCatalog: () => master<RequestCatalog>(queryKeys.master.requestCatalog(), '/request-catalog'),
+  storageLocations: () => master<string>(queryKeys.master.storageLocations(), '/lookups/storage-locations'),
 }
 
 const EMPTY: never[] = []
@@ -38,3 +39,4 @@ export const useRooms = (buildingId?: number | null, requireBuilding = false) =>
 export const useCategories = () => useMaster(masterQueries.categories())
 export const useAssetTypes = () => useMaster(masterQueries.assetTypes())
 export const useRequestCatalog = () => useMaster(masterQueries.requestCatalog())
+export const useStorageLocations = () => useMaster(masterQueries.storageLocations())

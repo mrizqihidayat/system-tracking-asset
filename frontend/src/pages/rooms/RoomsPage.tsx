@@ -37,12 +37,17 @@ const chipRow = '-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap
 
 const requestUrl = (roomId: number, s?: RoomStandard) => {
   const p = new URLSearchParams({ room_id: String(roomId) })
-  const item = s?.fulfillment?.consumable
-  if (item) {
-    p.set('consumable_id', String(item.id))
-    p.set('item_name', item.name)
-    if (item.catalog_id) p.set('catalog_id', String(item.catalog_id))
-    else if (item.provider_department) p.set('provider_department_id', String(item.provider_department.id))
+  const f = s?.fulfillment
+  if (f?.type === 'stok') {
+    p.set('consumable_id', String(f.consumable.id))
+    p.set('item_name', f.consumable.name)
+    if (f.consumable.catalog_id) p.set('catalog_id', String(f.consumable.catalog_id))
+    else if (f.consumable.provider_department) p.set('provider_department_id', String(f.consumable.provider_department.id))
+  } else if (f?.type === 'unit_lain' && s) {
+    p.set('room_standard_id', String(s.id))
+    p.set('item_name', s.item_name)
+    if (f.catalog) p.set('catalog_id', String(f.catalog.id))
+    else if (f.provider_department) p.set('provider_department_id', String(f.provider_department.id))
   }
   if (s?.shortage) p.set('quantity', String(s.shortage))
   return `/permintaan?${p}`
@@ -210,7 +215,7 @@ export default function RoomsPage() {
           ) : s.count_method === 'QR' ? (
             <AssetCodes standard={s} />
           ) : (
-            <span className="block text-xs text-slate-500">Stok Habis Pakai</span>
+            <span className="block text-xs text-slate-500">{s.fulfillment?.type === 'unit_lain' ? 'Barang unit lain' : 'Stok Habis Pakai'}</span>
           )}
         </>
       ),
@@ -258,13 +263,12 @@ export default function RoomsPage() {
             </button>
           )
         }
-        const item = s.fulfillment?.consumable
-        const provider = item?.provider_department?.name ?? 'unit penyedia'
-        const text = !item
+        const f = s.fulfillment
+        const text = !f
           ? '-'
-          : !item.is_stored
-            ? `Minta ke ${provider}`
-            : `Stok: ${item.name} (${item.quantity} ${item.unit})`
+          : f.type === 'unit_lain'
+            ? `Minta ke ${f.provider_department?.name ?? 'unit penyedia'}`
+            : `Stok: ${f.consumable.name} (${f.consumable.quantity} ${f.consumable.unit})`
         return (
           <div className="space-y-1">
             <span className="block text-xs text-slate-600">{text}</span>

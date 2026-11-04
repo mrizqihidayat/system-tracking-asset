@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ConsumableStatus;
+use App\Enums\CountMethod;
 use App\Enums\RequestStatus;
 use App\Models\Consumable;
 use App\Models\RequestCatalog;
@@ -114,7 +115,7 @@ class SupplyRequestService
     }
 
     /**
-     * Sasaran & jumlah perubahan. Diterima: barang disimpan SHD → stok, tidak disimpan → Ada standar ruangan terkait.
+     * Sasaran & jumlah perubahan. Diterima: barang stok → stok, barang unit lain → Ada baris standar yang ditautkan.
      * Dikembalikan/Dibatalkan setelah Diterima: kurangi tujuan yang tercatat, tidak sampai di bawah 0.
      *
      * @return array{target: Consumable|RoomStandard, adding: bool, amount: int, current: int, clamped: bool}|null
@@ -146,23 +147,8 @@ class SupplyRequestService
 
     private function receiveTarget(SupplyRequest $request, bool $lock): Consumable|RoomStandard|null
     {
-        $consumable = $this->find(Consumable::query(), $request->consumable_id, $lock);
-
-        if (! $consumable) {
-            return null;
-        }
-
-        if ($consumable->is_stored) {
-            return $consumable;
-        }
-
-        if (! $request->room_id) {
-            return null;
-        }
-
-        $standards = RoomStandard::query()->where('room_id', $request->room_id)->where('consumable_id', $consumable->id)->orderBy('id');
-
-        return ($lock ? $standards->lockForUpdate() : $standards)->first();
+        return $this->find(Consumable::query(), $request->consumable_id, $lock)
+            ?? $this->find(RoomStandard::query(), $request->room_standard_id, $lock);
     }
 
     /**
@@ -299,7 +285,7 @@ class SupplyRequestService
 
         $rooms = $this->roomSuggestions();
         // Barang yang sudah muncul dari kekurangan ruangan tidak diulang sebagai saran stok.
-        $stock = $this->stockSuggestions()->whereNotIn('consumable_id', $rooms->pluck('consumable_id'));
+        $stock = $this->stockSuggestions()->whereNotIn('consumable_id', $rooms->pluck('consumable_id')->filter()->all());
 
         $items = $rooms
             ->concat($stock)
@@ -326,22 +312,22 @@ class SupplyRequestService
     private function roomSuggestions(): Collection
     {
         return RoomStandard::query()
-            ->whereNotNull('consumable_id')
-            ->with(['consumable.catalog', 'consumable.providerDepartment', 'room.building'])
+            ->where('count_method', CountMethod::Manual->value)
+            ->with(['consumable.catalog', 'consumable.providerDepartment', 'catalog', 'sourceDepartment', 'room.building'])
             ->orderBy('room_id')
             ->orderBy('id')
             ->get()
             ->filter(fn (RoomStandard $standard) => $standard->canRequest())
             ->map(fn (RoomStandard $standard) => [
                 'source' => 'kekurangan_ruangan',
-                'item_name' => $standard->consumable->name,
-                'catalog_name' => $standard->consumable->catalog?->item_name,
+                'item_name' => $standard->consumable?->name ?? $standard->item_name,
+                'catalog_name' => ($standard->consumable ? $standard->consumable->catalog : $standard->catalog)?->item_name,
                 'quantity' => $standard->shortage(),
-                'catalog_id' => $standard->consumable->catalog_id,
+                'catalog_id' => $standard->consumable ? $standard->consumable->catalog_id : $standard->catalog_id,
                 'room' => ['id' => $standard->room_id, 'name' => $standard->room->name, 'building' => $standard->room->building->name],
                 'room_standard_id' => $standard->id,
                 'consumable_id' => $standard->consumable_id,
-                'provider_department' => $this->department($standard->consumable->providerDepartment),
+                'provider_department' => $this->department($standard->consumable?->providerDepartment ?? $standard->sourceDepartment),
             ])
             ->values();
     }
@@ -388,6 +374,10 @@ class SupplyRequestService
             return (int) $request->consumable_id === (int) $item['consumable_id'];
         }
 
+        if ($request->room_standard_id !== null) {
+            return (int) $request->room_standard_id === (int) $item['room_standard_id'];
+        }
+
         return $item['catalog_id'] !== null
             ? (int) $request->catalog_id === (int) $item['catalog_id']
             : mb_strtolower($request->item_name) === mb_strtolower($item['item_name']);
@@ -420,6 +410,12 @@ class SupplyRequestService
         // Permintaan tertaut stok memakai nama barang, bukan nama katalog.
         if (! empty($data['consumable_id'])) {
             $data['item_name'] = Consumable::query()->whereKey($data['consumable_id'])->value('name');
+            $data['room_standard_id'] = null;
+        } elseif (! empty($data['room_standard_id'])) {
+            // Barang unit lain: nama & ruangan mengikuti baris standarnya.
+            $standard = RoomStandard::query()->findOrFail($data['room_standard_id']);
+            $data['item_name'] = $standard->item_name;
+            $data['room_id'] = $standard->room_id;
         }
 
         $data['lead_time_days'] = $catalog?->lead_time_days;

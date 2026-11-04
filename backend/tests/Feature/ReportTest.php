@@ -225,15 +225,13 @@ class ReportTest extends TestCase
         Room::factory()->create(['building_id' => $building->id, 'name' => 'Gudang']);
         $other = Room::factory()->create(['name' => 'Ruang Lain']);
 
-        $tisu = Consumable::factory()->create(['name' => 'Tisu', 'quantity' => 0, 'min_quantity' => 0, 'is_stored' => false, 'provider_department_id' => $this->deptA->id]);
-
         RoomStandard::factory()->create([
             'room_id' => $short->id, 'item_name' => 'Spidol', 'source_department_id' => $this->shd->id,
             'standard_quantity' => 5, 'count_method' => CountMethod::Manual, 'actual_quantity' => 2,
         ]);
         RoomStandard::factory()->create([
             'room_id' => $short->id, 'item_name' => 'Tisu', 'source_department_id' => $this->deptA->id,
-            'standard_quantity' => 3, 'count_method' => CountMethod::Manual, 'actual_quantity' => null, 'consumable_id' => $tisu->id,
+            'standard_quantity' => 3, 'count_method' => CountMethod::Manual, 'actual_quantity' => null,
         ]);
         RoomStandard::factory()->create([
             'room_id' => $ok->id, 'item_name' => 'Kursi', 'source_department_id' => $this->shd->id,
@@ -312,8 +310,7 @@ class ReportTest extends TestCase
 
     public function test_consumables_report_status_and_filters(): void
     {
-        $room = Room::factory()->create(['name' => 'Gudang', 'building_id' => Building::factory()->create(['name' => 'IHS'])->id]);
-        Consumable::factory()->create(['name' => 'Spidol', 'category' => 'ATK', 'unit' => 'pcs', 'quantity' => 0, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id, 'room_id' => $room->id]);
+        Consumable::factory()->create(['name' => 'Spidol', 'category' => 'ATK', 'unit' => 'pcs', 'quantity' => 0, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id, 'storage_location' => 'Gudang IHS']);
         Consumable::factory()->create(['name' => 'Kertas', 'category' => 'ATK', 'unit' => 'rim', 'quantity' => 4, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
         Consumable::factory()->create(['name' => 'Map', 'category' => 'Arsip', 'unit' => 'pcs', 'quantity' => 50, 'min_quantity' => 10, 'provider_department_id' => $this->shd->id]);
 
@@ -323,7 +320,7 @@ class ReportTest extends TestCase
         $this->assertSame(['Kertas', 'Map', 'Spidol'], array_column($data, 0));
         $this->assertSame(['Menipis', 'Aman', 'Habis'], array_column($data, 5));
         $this->assertSame(['rim', 4, 10], [$data[0][2], $data[0][3], $data[0][4]]);
-        $this->assertSame('IHS / Gudang', $data[2][7]);
+        $this->assertSame('Gudang IHS', $data[2][7]);
 
         $this->assertSame(['Spidol'], array_column($this->dataRows($sheet('?status=Habis')), 0));
         $this->assertSame(['Kertas', 'Spidol'], array_column($this->dataRows($sheet('?category=atk')), 0));

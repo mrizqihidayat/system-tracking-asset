@@ -230,9 +230,9 @@ class ReportService
     {
         return match (true) {
             $standard->needsCompletion() => 'Perlu dilengkapi',
-            $standard->consumable === null => null,
-            $standard->consumable->is_stored => "Stok: {$standard->consumable->name}",
-            default => "Minta ke {$standard->consumable->providerDepartment->name}: {$standard->consumable->name}",
+            $standard->isOtherUnit() => "Minta ke {$standard->sourceDepartment->name}: {$standard->item_name}",
+            $standard->consumable !== null => "Stok: {$standard->consumable->name}",
+            default => null,
         };
     }
 
@@ -288,7 +288,7 @@ class ReportService
     private function consumables(array $filters): Report
     {
         $rows = Consumable::query()
-            ->with(['providerDepartment', 'room.building'])
+            ->with(['providerDepartment'])
             ->filter($filters)
             ->orderBy('name')
             ->lazy(self::CHUNK)
@@ -298,9 +298,9 @@ class ReportService
                 $consumable->unit,
                 $consumable->quantity,
                 $consumable->min_quantity,
-                $consumable->status()?->value ?? 'Tidak disimpan',
+                $consumable->status()->value,
                 $consumable->providerDepartment->name,
-                $consumable->room ? "{$consumable->room->building->name} / {$consumable->room->name}" : null,
+                $consumable->storage_location,
                 $consumable->note,
             ]);
 
@@ -314,8 +314,6 @@ class ReportService
             'Status' => $filters['status'] ?? null,
             'Kategori' => $filters['category'] ?? null,
             'Minta ke' => $this->nameOf(Department::class, $filters['provider_department_id'] ?? null),
-            'Gedung' => $this->nameOf(Building::class, $filters['building_id'] ?? null),
-            'Ruangan' => $this->nameOf(Room::class, $filters['room_id'] ?? null),
             'Pencarian' => $filters['search'] ?? null,
         ]);
 

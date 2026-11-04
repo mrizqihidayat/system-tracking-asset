@@ -60,14 +60,17 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
 
   // Tautan barang stok hanya berlaku selama itemnya tidak diganti di form.
   const linkedConsumable = request ? request.consumable_id : prefill?.consumable_id
+  const linkedStandard = request ? request.room_standard_id : prefill?.room_standard_id
   const initialName = request?.item_name ?? prefill?.item_name ?? ''
   const itemUnchanged = (selected?.id ?? null) === (initialCatalog ?? null) && (!manual || itemName.trim() === initialName.trim())
   const consumableId = itemUnchanged ? (linkedConsumable ?? null) : null
+  const roomStandardId = itemUnchanged ? (linkedStandard ?? null) : null
 
   const submit = async () => {
     const payload = {
       catalog_id: selected?.id ?? null,
       consumable_id: consumableId,
+      room_standard_id: roomStandardId,
       item_name: manual ? itemName.trim() : null,
       provider_department_id: manual ? providerId : null,
       must_return: mustReturn,
@@ -118,6 +121,9 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
           )}
           {consumableId && initialName && (
             <p className="-mt-1 text-xs text-slate-500">Barang stok: <b>{initialName}</b></p>
+          )}
+          {roomStandardId && initialName && (
+            <p className="-mt-1 text-xs text-slate-500">Untuk standar ruangan: <b>{initialName}</b></p>
           )}
           {manual && (
             <div className="grid grid-cols-2 gap-3">

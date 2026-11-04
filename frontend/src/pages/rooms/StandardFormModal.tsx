@@ -5,18 +5,27 @@ import { FormField, Input, Select } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
 import { useConsumables } from '../../lib/queries/lists'
-import { useAssetTypes, useDepartments } from '../../lib/queries/master'
+import { useAssetTypes, useDepartments, useRequestCatalog } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
-import type { CountMethod, RoomStandard } from '../../types/room'
+import type { RoomStandard } from '../../types/room'
 import ActionModal from '../assets/modals/ActionModal'
 
 /** Pilihan barang stok (maks. 100 barang, sama dengan sebelumnya). */
 const STOCK_PARAMS = { per_page: 100 }
 
-const KINDS: { value: CountMethod; label: string; hint: string }[] = [
-  { value: 'QR', label: 'Aset', hint: 'Punya kode & QR, jumlah Ada dihitung otomatis' },
-  { value: 'Manual', label: 'Stok Habis Pakai', hint: 'Tanpa kode, jumlah Ada diisi saat cek' },
+type Kind = 'asset' | 'stock' | 'other'
+
+const KINDS: { value: Kind; label: string; hint: string }[] = [
+  { value: 'asset', label: 'Aset', hint: 'Punya kode & QR, jumlah Ada dihitung otomatis' },
+  { value: 'stock', label: 'Stok Habis Pakai', hint: 'Barang di Stok SHD, jumlah Ada diisi saat cek' },
+  { value: 'other', label: 'Barang unit lain', hint: 'Tidak disimpan SHD, kekurangan diminta ke unitnya' },
 ]
+
+const kindOf = (standard: RoomStandard | null): Kind | null => {
+  if (!standard || standard.needs_completion) return null
+  if (standard.count_method === 'QR') return 'asset'
+  return standard.fulfillment?.type === 'unit_lain' ? 'other' : 'stock'
+}
 
 interface Props {
   roomId: number
@@ -32,20 +41,26 @@ export default function StandardFormModal({ roomId, roomName, standard, onClose,
   const toast = useToast()
   const { data: departments, error: departmentsError } = useDepartments()
   const { data: assetTypes, error: typesError } = useAssetTypes()
+  const { data: catalog, error: catalogError } = useRequestCatalog()
   const stock = useConsumables(STOCK_PARAMS)
-  useErrorToast(departmentsError, typesError, stock.error)
+  useErrorToast(departmentsError, typesError, catalogError, stock.error)
   const consumables = stock.data?.data ?? []
 
-  const [kind, setKind] = useState<CountMethod | null>(standard && !standard.needs_completion ? standard.count_method : null)
+  const [kind, setKind] = useState<Kind | null>(kindOf(standard))
   const [itemName, setItemName] = useState(standard?.item_name ?? '')
   const [quantity, setQuantity] = useState(String(standard?.standard_quantity ?? 1))
   const [assetTypeId, setAssetTypeId] = useState<number | null>(standard?.asset_type?.id ?? null)
-  const [consumableId, setConsumableId] = useState<number | null>(standard?.fulfillment?.consumable.id ?? null)
+  const f = standard?.fulfillment
+  const [consumableId, setConsumableId] = useState<number | null>(f?.type === 'stok' ? f.consumable.id : null)
+  const [otherSourceId, setOtherSourceId] = useState<number | null>(f?.type === 'unit_lain' ? (f.provider_department?.id ?? null) : null)
+  const [catalogId, setCatalogId] = useState<number | null>(f?.type === 'unit_lain' ? (f.catalog?.id ?? null) : null)
   // Baris baru: sumber aset bawaan SHD sampai dipilih lain (undefined = belum dipilih).
   const [pickedSourceId, setSourceId] = useState<number | null | undefined>(standard?.count_method === 'QR' ? (standard.source_department?.id ?? null) : undefined)
   const sourceId = pickedSourceId === undefined ? (departments.find((d) => d.is_internal)?.id ?? null) : pickedSourceId
 
   const consumable = consumables.find((c) => c.id === consumableId)
+  const otherUnits = departments.filter((d) => !d.is_internal)
+  const catalogOptions = catalog.filter((c) => c.provider_department?.id === otherSourceId)
 
   // Nama mengikuti pilihan selama belum diubah sendiri.
   const followName = (previous: string | undefined, next: string | undefined) =>
@@ -59,15 +74,24 @@ export default function StandardFormModal({ roomId, roomName, standard, onClose,
     followName(consumable?.name, consumables.find((c) => c.id === id)?.name)
     setConsumableId(id)
   }
+  const pickOtherSource = (id: number | null) => {
+    setOtherSourceId(id)
+    setCatalogId(null)
+  }
+  const pickCatalog = (id: number | null) => {
+    followName(catalog.find((c) => c.id === catalogId)?.item_name, catalog.find((c) => c.id === id)?.item_name)
+    setCatalogId(id)
+  }
 
   const submit = async () => {
     const payload = {
       item_name: itemName.trim(),
       standard_quantity: Number(quantity),
-      count_method: kind,
-      source_department_id: kind === 'QR' ? sourceId : null,
-      asset_type_id: kind === 'QR' ? assetTypeId : null,
-      consumable_id: kind === 'Manual' ? consumableId : null,
+      count_method: kind === 'asset' ? 'QR' : 'Manual',
+      source_department_id: kind === 'asset' ? sourceId : kind === 'other' ? otherSourceId : null,
+      asset_type_id: kind === 'asset' ? assetTypeId : null,
+      consumable_id: kind === 'stock' ? consumableId : null,
+      catalog_id: kind === 'other' ? catalogId : null,
     }
     if (standard) await api.put(`/room-standards/${standard.id}`, payload)
     else await api.post(`/rooms/${roomId}/standards`, payload)
@@ -75,7 +99,7 @@ export default function StandardFormModal({ roomId, roomName, standard, onClose,
     onDone()
   }
 
-  const selectionMissing = kind === 'QR' ? !assetTypeId || !sourceId : !consumableId
+  const selectionMissing = kind === 'asset' ? !assetTypeId || !sourceId : kind === 'stock' ? !consumableId : !otherSourceId
 
   return (
     <ActionModal
@@ -95,7 +119,7 @@ export default function StandardFormModal({ roomId, roomName, standard, onClose,
           )}
           <div role="radiogroup" aria-label="Tipe perlengkapan" className="space-y-1.5">
             <p className="text-sm font-medium text-slate-700">Tipe perlengkapan <span className="text-bad-700">*</span></p>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
               {KINDS.map((k) => (
                 <button
                   key={k.value}
@@ -114,7 +138,7 @@ export default function StandardFormModal({ roomId, roomName, standard, onClose,
             </div>
           </div>
 
-          {kind === 'QR' && (
+          {kind === 'asset' && (
             <div className="grid gap-3 sm:grid-cols-2">
               <FormField label="Jenis aset" required error={errors.asset_type_id}>
                 <Select value={assetTypeId ?? ''} onChange={(e) => pickAssetType(Number(e.target.value) || null)} error={errors.asset_type_id}>
@@ -131,14 +155,31 @@ export default function StandardFormModal({ roomId, roomName, standard, onClose,
             </div>
           )}
 
-          {kind === 'Manual' && (
+          {kind === 'other' && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField label="Departemen penyedia" required error={errors.source_department_id}>
+                <Select value={otherSourceId ?? ''} onChange={(e) => pickOtherSource(Number(e.target.value) || null)} error={errors.source_department_id}>
+                  <option value="">Pilih departemen</option>
+                  {otherUnits.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </Select>
+              </FormField>
+              <FormField label="Katalog permintaan (opsional)" error={errors.catalog_id}>
+                <Select clearable value={catalogId ?? ''} disabled={!otherSourceId} onChange={(e) => pickCatalog(Number(e.target.value) || null)} error={errors.catalog_id}>
+                  <option value="">{catalogOptions.length ? 'Tidak ada' : 'Tidak ada katalog dari unit ini'}</option>
+                  {catalogOptions.map((c) => <option key={c.id} value={c.id}>{c.item_name}</option>)}
+                </Select>
+              </FormField>
+            </div>
+          )}
+
+          {kind === 'stock' && (
             <div className="space-y-1.5">
               <FormField label="Barang stok" required error={errors.consumable_id}>
                 <Select value={consumableId ?? ''} onChange={(e) => pickConsumable(Number(e.target.value) || null)} error={errors.consumable_id}>
                   <option value="">{stock.isPending ? 'Memuat barang…' : 'Pilih barang'}</option>
                   {consumables.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} ({c.is_stored ? `stok ${c.quantity} ${c.unit}` : 'tidak disimpan SHD'})
+                      {c.name} (stok {c.quantity} {c.unit})
                     </option>
                   ))}
                 </Select>

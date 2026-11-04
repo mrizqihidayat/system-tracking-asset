@@ -36,7 +36,7 @@ class SeederConsistencyTest extends TestCase
         $this->assertSame(1, Department::where('is_internal', true)->count());
         $this->assertSame(3, Department::where('is_internal', false)->count());
         $this->assertEqualsWithDelta(30, Asset::count(), 3);
-        $this->assertEqualsWithDelta(14, Consumable::count(), 2);
+        $this->assertEqualsWithDelta(10, Consumable::count(), 2);
     }
 
     public function test_asset_status_matches_active_loans(): void
@@ -128,20 +128,21 @@ class SeederConsistencyTest extends TestCase
         RoomStandard::with('consumable')->get()->each(function (RoomStandard $standard) {
             $this->assertFalse($standard->needsCompletion(), "{$standard->item_name} perlu dilengkapi");
             $this->assertNull($standard->fulfillment_note);
-            $this->assertNull($standard->catalog_id);
 
             if ($standard->count_method === CountMethod::Qr) {
                 $this->assertNotNull($standard->asset_type_id);
                 $this->assertNull($standard->consumable_id);
-            } else {
+            } elseif ($standard->consumable_id !== null) {
                 $this->assertSame($standard->consumable->provider_department_id, $standard->source_department_id);
+                $this->assertNull($standard->catalog_id);
+            } else {
+                $this->assertTrue($standard->isOtherUnit());
+                $this->assertSame($standard->catalog->provider_department_id, $standard->source_department_id);
             }
         });
 
-        Consumable::where('is_stored', false)->get()->each(function (Consumable $consumable) {
-            $this->assertSame(0, $consumable->quantity);
-            $this->assertSame(0, $consumable->min_quantity);
-        });
-        $this->assertNotEmpty(Consumable::where('is_stored', false)->count());
+        $this->assertNotEmpty(RoomStandard::query()->where('item_name', 'Tisu')->whereNull('consumable_id')->count());
+        $this->assertSame(0, Consumable::query()->where('name', 'Tisu')->count());
+        $this->assertSame(0, Consumable::query()->whereNull('storage_location')->count());
     }
 }

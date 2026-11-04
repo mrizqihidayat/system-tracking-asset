@@ -96,7 +96,6 @@ class MasterDataService
                 'peminjaman (kembali)' => ['loans', 'return_room_id'],
                 'riwayat aset (asal)' => ['asset_events', 'from_room_id'],
                 'riwayat aset (tujuan)' => ['asset_events', 'to_room_id'],
-                'barang habis pakai' => ['consumables', 'room_id'],
                 'permintaan' => ['supply_requests', 'room_id'],
                 'standar ruangan' => ['room_standards', 'room_id'],
             ],

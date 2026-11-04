@@ -28,6 +28,7 @@ class IndexSupplyRequestRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'id' => ['nullable', 'integer'],
             'status' => ['nullable', Rule::enum(RequestStatus::class)],
             'provider_department_id' => ['nullable', 'integer'],
             'room_id' => ['nullable', 'integer'],

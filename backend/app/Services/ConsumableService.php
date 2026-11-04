@@ -35,7 +35,7 @@ class ConsumableService
     public function setQuantity(Consumable $consumable, int $quantity): Consumable
     {
         return DB::transaction(function () use ($consumable, $quantity) {
-            $consumable = $this->lockStored($consumable);
+            $consumable = $this->lock($consumable);
             $consumable->update(['quantity' => $quantity]);
 
             return $consumable;
@@ -48,7 +48,7 @@ class ConsumableService
     public function adjust(Consumable $consumable, int $adjustment): Consumable
     {
         return DB::transaction(function () use ($consumable, $adjustment) {
-            $consumable = $this->lockStored($consumable);
+            $consumable = $this->lock($consumable);
             $result = $consumable->quantity + $adjustment;
 
             if ($result < 0) {
@@ -105,16 +105,5 @@ class ConsumableService
     private function lock(Consumable $consumable): Consumable
     {
         return Consumable::query()->whereKey($consumable->getKey())->lockForUpdate()->firstOrFail();
-    }
-
-    private function lockStored(Consumable $consumable): Consumable
-    {
-        $consumable = $this->lock($consumable);
-
-        if (! $consumable->is_stored) {
-            throw ValidationException::withMessages(['quantity' => "{$consumable->name} tidak disimpan SHD, jumlahnya tidak bisa diubah."]);
-        }
-
-        return $consumable;
     }
 }

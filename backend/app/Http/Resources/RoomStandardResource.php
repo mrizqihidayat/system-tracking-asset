@@ -47,12 +47,20 @@ class RoomStandardResource extends JsonResource
     }
 
     /**
-     * Kolom "Pemenuhan": barang stok yang ditautkan beserta penyedia & katalognya.
+     * Kolom "Pemenuhan": barang stok beserta penyedia & katalognya, atau barang unit lain beserta katalognya.
      *
      * @return array<string, mixed>|null
      */
     private function fulfillment(): ?array
     {
+        if ($this->isOtherUnit()) {
+            return [
+                'type' => 'unit_lain',
+                'catalog' => $this->catalog ? ['id' => $this->catalog->id, 'item_name' => $this->catalog->item_name] : null,
+                'provider_department' => DepartmentResource::make($this->sourceDepartment),
+            ];
+        }
+
         if (! $this->consumable_id) {
             return null;
         }
@@ -64,7 +72,6 @@ class RoomStandardResource extends JsonResource
                 'name' => $this->consumable->name,
                 'unit' => $this->consumable->unit,
                 'quantity' => $this->consumable->quantity,
-                'is_stored' => $this->consumable->is_stored,
                 'catalog_id' => $this->consumable->catalog_id,
                 'provider_department' => DepartmentResource::make($this->consumable->providerDepartment),
             ],

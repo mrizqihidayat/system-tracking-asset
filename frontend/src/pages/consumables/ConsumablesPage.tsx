@@ -1,6 +1,7 @@
 import { EllipsisVertical, Minus, Plus } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -11,6 +12,7 @@ import DropdownMenu from '../../components/ui/DropdownMenu'
 import { FormField, Input, Select } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
+import { formatDate } from '../../lib/format'
 import { invalidate } from '../../lib/queries/invalidate'
 import { queryKeys } from '../../lib/queries/keys'
 import { listConfigs } from '../../lib/queries/list-configs'
@@ -29,6 +31,20 @@ const stockStatus = (quantity: number, min: number): ConsumableStatus =>
   quantity <= 0 ? 'Habis' : quantity <= min ? 'Menipis' : 'Aman'
 
 type ModalState = { kind: 'form'; item: ConsumableItem | null } | { kind: 'quantity'; item: ConsumableItem } | null
+
+/** Form Buat permintaan terisi: item, departemen/katalog, jumlah = minimum − jumlah (minimal 1). */
+const requestUrl = (c: ConsumableItem) => {
+  const p = new URLSearchParams({
+    consumable_id: String(c.id),
+    item_name: c.name,
+    quantity: String(Math.max(c.min_quantity - c.quantity, 1)),
+  })
+  if (c.catalog) p.set('catalog_id', String(c.catalog.id))
+  else if (c.provider_department) p.set('provider_department_id', String(c.provider_department.id))
+  return `/permintaan?${p}`
+}
+
+const openRequestUrl = (id: number) => `/permintaan?id=${id}`
 
 function QuantityModal({ item, onClose, onDone }: { item: ConsumableItem; onClose: () => void; onDone: () => void }) {
   const toast = useToast()
@@ -51,6 +67,7 @@ function QuantityModal({ item, onClose, onDone }: { item: ConsumableItem; onClos
 
 export default function ConsumablesPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [modal, setModal] = useState<ModalState>(null)
   const [deleting, setDeleting] = useState<{ item: ConsumableItem; usage: ConsumableUsage[] } | null>(null)
@@ -135,7 +152,7 @@ export default function ConsumablesPage() {
       header: 'Jumlah',
       className: 'text-center',
       sortKey: 'quantity',
-      cell: (c) => !c.is_stored ? '-' : (
+      cell: (c) => (
         <div className="flex items-center gap-1 md:justify-center">
           <button
             type="button"
@@ -165,17 +182,26 @@ export default function ConsumablesPage() {
         </div>
       ),
     },
-    { header: 'Minimum', className: 'text-center', cell: (c) => (c.is_stored ? <span className="tabular-nums">{c.min_quantity}</span> : '-') },
+    { header: 'Minimum', className: 'text-center', cell: (c) => <span className="tabular-nums">{c.min_quantity}</span> },
+    { header: 'Status', className: 'text-center', mobile: 'badge', cell: (c) => <Badge color={statusColor[c.status]}>{c.status}</Badge> },
+    { header: 'Lokasi simpan', cell: (c) => c.storage_location ?? '-' },
     {
-      header: 'Status',
+      header: 'Departemen penyedia',
       className: 'text-center',
-      mobile: 'badge',
-      cell: (c) => (c.status ? <Badge color={statusColor[c.status]}>{c.status}</Badge> : <span className="whitespace-nowrap text-xs text-slate-500">Tidak disimpan</span>),
-    },
-    { header: 'Departemen penyedia', className: 'text-center', cell: (c) => c.provider_department?.name ?? '-' },
-    {
-      header: 'Lokasi simpan',
-      cell: (c) => (c.room ? `${c.room.name}${c.room.building ? `, ${c.room.building.name}` : ''}` : '-'),
+      cell: (c) => (
+        <>
+          {c.provider_department?.name ?? '-'}
+          {c.provider_department && !c.provider_department.is_internal && (c.open_request ? (
+            <Link to={openRequestUrl(c.open_request.id)} className="block whitespace-nowrap text-xs text-slate-500 hover:text-brand-700 hover:underline">
+              Diajukan · {formatDate(c.open_request.created_at)}
+            </Link>
+          ) : c.status !== 'Aman' && (
+            <Link to={requestUrl(c)} className="block whitespace-nowrap text-xs font-semibold text-brand-700 hover:underline">
+              Ajukan permintaan
+            </Link>
+          ))}
+        </>
+      ),
     },
     {
       header: '',
@@ -188,6 +214,11 @@ export default function ConsumablesPage() {
           triggerClassName="px-2.5!"
           items={[
             { label: 'Ubah data', onClick: () => setModal({ kind: 'form', item: c }) },
+            ...(c.provider_department && !c.provider_department.is_internal
+              ? [c.open_request
+                ? { label: 'Lihat permintaan', onClick: () => navigate(openRequestUrl(c.open_request!.id)) }
+                : { label: 'Ajukan permintaan', onClick: () => navigate(requestUrl(c)) }]
+              : []),
             { label: 'Hapus', danger: true, onClick: () => askDelete(c) },
           ]}
         />

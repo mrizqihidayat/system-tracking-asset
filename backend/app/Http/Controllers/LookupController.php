@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Consumable;
 use App\Models\Department;
 use App\Models\SupplyRequest;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +23,20 @@ class LookupController extends Controller
             ->pluck('name');
 
         return response()->json(['data' => $units]);
+    }
+
+    /**
+     * Saran lokasi simpan stok: nilai yang pernah diinput, tanpa duplikat (maks. 20).
+     */
+    public function storageLocations(Request $request): JsonResponse
+    {
+        $locations = $this->applySearch(Consumable::query()->whereNotNull('storage_location'), $request->query('search'), 'storage_location')
+            ->distinct()
+            ->orderBy('storage_location')
+            ->limit(self::LIMIT)
+            ->pluck('storage_location');
+
+        return response()->json(['data' => $locations]);
     }
 
     /**

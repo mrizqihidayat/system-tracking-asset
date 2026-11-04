@@ -17,7 +17,7 @@ class ConsumableController extends Controller
 {
     use PaginatesList;
 
-    private const RELATIONS = ['providerDepartment', 'catalog', 'room.building'];
+    private const RELATIONS = ['providerDepartment', 'catalog', 'openRequest'];
 
     public function __construct(private ConsumableService $consumables) {}
 

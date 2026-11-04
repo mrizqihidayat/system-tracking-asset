@@ -31,8 +31,6 @@ class IndexConsumableRequest extends FormRequest
             'status' => ['nullable', Rule::enum(ConsumableStatus::class)],
             'category' => ['nullable', 'string', 'max:100'],
             'provider_department_id' => ['nullable', 'integer'],
-            'building_id' => ['nullable', 'integer'],
-            'room_id' => ['nullable', 'integer'],
             ...$this->listRules(),
         ];
     }

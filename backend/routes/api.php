@@ -59,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('asset-types', AssetTypeController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('/lookups/borrower-units', [LookupController::class, 'borrowerUnits']);
     Route::get('/lookups/request-methods', [LookupController::class, 'requestMethods']);
+    Route::get('/lookups/storage-locations', [LookupController::class, 'storageLocations']);
 
     // Aset (SPEC §5, §14). Hapus = permanen lewat AssetService (cek delete-impact dulu).
     Route::get('/assets', [AssetController::class, 'index']);

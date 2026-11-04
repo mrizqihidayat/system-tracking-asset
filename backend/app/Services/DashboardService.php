@@ -249,7 +249,7 @@ class DashboardService
     {
         return Consumable::query()
             ->where(fn ($query) => $query->withStatus(ConsumableStatus::Habis)->orWhere(fn ($q) => $q->withStatus(ConsumableStatus::Menipis)))
-            ->with(['providerDepartment', 'catalog', 'room.building'])
+            ->with(['providerDepartment', 'catalog'])
             ->orderBy('quantity')
             ->orderBy('name')
             ->limit(self::PANEL_LIMIT)

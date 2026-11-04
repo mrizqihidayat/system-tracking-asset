@@ -246,11 +246,10 @@ class RoomReadinessTest extends TestCase
 
         $inStock = Consumable::factory()->create(['quantity' => 3]);
         $outOfStock = Consumable::factory()->create(['quantity' => 0]);
-        $notStored = Consumable::factory()->create(['quantity' => 0, 'min_quantity' => 0, 'is_stored' => false]);
 
         $fill = $this->standard(['actual_quantity' => 0, 'consumable_id' => $inStock->id]);
         $request = $this->standard(['actual_quantity' => 0, 'consumable_id' => $outOfStock->id]);
-        $requestOnly = $this->standard(['actual_quantity' => 0, 'consumable_id' => $notStored->id]);
+        $requestOnly = $this->standard(['actual_quantity' => 0, 'source_department_id' => $this->deptA->id]);
         $enough = $this->standard(['actual_quantity' => 5, 'consumable_id' => $inStock->id]);
 
         $this->assertTrue($row($fill)['can_fill_from_stock']);
@@ -268,20 +267,41 @@ class RoomReadinessTest extends TestCase
         $this->assertTrue($row($fill)['can_request']);
     }
 
-    public function test_fill_from_stock_rejects_not_stored_item(): void
+    public function test_other_unit_row_is_stored_without_stock_and_cannot_be_filled(): void
     {
-        $notStored = Consumable::factory()->create(['quantity' => 0, 'min_quantity' => 0, 'is_stored' => false]);
-        $standard = $this->standard(['actual_quantity' => 0, 'consumable_id' => $notStored->id]);
+        $url = "/api/rooms/{$this->room->id}/standards";
+        $catalog = RequestCatalog::factory()->create(['provider_department_id' => $this->deptA->id, 'item_name' => 'Tisu Dus']);
+        $otherCatalog = RequestCatalog::factory()->create();
 
-        $this->postJson("/api/room-standards/{$standard->id}/fill-from-stock")
-            ->assertJsonValidationErrors(['standard' => 'tidak disimpan SHD']);
+        $this->postJson($url, $this->payload(['source_department_id' => $this->deptA->id, 'catalog_id' => $otherCatalog->id]))
+            ->assertJsonValidationErrors(['catalog_id' => 'Katalog harus dari departemen yang sama.']);
+
+        $id = $this->postJson($url, $this->payload(['item_name' => 'Tisu', 'source_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]))
+            ->assertCreated()
+            ->assertJsonPath('data.needs_completion', false)
+            ->assertJsonPath('data.fulfillment.type', 'unit_lain')
+            ->assertJsonPath('data.fulfillment.catalog.item_name', 'Tisu Dus')
+            ->assertJsonPath('data.fulfillment.provider_department.name', 'Dept A')
+            ->assertJsonPath('data.can_request', false)
+            ->json('data.id');
+
+        $this->postJson("/api/rooms/{$this->room->id}/check", ['items' => [['id' => $id, 'actual_quantity' => 1]]])->assertOk();
+
+        $row = collect($this->getJson("/api/rooms/{$this->room->id}/checklist")->json('data'))->firstWhere('id', $id);
+        $this->assertTrue($row['can_request']);
+        $this->assertFalse($row['can_fill_from_stock']);
+
+        $this->postJson("/api/room-standards/{$id}/fill-from-stock")->assertJsonValidationErrors('standard');
+
+        // Katalog dihapus: tetap Barang unit lain, tanpa katalog.
+        $this->deleteJson("/api/request-catalog/{$catalog->id}")->assertOk();
+        $this->getJson("/api/rooms/{$this->room->id}/checklist")->assertOk()->assertJsonPath('data.0.needs_completion', false)->assertJsonPath('data.0.fulfillment.catalog', null);
     }
 
-    public function test_old_manual_row_without_stock_needs_completion(): void
+    public function test_shd_row_without_stock_needs_completion(): void
     {
-        $catalog = RequestCatalog::factory()->create(['provider_department_id' => $this->deptA->id]);
-        $old = $this->standard(['actual_quantity' => 1, 'source_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
-        $consumable = Consumable::factory()->create(['provider_department_id' => $this->shd->id]);
+        $old = $this->standard(['actual_quantity' => 1, 'fulfillment_note' => 'Gudang']);
+        $consumable = Consumable::factory()->create(['provider_department_id' => $this->deptA->id]);
 
         $row = collect($this->getJson("/api/rooms/{$this->room->id}/checklist")->assertOk()->json('data'))->firstWhere('id', $old->id);
 
@@ -291,13 +311,13 @@ class RoomReadinessTest extends TestCase
         $this->assertFalse($row['can_request']);
         $this->assertSame('Kurang', $row['result']);
 
-        // Dilengkapi lewat PUT: tautan lama dilepas, jumlah Ada tetap.
+        // Dilengkapi lewat PUT: catatan lama dilepas, jumlah Ada tetap, sumber mengikuti penyedia.
         $this->putJson("/api/room-standards/{$old->id}", $this->payload(['consumable_id' => $consumable->id]))
             ->assertOk()
             ->assertJsonPath('data.needs_completion', false)
             ->assertJsonPath('data.present_quantity', 1)
-            ->assertJsonPath('data.source_department.name', 'SHD');
-        $this->assertNull($old->fresh()->catalog_id);
+            ->assertJsonPath('data.source_department.name', 'Dept A');
+        $this->assertNull($old->fresh()->fulfillment_note);
     }
 
     public function test_save_check_stores_manual_quantities_and_checker(): void

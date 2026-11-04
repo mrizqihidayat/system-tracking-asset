@@ -59,11 +59,19 @@ class RoomStandard extends Model
     }
 
     /**
-     * Baris Manual tanpa barang stok (data lama atau barangnya sudah dihapus): tanpa aksi sampai dilengkapi.
+     * Barang unit lain: Manual tanpa barang stok dengan sumber bukan SHD; kekurangannya diminta ke sumbernya.
+     */
+    public function isOtherUnit(): bool
+    {
+        return $this->count_method === CountMethod::Manual && $this->consumable_id === null && ! $this->sourceDepartment->is_internal;
+    }
+
+    /**
+     * Baris SHD tanpa barang stok (data lama atau barangnya sudah dihapus): tanpa aksi sampai dilengkapi.
      */
     public function needsCompletion(): bool
     {
-        return $this->count_method === CountMethod::Manual && $this->consumable_id === null;
+        return $this->count_method === CountMethod::Manual && $this->consumable_id === null && ! $this->isOtherUnit();
     }
 
     /**
@@ -71,14 +79,18 @@ class RoomStandard extends Model
      */
     public function canFillFromStock(): bool
     {
-        return $this->hasStockShortage() && $this->consumable->is_stored && $this->consumable->quantity > 0;
+        return $this->hasStockShortage() && $this->consumable->quantity > 0;
     }
 
     /**
-     * Kurang dan barang tidak disimpan SHD atau stoknya habis → Buat permintaan ke penyedia.
+     * Kurang dan stok habis, atau barang unit lain → Buat permintaan ke penyedia.
      */
     public function canRequest(): bool
     {
+        if ($this->isOtherUnit()) {
+            return ($this->shortage() ?? 0) > 0;
+        }
+
         return $this->hasStockShortage() && ! $this->canFillFromStock();
     }
 

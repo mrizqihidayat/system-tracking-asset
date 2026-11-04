@@ -26,6 +26,7 @@ import CatalogFormModal from './CatalogFormModal'
 import RequestFormModal from './RequestFormModal'
 
 const CATALOG_PER_PAGE = 5
+const PREFILL_PARAMS = ['room_id', 'catalog_id', 'consumable_id', 'room_standard_id']
 
 const statusColor = {
   Diajukan: 'blue',
@@ -112,9 +113,9 @@ export default function RequestsPage() {
   const catalog = catalogQuery.data
   const history = historyQuery.data
   const suggestions = suggestionsQuery.data ?? []
-  // Dari Kelengkapan Ruangan: /permintaan?room_id=&consumable_id=&item_name=&catalog_id=&quantity= (tanpa katalog: provider_department_id=) → buka form terisi otomatis.
+  // Dari Kelengkapan Ruangan/Stok: /permintaan?room_id=&consumable_id=|room_standard_id=&item_name=&catalog_id=&quantity= (tanpa katalog: provider_department_id=) → buka form terisi otomatis.
   const [modal, setModal] = useState<ModalState>(() => {
-    if (!params.has('room_id') && !params.has('catalog_id')) return null
+    if (!PREFILL_PARAMS.some((k) => params.has(k))) return null
     const num = (k: string) => (params.get(k) ? Number(params.get(k)) : null)
     return {
       kind: 'request',
@@ -123,6 +124,7 @@ export default function RequestsPage() {
         room_id: num('room_id'),
         catalog_id: num('catalog_id'),
         consumable_id: num('consumable_id'),
+        room_standard_id: num('room_standard_id'),
         item_name: params.get('item_name') ?? undefined,
         provider_department_id: num('provider_department_id'),
         quantity: num('quantity') ?? undefined,
@@ -139,10 +141,10 @@ export default function RequestsPage() {
 
   // Query sudah dipakai untuk isian awal modal → bersihkan dari URL (filter tabel tetap).
   useEffect(() => {
-    if (!params.has('room_id') && !params.has('catalog_id')) return
+    if (!PREFILL_PARAMS.some((k) => params.has(k))) return
     setParams(
       (p) => {
-        ;['room_id', 'catalog_id', 'consumable_id', 'item_name', 'provider_department_id', 'quantity'].forEach((k) => p.delete(k))
+        ;[...PREFILL_PARAMS, 'item_name', 'provider_department_id', 'quantity'].forEach((k) => p.delete(k))
         return p
       },
       { replace: true },
@@ -316,6 +318,7 @@ export default function RequestsPage() {
                             prefill: {
                               catalog_id: s.catalog_id,
                               consumable_id: s.consumable_id,
+                              room_standard_id: s.consumable_id ? null : s.room_standard_id,
                               item_name: s.item_name,
                               provider_department_id: g.provider_department.id,
                               quantity: s.quantity,
@@ -352,6 +355,14 @@ export default function RequestsPage() {
       </Card>
 
       <Card title="Riwayat permintaan">
+        {list.get('id') && (
+          <p className="text-sm text-slate-600">
+            Menampilkan satu permintaan.{' '}
+            <button type="button" className="font-semibold text-brand-700 hover:underline" onClick={() => list.setFilter('id', '')}>
+              Tampilkan semua
+            </button>
+          </p>
+        )}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Input
             className="sm:max-w-xs"

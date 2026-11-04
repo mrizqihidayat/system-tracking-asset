@@ -141,6 +141,7 @@ class SupplyRequest extends Model
     protected function filter(Builder $query, array $filters): void
     {
         $query
+            ->when($filters['id'] ?? null, fn ($query, $id) => $query->whereKey($id))
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('supply_requests.status', $status))
             ->when(filter_var($filters['unresponded'] ?? false, FILTER_VALIDATE_BOOLEAN), fn ($query) => $query->unresponded())
             ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id))

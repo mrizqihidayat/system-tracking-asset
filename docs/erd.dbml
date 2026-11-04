@@ -238,7 +238,7 @@ Table supply_requests {
   lead_time_days int [note: 'snapshot dari katalog saat dibuat/diubah (Diajukan); null tanpa katalog']
   must_return boolean [not null, default: false, note: 'pilihan di form: Dikembalikan / Tidak dikembalikan; default dari katalog']
   status request_status [not null, default: 'Diajukan']
-  room_standard_id bigint [ref: > room_standards.id, note: 'baris yang ditambah saat Diterima; ON DELETE SET NULL']
+  room_standard_id bigint [ref: > room_standards.id, note: 'baris Barang unit lain yang ditambah saat Diterima; ON DELETE SET NULL']
   applied_to varchar(10) [note: 'stok | ruangan: tujuan penambahan saat Diterima, untuk mengurangi kembali; kosong = tidak mengubah apa pun']
   received_at timestamp
   returned_at timestamp
@@ -259,13 +259,13 @@ Table room_standards {
   count_method count_method [not null]
   asset_type_id bigint [ref: > asset_types.id, note: 'wajib jika QR']
   actual_quantity int [note: 'diisi jika Manual; null = Belum dicek (bukan kurang)']
-  consumable_id bigint [ref: > consumables.id, note: 'wajib untuk baris Manual baru; kosong = Perlu dilengkapi; ON DELETE SET NULL']
+  consumable_id bigint [ref: > consumables.id, note: 'tipe Stok Habis Pakai; kosong = Barang unit lain (sumber bukan SHD) atau Perlu dilengkapi (sumber SHD); ON DELETE SET NULL']
   fulfillment_note varchar(255) [note: 'data lama, input baru ditolak']
-  catalog_id bigint [ref: > request_catalog.id, note: 'data lama, input baru ditolak; ON DELETE SET NULL']
+  catalog_id bigint [ref: > request_catalog.id, note: 'tipe Barang unit lain (opsional); ON DELETE SET NULL']
   created_at timestamp
   updated_at timestamp
 
-  Note: 'Tipe Aset = QR + asset_type_id. Tipe Stok Habis Pakai = Manual + consumable_id (aksi & tujuan permintaan mengikuti data stok)'
+  Note: 'Tipe Aset = QR + asset_type_id. Tipe Stok Habis Pakai = Manual + consumable_id (aksi & tujuan permintaan mengikuti data stok). Tipe Barang unit lain = Manual tanpa consumable_id, sumber bukan SHD'
 }
 
 Table consumables {
@@ -275,13 +275,12 @@ Table consumables {
   unit varchar(20) [not null]
   quantity int [not null, default: 0]
   min_quantity int [not null, default: 0]
-  is_stored boolean [not null, default: true, note: 'false = barang unit lain, tidak disimpan SHD: jumlah & minimum 0, tanpa status stok']
   provider_department_id bigint [not null, ref: > departments.id, note: 'minta ke (isi ulang); menjadi sumber baris standar yang memakainya']
   catalog_id bigint [ref: > request_catalog.id, note: 'ON DELETE SET NULL']
-  room_id bigint [ref: > rooms.id, note: 'lokasi simpan']
+  storage_location varchar(150) [note: 'lokasi simpan, teks bebas (tidak tertaut ruangan)']
   note text
   created_at timestamp
   updated_at timestamp
 
-  Note: 'Barang disimpan SHD dan barang unit lain (is_stored = false). Hapus = hard delete (tanpa soft delete)'
+  Note: 'Hanya barang yang disimpan SHD. Hapus = hard delete (tanpa soft delete)'
 }

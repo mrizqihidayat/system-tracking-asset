@@ -289,7 +289,7 @@ export default function DashboardPage() {
                       <span className="whitespace-nowrap tabular-nums text-slate-500">
                         {c.quantity} {c.unit}
                       </span>
-                      <Badge color={c.status === 'Habis' ? 'red' : 'amber'}>{c.status ?? ''}</Badge>
+                      <Badge color={c.status === 'Habis' ? 'red' : 'amber'}>{c.status}</Badge>
                     </span>
                   </li>
                 ))}
