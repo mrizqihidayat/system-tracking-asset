@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\FileType;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -12,6 +13,8 @@ use Illuminate\Validation\Rule;
 class StoreAssetFileRequest extends FormRequest
 {
     public const MAX_BYTES = 5 * 1024 * 1024;
+
+    private const MAX_NAME_LENGTH = 255;
 
     public function authorize(): bool
     {
@@ -44,8 +47,26 @@ class StoreAssetFileRequest extends FormRequest
     {
         return [
             'file_type' => ['required', Rule::enum(FileType::class)],
-            'file' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'mimetypes:image/jpeg,image/png,image/webp,application/pdf'],
+            'file' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'mimetypes:image/jpeg,image/png,image/webp,application/pdf', $this->validName()],
         ];
+    }
+
+    /**
+     * Nama asli disimpan di kolom varchar(255) dan dikirim sebagai JSON: wajib UTF-8 sah dan maks. 255 karakter.
+     */
+    private function validName(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if (! $value instanceof UploadedFile) {
+                return;
+            }
+
+            $name = $value->getClientOriginalName();
+
+            if (! mb_check_encoding($name, 'UTF-8') || mb_strlen($name, 'UTF-8') > self::MAX_NAME_LENGTH) {
+                $fail('Nama file tidak valid atau lebih dari 255 karakter.');
+            }
+        };
     }
 
     /**

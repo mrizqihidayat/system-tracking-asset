@@ -18,6 +18,23 @@ class AssetFile extends Model
     public const UPDATED_AT = null;
 
     /**
+     * Nama untuk header unduhan: ekstensi mengikuti isi file (ekstensi path tersimpan), bukan nama dari pengunggah.
+     * Nama asli tetap utuh di kolom original_name untuk ditampilkan.
+     */
+    public function downloadName(): string
+    {
+        $actual = strtolower(pathinfo($this->path, PATHINFO_EXTENSION));
+        $given = strtolower(pathinfo($this->original_name, PATHINFO_EXTENSION));
+        $jpeg = ['jpg', 'jpeg'];
+
+        if ($actual === '' || $given === $actual || (in_array($given, $jpeg, true) && in_array($actual, $jpeg, true))) {
+            return $this->original_name;
+        }
+
+        return (pathinfo($this->original_name, PATHINFO_FILENAME) ?: 'file').'.'.$actual;
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

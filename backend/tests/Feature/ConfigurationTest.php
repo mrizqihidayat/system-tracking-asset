@@ -54,6 +54,36 @@ class ConfigurationTest extends TestCase
         $this->withToken($token)->getJson('/api/user')->assertUnauthorized();
     }
 
+    public function test_env_example_uses_production_safe_defaults(): void
+    {
+        $env = file_get_contents(base_path('.env.example'));
+
+        $this->assertMatchesRegularExpression('/^APP_ENV=production$/m', $env);
+        $this->assertMatchesRegularExpression('/^APP_DEBUG=false$/m', $env);
+        $this->assertMatchesRegularExpression('/^LOG_LEVEL=warning$/m', $env);
+        $this->assertMatchesRegularExpression('/^TRUSTED_PROXIES=$/m', $env);
+    }
+
+    public function test_trusted_proxies_config_reads_env_and_never_trusts_everyone(): void
+    {
+        Env::getRepository()->set('TRUSTED_PROXIES', '10.0.0.1, 192.168.0.0/16, *, **, REMOTE_ADDR, 0.0.0.0/0');
+
+        try {
+            $config = require config_path('trustedproxy.php');
+        } finally {
+            Env::getRepository()->clear('TRUSTED_PROXIES');
+        }
+
+        $this->assertSame(['10.0.0.1', '192.168.0.0/16'], $config['proxies']);
+    }
+
+    public function test_trusted_proxies_config_is_empty_by_default(): void
+    {
+        $config = require config_path('trustedproxy.php');
+
+        $this->assertSame([], $config['proxies']);
+    }
+
     /**
      * @return array<string, array{0: string, 1: string, 2: string}>
      */

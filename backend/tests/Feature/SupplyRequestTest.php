@@ -526,6 +526,37 @@ class SupplyRequestTest extends TestCase
         $this->getJson('/api/supply-requests?id=abc')->assertJsonValidationErrors('id');
     }
 
+    public function test_request_quantity_above_integer_column_limit_is_rejected(): void
+    {
+        $this->postJson('/api/supply-requests', [
+            'item_name' => 'Tisu', 'provider_department_id' => $this->deptA->id, 'request_method' => 'Email', 'quantity' => 2147483648,
+        ])->assertUnprocessable()->assertJsonValidationErrors('quantity');
+
+        $this->assertDatabaseCount('supply_requests', 0);
+    }
+
+    public function test_received_request_cannot_push_stock_over_integer_column_limit(): void
+    {
+        $pulpen = Consumable::factory()->create(['quantity' => 2147483647, 'provider_department_id' => $this->deptA->id]);
+        $request = $this->supplyRequest(['consumable_id' => $pulpen->id, 'quantity' => 1]);
+
+        $this->setStatus($request, 'Diterima')->assertUnprocessable()->assertJsonPath('errors.adjustment.0', 'Jumlah stok melebihi batas.');
+
+        $this->assertSame(2147483647, $pulpen->fresh()->quantity);
+        $this->assertSame('Diajukan', $request->fresh()->status->value);
+    }
+
+    public function test_received_request_cannot_push_room_quantity_over_integer_column_limit(): void
+    {
+        $standard = $this->otherUnitStandard(2147483647);
+        $request = $this->supplyRequest(['room_standard_id' => $standard->id, 'quantity' => 1]);
+
+        $this->setStatus($request, 'Diterima')->assertUnprocessable()->assertJsonPath('errors.status.0', 'Jumlah Ada melebihi batas.');
+
+        $this->assertSame(2147483647, $standard->fresh()->actual_quantity);
+        $this->assertSame('Diajukan', $request->fresh()->status->value);
+    }
+
     public function test_received_stored_item_adds_stock_only(): void
     {
         $room = Room::factory()->create();

@@ -79,7 +79,7 @@ class AssetFileController extends Controller
 
         return $disk->response(
             $assetFile->path,
-            $assetFile->original_name,
+            $assetFile->downloadName(),
             ['Content-Type' => $assetFile->mime_type ?: 'application/octet-stream'],
             $request->boolean('download') ? 'attachment' : 'inline',
         );

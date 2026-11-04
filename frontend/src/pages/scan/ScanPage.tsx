@@ -1,4 +1,3 @@
-import { Scanner } from '@yudiel/react-qr-scanner'
 import { CameraOff } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import Button from '../../components/ui/Button'
@@ -6,6 +5,7 @@ import { Input } from '../../components/ui/FormField'
 import { PageHeader } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/toast-context'
 import { errorMessage } from '../../lib/api'
+import { Scanner } from '../../lib/qr-scanner'
 import AssetActionPanel from './AssetActionPanel'
 import { useScanLookup, type ScanResult } from './useScanLookup'
 

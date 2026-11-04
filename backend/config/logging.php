@@ -52,6 +52,14 @@ return [
 
     'channels' => [
 
+        // Login & hapus aset. Level tetap info: tidak ikut LOG_LEVEL agar tidak hilang di production.
+        'security' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/security.log'),
+            'level' => 'info',
+            'max_files' => env('LOG_SECURITY_DAYS', 90),
+        ],
+
         'stack' => [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),

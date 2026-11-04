@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
-import { useDepartments, useRooms } from '../../lib/queries/master'
+import { useDepartments, useRequestMethods, useRooms } from '../../lib/queries/master'
+import { useErrorToast } from '../../lib/useErrorToast'
 import type { RequestCatalog, RequestPrefill, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import RoomSelect from '../loans/RoomSelect'
@@ -18,7 +19,6 @@ interface Props {
 
 const today = () => new Date().toLocaleDateString('en-CA')
 const MANUAL = 'manual'
-const REQUEST_METHODS = ['Memo', 'Form', 'Email', 'WhatsApp']
 const OTHER_METHOD = 'Lainnya'
 
 /** Catat permintaan ke unit lain (proses permintaan tetap di luar sistem). */
@@ -36,11 +36,18 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
   )
   // null = mengikuti katalog; pilihan staf disimpan sampai item diganti.
   const [returnChoice, setReturnChoice] = useState<boolean | null>(request?.must_return ?? null)
-  // Nilai di luar daftar (mis. "Telegram") tampil sebagai Lainnya + isian teks.
+  // Pilihan dari server (satu sumber untuk web dan versi HP). "Lainnya" selalu ada agar form tetap bisa dipakai.
+  const requestMethods = useRequestMethods()
+  useErrorToast(requestMethods.error)
+  const methodOptions = requestMethods.data.filter((m) => m !== OTHER_METHOD)
+  // Nilai di luar daftar (mis. "Telegram") tampil sebagai Lainnya + isian teks. Daftar bisa tiba setelah form
+  // terbuka, jadi nilai awal dihitung saat render sampai staf memilih atau mengetik sendiri.
   const initialMethod = request?.request_method ?? ''
-  const knownMethod = REQUEST_METHODS.includes(initialMethod)
-  const [methodChoice, setMethodChoice] = useState(knownMethod ? initialMethod : initialMethod && OTHER_METHOD)
-  const [otherMethod, setOtherMethod] = useState(knownMethod || initialMethod === OTHER_METHOD ? '' : initialMethod)
+  const knownMethod = methodOptions.includes(initialMethod)
+  const [pickedMethod, setPickedMethod] = useState<string | null>(null)
+  const [typedMethod, setTypedMethod] = useState<string | null>(null)
+  const methodChoice = pickedMethod ?? (knownMethod ? initialMethod : initialMethod && OTHER_METHOD)
+  const otherMethod = typedMethod ?? (knownMethod || initialMethod === OTHER_METHOD ? '' : initialMethod)
   const method = methodChoice === OTHER_METHOD ? otherMethod.trim() : methodChoice
   const [quantity, setQuantity] = useState(String(request?.quantity ?? prefill?.quantity ?? 1))
   const [purpose, setPurpose] = useState(request?.purpose ?? '')
@@ -91,7 +98,7 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
     <ActionModal
       title={request ? 'Ubah permintaan' : 'Buat permintaan'}
       submitLabel="Simpan"
-      submitDisabled={!catalogId || !method || (manual && (!itemName.trim() || !providerId))}
+      submitDisabled={!catalogId || !method || requestMethods.isPending || (manual && (!itemName.trim() || !providerId))}
       onClose={onClose}
       onSubmit={submit}
     >
@@ -145,15 +152,15 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
             </Select>
           </FormField>
           <FormField label="Cara permintaan" required error={methodChoice === OTHER_METHOD ? undefined : errors.request_method}>
-            <Select value={methodChoice} onChange={(e) => setMethodChoice(e.target.value)} error={methodChoice === OTHER_METHOD ? undefined : errors.request_method}>
-              <option value="">Pilih cara permintaan</option>
-              {REQUEST_METHODS.map((m) => <option key={m}>{m}</option>)}
+            <Select value={methodChoice} disabled={requestMethods.isPending} onChange={(e) => setPickedMethod(e.target.value)} error={methodChoice === OTHER_METHOD ? undefined : errors.request_method}>
+              <option value="">{requestMethods.isPending ? 'Memuat pilihan…' : 'Pilih cara permintaan'}</option>
+              {methodOptions.map((m) => <option key={m}>{m}</option>)}
               <option>{OTHER_METHOD}</option>
             </Select>
           </FormField>
           {methodChoice === OTHER_METHOD && (
             <FormField label="Cara lainnya" required error={errors.request_method}>
-              <Input value={otherMethod} onChange={(e) => setOtherMethod(e.target.value)} placeholder="Misal: Telegram" error={errors.request_method} maxLength={50} autoFocus />
+              <Input value={otherMethod} onChange={(e) => setTypedMethod(e.target.value)} placeholder="Misal: Telegram" error={errors.request_method} maxLength={50} autoFocus />
             </FormField>
           )}
           <div className="grid grid-cols-2 gap-3">

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\DbInteger;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -20,8 +21,8 @@ class UpdateConsumableQuantityRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'quantity' => ['nullable', 'integer', 'min:0', 'required_without:adjustment', 'prohibits:adjustment'],
-            'adjustment' => ['nullable', 'integer', 'not_in:0', 'required_without:quantity'],
+            'quantity' => ['nullable', 'integer', 'min:0', 'max:'.DbInteger::MAX, 'required_without:adjustment', 'prohibits:adjustment'],
+            'adjustment' => ['nullable', 'integer', 'min:-'.DbInteger::MAX, 'max:'.DbInteger::MAX, 'not_in:0', 'required_without:quantity'],
         ];
     }
 

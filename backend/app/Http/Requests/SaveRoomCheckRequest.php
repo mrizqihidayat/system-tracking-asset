@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\DbInteger;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -23,7 +24,7 @@ class SaveRoomCheckRequest extends FormRequest
         return [
             'items' => ['present', 'array'],
             'items.*.id' => ['required', 'integer', 'distinct'],
-            'items.*.actual_quantity' => ['required', 'integer', 'min:0'],
+            'items.*.actual_quantity' => ['required', 'integer', 'min:0', 'max:'.DbInteger::MAX],
         ];
     }
 }

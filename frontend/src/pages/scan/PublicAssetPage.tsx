@@ -65,6 +65,8 @@ export default function PublicAssetPage() {
 
   return (
     <div className="min-h-screen">
+      {/* Tautan QR yang tersebar tidak boleh masuk mesin pencari. */}
+      <meta name="robots" content="noindex" />
       <header className="bg-rail px-4 py-4 text-white">
         <div className="mx-auto max-w-lg">
           <Brand compact />

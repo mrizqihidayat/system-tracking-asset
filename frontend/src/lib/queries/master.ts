@@ -21,6 +21,7 @@ export const masterQueries = {
   assetTypes: () => master<AssetType>(queryKeys.master.assetTypes(), '/asset-types'),
   requestCatalog: () => master<RequestCatalog>(queryKeys.master.requestCatalog(), '/request-catalog'),
   storageLocations: () => master<string>(queryKeys.master.storageLocations(), '/lookups/storage-locations'),
+  requestMethods: () => master<string>(queryKeys.master.requestMethods(), '/lookups/request-methods'),
 }
 
 const EMPTY: never[] = []
@@ -40,3 +41,4 @@ export const useCategories = () => useMaster(masterQueries.categories())
 export const useAssetTypes = () => useMaster(masterQueries.assetTypes())
 export const useRequestCatalog = () => useMaster(masterQueries.requestCatalog())
 export const useStorageLocations = () => useMaster(masterQueries.storageLocations())
+export const useRequestMethods = () => useMaster(masterQueries.requestMethods())

@@ -1,5 +1,17 @@
 # React + TypeScript + Vite
 
+## Setup proyek ini
+
+File `.env` tidak ikut repo. Salin dari contoh sebelum menjalankan atau membangun frontend:
+
+```
+cp .env.example .env
+```
+
+Isi `VITE_API_URL` dengan alamat API backend, termasuk `/api`. Saat build production, pastikan nilainya alamat server production, bukan localhost.
+
+## Template
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

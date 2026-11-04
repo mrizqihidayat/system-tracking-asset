@@ -11,6 +11,7 @@ use App\Models\RoomStandard;
 use App\Models\SupplyRequest;
 use App\Models\User;
 use App\Support\AppCache;
+use App\Support\DbInteger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -183,6 +184,10 @@ class SupplyRequestService
             if ($target instanceof Consumable) {
                 $this->consumables->adjust($target, $signed);
             } else {
+                if ($effect['current'] + $signed > DbInteger::MAX) {
+                    throw ValidationException::withMessages(['status' => 'Jumlah Ada melebihi batas.']);
+                }
+
                 $target->update(['actual_quantity' => $effect['current'] + $signed]);
             }
         }

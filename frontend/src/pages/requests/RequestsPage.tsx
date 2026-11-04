@@ -16,7 +16,7 @@ import { formatDate } from '../../lib/format'
 import { invalidate } from '../../lib/queries/invalidate'
 import { listConfigs } from '../../lib/queries/list-configs'
 import { useStatusImpact, useSuggestions, useSupplyRequests } from '../../lib/queries/lists'
-import { useRequestCatalog } from '../../lib/queries/master'
+import { masterQueries, useRequestCatalog } from '../../lib/queries/master'
 import { prefetchRoomOptions, prefetchStatusImpacts } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
@@ -151,8 +151,11 @@ export default function RequestsPage() {
     )
   }, [params, setParams])
 
-  // Form permintaan dari saran/Kelengkapan Ruangan butuh gedung & ruangan: disiapkan saat halaman dibuka.
-  useEffect(() => prefetchRoomOptions(queryClient), [queryClient])
+  // Form permintaan butuh gedung, ruangan, dan cara permintaan: disiapkan saat halaman dibuka.
+  useEffect(() => {
+    prefetchRoomOptions(queryClient)
+    queryClient.prefetchQuery(masterQueries.requestMethods())
+  }, [queryClient])
 
   const closeModal = () => setModal(null)
   const done = () => {

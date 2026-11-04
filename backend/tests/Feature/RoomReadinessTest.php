@@ -63,6 +63,18 @@ class RoomReadinessTest extends TestCase
         ];
     }
 
+    public function test_quantities_above_integer_column_limit_are_rejected(): void
+    {
+        $this->postJson("/api/rooms/{$this->room->id}/standards", $this->payload(['standard_quantity' => 2147483648]))
+            ->assertJsonValidationErrors('standard_quantity');
+
+        $manual = $this->standard();
+
+        $this->postJson("/api/rooms/{$this->room->id}/check", ['items' => [['id' => $manual->id, 'actual_quantity' => 2147483648]]])
+            ->assertJsonValidationErrors('items.0.actual_quantity');
+        $this->assertNull($manual->fresh()->actual_quantity);
+    }
+
     public function test_requires_authentication(): void
     {
         $this->app['auth']->forgetGuards();

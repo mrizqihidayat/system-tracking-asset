@@ -10,6 +10,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class AssetFileTest extends TestCase
@@ -167,6 +168,70 @@ class AssetFileTest extends TestCase
 
         $attachment = $this->get("/api/asset-files/{$id}/download?download=1")->assertOk();
         $this->assertStringContainsString('attachment', $attachment->headers->get('Content-Disposition'));
+    }
+
+    public function test_download_name_extension_follows_actual_file_type(): void
+    {
+        $id = $this->upload('Lainnya', UploadedFile::fake()->create('evil.html', 10, 'application/pdf'))->json('data.id');
+
+        foreach (["/api/asset-files/{$id}/download", "/api/asset-files/{$id}/download?download=1"] as $url) {
+            $disposition = $this->get($url)->assertOk()->headers->get('Content-Disposition');
+
+            $this->assertStringContainsString('evil.pdf', $disposition);
+            $this->assertStringNotContainsString('evil.html', $disposition);
+        }
+
+        // Nama asli tetap utuh untuk ditampilkan.
+        $this->assertSame('evil.html', AssetFile::query()->findOrFail($id)->original_name);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function downloadNameProvider(): array
+    {
+        return [
+            'nama sudah sesuai' => ['Surat.pdf', 'application/pdf', 'Surat.pdf'],
+            'huruf besar dipertahankan' => ['Surat.PDF', 'application/pdf', 'Surat.PDF'],
+            'tanpa ekstensi' => ['dokumen', 'application/pdf', 'dokumen.pdf'],
+            'jpeg dan jpg setara' => ['foto.jpeg', 'image/jpeg', 'foto.jpeg'],
+            'ekstensi ganda' => ['shell.php.png', 'image/png', 'shell.php.png'],
+        ];
+    }
+
+    #[DataProvider('downloadNameProvider')]
+    public function test_download_name_keeps_name_when_type_matches(string $name, string $mime, string $expected): void
+    {
+        $id = $this->upload('Lainnya', UploadedFile::fake()->create($name, 10, $mime))->assertCreated()->json('data.id');
+
+        $this->assertSame($expected, AssetFile::query()->findOrFail($id)->downloadName());
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function invalidFileNameProvider(): array
+    {
+        return [
+            'bukan UTF-8' => ["dokumen\xE9.pdf"],
+            'lebih dari 255 karakter' => [str_repeat('a', 252).'.pdf'],
+        ];
+    }
+
+    #[DataProvider('invalidFileNameProvider')]
+    public function test_invalid_file_name_returns_422_and_stores_nothing(string $name): void
+    {
+        $this->upload('Lainnya', UploadedFile::fake()->create($name, 10, 'application/pdf'))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.file.0', 'Nama file tidak valid atau lebih dari 255 karakter.');
+
+        $this->assertSame(0, $this->asset->files()->count());
+        $this->assertSame([], $this->disk()->allFiles('assets'));
+    }
+
+    public function test_file_name_of_255_characters_is_accepted(): void
+    {
+        $this->upload('Lainnya', UploadedFile::fake()->create(str_repeat('a', 251).'.pdf', 10, 'application/pdf'))->assertCreated();
     }
 
     public function test_download_returns_404_when_physical_file_is_missing(): void

@@ -356,6 +356,30 @@ class MasterDataTest extends TestCase
         $this->assertSame(0, $type->fresh()->last_number);
     }
 
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function lookupProvider(): array
+    {
+        return [
+            'unit peminjam' => ['/api/lookups/borrower-units'],
+            'cara permintaan' => ['/api/lookups/request-methods'],
+            'lokasi simpan' => ['/api/lookups/storage-locations'],
+        ];
+    }
+
+    #[DataProvider('lookupProvider')]
+    public function test_lookup_search_must_be_text_up_to_100_characters(string $endpoint): void
+    {
+        foreach (['search[]=x', 'search[a]=b', 'search='.str_repeat('a', 101)] as $query) {
+            $this->getJson("{$endpoint}?{$query}")
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('search');
+        }
+
+        $this->getJson("{$endpoint}?search=a")->assertOk();
+    }
+
     public function test_request_methods_lookup_returns_fixed_options_only(): void
     {
         SupplyRequest::factory()->create(['request_method' => 'Telepon']);

@@ -7,10 +7,7 @@ import Button from '../components/ui/Button'
 import { FormField, Input } from '../components/ui/FormField'
 import { api, errorMessage, fieldErrors } from '../lib/api'
 import { getToken, setSession, type AuthUser } from '../lib/auth'
-
-function safeNext(next: string | null): string {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
-}
+import { safeNext } from '../lib/safe-next'
 
 export default function LoginPage() {
   const [params] = useSearchParams()
@@ -22,7 +19,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const next = safeNext(params.get('next'))
+  const next = safeNext(params.get('next'), location.origin)
 
   if (getToken()) return <Navigate to={next} replace />
 

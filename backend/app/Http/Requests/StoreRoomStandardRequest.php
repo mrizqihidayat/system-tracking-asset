@@ -6,6 +6,7 @@ use App\Enums\CountMethod;
 use App\Models\Consumable;
 use App\Models\Department;
 use App\Models\RequestCatalog;
+use App\Support\DbInteger;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -32,7 +33,7 @@ class StoreRoomStandardRequest extends FormRequest
         return [
             'item_name' => ['required', 'string', 'max:150'],
             'source_department_id' => ['nullable', 'integer', 'exists:departments,id', 'required_without:consumable_id'],
-            'standard_quantity' => ['required', 'integer', 'min:1'],
+            'standard_quantity' => ['required', 'integer', 'min:1', 'max:'.DbInteger::MAX],
             'count_method' => ['required', Rule::enum(CountMethod::class)],
             'asset_type_id' => ['nullable', 'integer', 'exists:asset_types,id', 'required_if:count_method,'.CountMethod::Qr->value, 'prohibited_if:count_method,'.CountMethod::Manual->value],
             'consumable_id' => ['nullable', 'integer', 'exists:consumables,id', 'prohibited_if:count_method,'.CountMethod::Qr->value],

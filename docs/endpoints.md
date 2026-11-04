@@ -6,7 +6,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 
 ## Ringkasan
 
-- **87 endpoint API:** 84 dipakai frontend web, 3 tidak dipakai.
+- **87 endpoint API:** 85 dipakai frontend web, 2 tidak dipakai.
 - **6 route non-API:** tidak ada yang dipakai frontend.
 - **Alamat:** semua endpoint API berawalan `/api`. Frontend web mengambil alamat API dari `VITE_API_URL`.
 - **Akses "Token":** wajib header `Authorization: Bearer {token}` dari `POST /api/login`. Tanpa token sah dijawab 401.
@@ -21,23 +21,52 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Data master: departemen | 5 | 5 | 0 |
 | Data master: gedung & ruangan | 11 | 10 | 1 |
 | Data master: kategori & jenis aset | 10 | 10 | 0 |
-| Lookup | 3 | 1 | 2 |
+| Lookup | 3 | 2 | 1 |
 | Aset | 20 | 20 | 0 |
 | Peminjaman | 5 | 5 | 0 |
 | Kelengkapan ruangan | 7 | 7 | 0 |
 | Permintaan ke unit lain | 11 | 11 | 0 |
 | Stok habis pakai | 7 | 7 | 0 |
-| **Total** | **87** | **84** | **3** |
+| **Total** | **87** | **85** | **2** |
 
 ## Endpoint API yang tidak dipakai frontend
 
-"Tidak dipakai" hanya berarti tidak dipanggil oleh frontend web. Ketiganya masih punya test, tercantum di SPEC §14, dan bisa dipakai versi HP, jadi jangan dihapus tanpa memastikan ke tim HP.
+"Tidak dipakai" hanya berarti tidak dipanggil oleh frontend web. Keduanya tetap dipertahankan, punya test, dan tercantum di SPEC §14. **Konfirmasi dulu ke tim HP sebelum menghapus.**
 
 | Method | Endpoint | Fungsi | Keterangan |
 |---|---|---|---|
 | GET | `/api/buildings/{id}/rooms` | Daftar ruangan dalam satu gedung | Frontend memakai `GET /api/rooms?building_id={id}` |
 | GET | `/api/lookups/borrower-units` | Saran unit peminjam | Unit kerja di form pinjam kini teks bebas tanpa saran (SPEC §7) |
-| GET | `/api/lookups/request-methods` | Daftar cara permintaan | Form permintaan memakai daftar tetap di `pages/requests/RequestFormModal.tsx`, jadi isinya bisa berbeda jika salah satu diubah |
+
+`GET /api/lookups/request-methods` juga sempat tidak dipakai. Sejak T26p form permintaan mengambil pilihannya dari endpoint ini, sehingga web dan versi HP memakai sumber yang sama. Endpoint ini tidak boleh dihapus.
+
+## Batas permintaan
+
+Melewati batas dijawab 429 dengan pesan Bahasa Indonesia dan header `Retry-After`, kecuali halaman publik yang masih memakai pesan bawaan Laravel.
+
+| Endpoint | Batas | Dihitung per |
+|---|---|---|
+| `POST /api/login` | 5/menit | Kombinasi username + IP |
+| `POST /api/login` | 20/menit | IP |
+| `GET /api/public/assets/{token}` | 30/menit | IP |
+| `GET /api/reports/{type}` | 10/menit | Pengguna |
+| `GET /api/assets/{id}/label`, `POST /api/assets/labels` | 20/menit, jatah bersama | Pengguna |
+| `POST /api/assets/{id}/files` | 30/menit | Pengguna |
+
+Di balik reverse proxy, batas per IP hanya benar jika `TRUSTED_PROXIES` diisi. Tanpa itu semua pengunjung terbaca satu IP dan berbagi jatah.
+
+## Aturan input
+
+| Input | Aturan | Jika dilanggar |
+|---|---|---|
+| `username` pada login | Teks UTF-8 tanpa karakter NUL, maks. 50 karakter | 422 |
+| `{token}` halaman publik | Tepat 12 karakter huruf dan angka | 404, tanpa query ke database |
+| `search` pada `/api/lookups/*` | Teks, maks. 100 karakter | 422 |
+| `quantity`, `min_quantity`, `standard_quantity`, `actual_quantity` | Maks. 2147483647 | 422 |
+| `adjustment` pada `PATCH /api/consumables/{id}/quantity` | Antara -2147483647 dan 2147483647; hasil akhir tidak boleh melewati batas | 422 |
+| Nama file unggahan | UTF-8 sah, maks. 255 karakter | 422 |
+
+Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diunduh sebagai `evil.pdf`. Nama asli tetap ditampilkan di daftar file.
 
 ## Daftar endpoint API
 
@@ -45,7 +74,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| POST | `/api/login` | Login, mengembalikan token dan data akun | Publik, maks. 5/menit per username + IP | Ya: Halaman Login (`pages/LoginPage.tsx`) |
+| POST | `/api/login` | Login, mengembalikan token dan data akun | Publik, maks. 5/menit per username + IP dan 20/menit per IP | Ya: Halaman Login (`pages/LoginPage.tsx`) |
 | POST | `/api/logout` | Logout, mencabut token yang dipakai | Token | Ya: Tombol Keluar (`components/layout/AppLayout.tsx`) |
 | GET | `/api/user` | Data akun yang sedang login | Token | Ya: Pemeriksaan sesi (`components/RequireAuth.tsx`) |
 
@@ -67,7 +96,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| GET | `/api/reports/{type}` | Unduh laporan Excel. `type`: `assets`, `loans`, `rooms`, `requests`, `consumables` | Token | Ya: Ekspor di Dashboard dan tiap halaman daftar (`lib/download.ts`) |
+| GET | `/api/reports/{type}` | Unduh laporan Excel. `type`: `assets`, `loans`, `rooms`, `requests`, `consumables` | Token, maks. 10/menit per pengguna | Ya: Ekspor di Dashboard dan tiap halaman daftar (`lib/download.ts`) |
 
 ### Data master: departemen
 
@@ -115,7 +144,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
 | GET | `/api/lookups/borrower-units` | Saran unit peminjam | Token | **Tidak** |
-| GET | `/api/lookups/request-methods` | Daftar cara permintaan | Token | **Tidak** |
+| GET | `/api/lookups/request-methods` | Pilihan cara permintaan, satu sumber untuk web dan versi HP | Token | Ya: Form permintaan (`lib/queries/master.ts`) |
 | GET | `/api/lookups/storage-locations` | Saran lokasi simpan stok | Token | Ya: Form barang stok (`lib/queries/master.ts`) |
 
 ### Aset
@@ -135,13 +164,13 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | POST | `/api/assets/{id}/services` | Catat servis | Token | Ya: Popup servis (`pages/assets/modals/ServiceModal.tsx`) |
 | PATCH | `/api/assets/{id}/location` | Pindah lokasi | Token | Ya: Popup pindah (`pages/assets/modals/MoveLocationModal.tsx`) |
 | GET | `/api/assets/{id}/files` | Daftar foto dan dokumen | Token | Ya: Detail aset, form ubah (`lib/queries/lists.ts`) |
-| POST | `/api/assets/{id}/files` | Unggah foto atau dokumen | Token | Ya: Form ubah (`pages/assets/AssetFilesManager.tsx`) |
+| POST | `/api/assets/{id}/files` | Unggah foto atau dokumen | Token, maks. 30/menit per pengguna | Ya: Form ubah (`pages/assets/AssetFilesManager.tsx`) |
 | DELETE | `/api/asset-files/{id}` | Hapus file | Token | Ya: Form ubah (`pages/assets/AssetFilesManager.tsx`) |
 | GET | `/api/asset-files/{id}/download` | Ambil isi file. URL-nya dikirim backend lewat `download_url` | Token | Ya: Detail aset, form ubah (`pages/assets/AssetDetailPage.tsx`, `pages/assets/AssetFilesManager.tsx`) |
 | GET | `/api/assets/scan/{value}` | Cari aset dari kode, kode lama, atau token QR | Token | Ya: Scan QR (`pages/scan/useScanLookup.ts`) |
 | GET | `/api/assets/{id}/qr` | Gambar QR | Token | Ya: Detail aset (`pages/assets/AssetDetailPage.tsx`) |
-| GET | `/api/assets/{id}/label` | PDF label satu aset | Token | Ya: Detail aset (`pages/assets/AssetDetailPage.tsx`) |
-| POST | `/api/assets/labels` | PDF label banyak aset, maks. 120 | Token | Ya: Daftar Aset (`pages/assets/AssetListPage.tsx`) |
+| GET | `/api/assets/{id}/label` | PDF label satu aset | Token, maks. 20/menit per pengguna | Ya: Detail aset (`pages/assets/AssetDetailPage.tsx`) |
+| POST | `/api/assets/labels` | PDF label banyak aset, maks. 120 | Token, maks. 20/menit per pengguna | Ya: Daftar Aset (`pages/assets/AssetListPage.tsx`) |
 
 ### Peminjaman
 

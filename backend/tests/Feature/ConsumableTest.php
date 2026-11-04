@@ -125,6 +125,32 @@ class ConsumableTest extends TestCase
         $this->getJson("/api/consumables/{$id}")->assertOk()->assertJsonPath('meta.used_in_rooms', []);
     }
 
+    public function test_quantity_and_adjustment_stop_at_integer_column_limit(): void
+    {
+        $item = $this->consumable(['quantity' => 10]);
+        $url = "/api/consumables/{$item->id}/quantity";
+
+        $this->patchJson($url, ['quantity' => 2147483648])->assertJsonValidationErrors('quantity');
+        $this->patchJson($url, ['adjustment' => 2147483648])->assertJsonValidationErrors('adjustment');
+        $this->patchJson($url, ['adjustment' => -2147483648])->assertJsonValidationErrors('adjustment');
+        $this->assertSame(10, $item->fresh()->quantity);
+
+        $this->patchJson($url, ['quantity' => 2147483647])->assertOk();
+        $this->patchJson($url, ['adjustment' => 1])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.adjustment.0', 'Jumlah stok melebihi batas.');
+        $this->assertSame(2147483647, $item->fresh()->quantity);
+    }
+
+    public function test_store_rejects_quantities_above_integer_column_limit(): void
+    {
+        $this->postJson('/api/consumables', $this->payload(['quantity' => 2147483648, 'min_quantity' => 2147483648]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['quantity', 'min_quantity']);
+
+        $this->assertDatabaseCount('consumables', 0);
+    }
+
     public function test_store_validation(): void
     {
         $this->consumable(['name' => 'Pulpen']);

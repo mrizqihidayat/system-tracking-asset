@@ -186,7 +186,7 @@ class AssetController extends Controller
     public function destroy(DeleteAssetRequest $request, Asset $asset): JsonResponse
     {
         $code = $asset->code;
-        $this->assets->delete($asset, $request->validated('confirm_code'));
+        $this->assets->delete($asset, $request->validated('confirm_code'), $request->user());
 
         return response()->json(['message' => "Aset {$code} dihapus."]);
     }

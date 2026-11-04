@@ -46,5 +46,6 @@ export const queryKeys = {
     assetTypes: () => ['master', 'asset-types'] as const,
     requestCatalog: () => ['master', 'request-catalog'] as const,
     storageLocations: () => ['master', 'storage-locations'] as const,
+    requestMethods: () => ['master', 'request-methods'] as const,
   },
 }

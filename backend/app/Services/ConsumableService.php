@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Consumable;
 use App\Models\RoomStandard;
+use App\Support\DbInteger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -43,7 +44,7 @@ class ConsumableService
     }
 
     /**
-     * Tambah/kurang jumlah; hasil akhir tidak boleh negatif.
+     * Tambah/kurang jumlah; hasil akhir tidak boleh negatif atau melewati batas kolom.
      */
     public function adjust(Consumable $consumable, int $adjustment): Consumable
     {
@@ -53,6 +54,10 @@ class ConsumableService
 
             if ($result < 0) {
                 throw ValidationException::withMessages(['adjustment' => "Stok tidak cukup (tersisa {$consumable->quantity})."]);
+            }
+
+            if ($result > DbInteger::MAX) {
+                throw ValidationException::withMessages(['adjustment' => 'Jumlah stok melebihi batas.']);
             }
 
             $consumable->update(['quantity' => $result]);

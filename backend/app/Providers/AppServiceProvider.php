@@ -31,13 +31,32 @@ class AppServiceProvider extends ServiceProvider
         // Halaman publik QR (tanpa login): batasi per IP.
         RateLimiter::for('public-assets', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
 
-        // Login: maks. 5 percobaan per menit per kombinasi username + IP (SPEC §15).
-        RateLimiter::for('login', fn (Request $request) => Limit::perMinute(5)
-            ->by(mb_strtolower(trim((string) $request->input('username'))).'|'.$request->ip())
-            ->response(function (Request $request, array $headers) {
+        // Login: maks. 5 percobaan per menit per username + IP, dan 20 per menit per IP (SPEC §15).
+        // Username bukan teks tidak dipakai sebagai kunci; validasi yang menjawab 422.
+        RateLimiter::for('login', function (Request $request) {
+            $username = $request->input('username');
+            $key = (is_string($username) ? mb_strtolower(trim($username)) : '').'|'.$request->ip();
+            $tooMany = function (Request $request, array $headers) {
                 $seconds = (int) ($headers['Retry-After'] ?? 60);
 
                 return response()->json(['message' => "Terlalu banyak percobaan login. Coba lagi dalam {$seconds} detik."], 429, $headers);
-            }));
+            };
+
+            return [
+                Limit::perMinute(5)->by($key)->response($tooMany),
+                Limit::perMinute(20)->by($request->ip())->response($tooMany),
+            ];
+        });
+
+        // Endpoint berat per pengguna (SPEC §14).
+        foreach (['reports' => 10, 'labels' => 20, 'uploads' => 30] as $name => $perMinute) {
+            RateLimiter::for($name, fn (Request $request) => Limit::perMinute($perMinute)
+                ->by((string) ($request->user()?->id ?? $request->ip()))
+                ->response(function (Request $request, array $headers) {
+                    $seconds = (int) ($headers['Retry-After'] ?? 60);
+
+                    return response()->json(['message' => "Terlalu banyak permintaan. Coba lagi dalam {$seconds} detik."], 429, $headers);
+                }));
+        }
     }
 }

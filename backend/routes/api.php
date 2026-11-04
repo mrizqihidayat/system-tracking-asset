@@ -40,7 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/panels', [DashboardController::class, 'panels']);
 
     // Ekspor laporan Excel (SPEC §12): hanya .xlsx
-    Route::get('/reports/{type}', [ReportController::class, 'show'])->whereIn('type', ReportType::values());
+    Route::get('/reports/{type}', [ReportController::class, 'show'])->whereIn('type', ReportType::values())->middleware('throttle:reports');
 
     // Master & lookup (SPEC §14)
     Route::get('/departments/{department}/usage', [DepartmentController::class, 'usage'])->whereNumber('department');
@@ -77,15 +77,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Foto & dokumen aset (SPEC §5): slot per jenis (kecuali Lainnya), stream lewat backend
     Route::get('/assets/{asset}/files', [AssetFileController::class, 'index'])->whereNumber('asset');
-    Route::post('/assets/{asset}/files', [AssetFileController::class, 'store'])->whereNumber('asset');
+    Route::post('/assets/{asset}/files', [AssetFileController::class, 'store'])->whereNumber('asset')->middleware('throttle:uploads');
     Route::delete('/asset-files/{assetFile}', [AssetFileController::class, 'destroy'])->whereNumber('assetFile');
     Route::get('/asset-files/{assetFile}/download', [AssetFileController::class, 'download'])->whereNumber('assetFile')->name('asset-files.download');
 
     // Scan & label QR (SPEC §6)
     Route::get('/assets/scan/{value}', [AssetScanController::class, 'show']);
     Route::get('/assets/{asset}/qr', [AssetQrController::class, 'show'])->whereNumber('asset');
-    Route::get('/assets/{asset}/label', [AssetLabelController::class, 'show'])->whereNumber('asset');
-    Route::post('/assets/labels', [AssetLabelController::class, 'store']);
+    Route::get('/assets/{asset}/label', [AssetLabelController::class, 'show'])->whereNumber('asset')->middleware('throttle:labels');
+    Route::post('/assets/labels', [AssetLabelController::class, 'store'])->middleware('throttle:labels');
 
     // Peminjaman (SPEC §7)
     Route::get('/loans', [LoanController::class, 'index']);

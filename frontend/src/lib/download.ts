@@ -1,4 +1,5 @@
 import { api } from './api'
+import { unwrapBlobError } from './blob'
 
 export type ReportType = 'assets' | 'loans' | 'rooms' | 'requests' | 'consumables'
 
@@ -38,19 +39,6 @@ function save(blob: Blob, name: string) {
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
-
-/** Blob error dari axios (responseType blob) → JSON agar errorMessage() bisa membaca `message`. */
-async function unwrapBlobError(error: unknown): Promise<never> {
-  const res = (error as { response?: { data?: unknown } }).response
-  if (res?.data instanceof Blob) {
-    try {
-      res.data = JSON.parse(await res.data.text())
-    } catch {
-      // bukan JSON; biarkan pesan umum
-    }
-  }
-  throw error
 }
 
 /**

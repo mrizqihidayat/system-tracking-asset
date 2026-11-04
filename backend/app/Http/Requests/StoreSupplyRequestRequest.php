@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\RequestCatalog;
+use App\Support\DbInteger;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -29,7 +30,7 @@ class StoreSupplyRequestRequest extends FormRequest
             'room_standard_id' => ['nullable', 'integer', 'exists:room_standards,id'],
             'item_name' => ['required_without:catalog_id', 'nullable', 'string', 'max:150'],
             'must_return' => ['nullable', 'boolean'],
-            'quantity' => ['required', 'integer', 'min:1'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:'.DbInteger::MAX],
             'purpose' => ['nullable', 'string', 'max:255'],
             'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
             'provider_department_id' => ['required_without:catalog_id', 'nullable', 'integer', 'exists:departments,id'],

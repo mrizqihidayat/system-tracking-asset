@@ -19,6 +19,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -195,10 +196,11 @@ class AssetService
      * Hapus aset PERMANEN (semua status, termasuk Dipinjam). Satu transaksi dengan lock: kode lama,
      * file, riwayat, dan pinjaman (termasuk yang aktif) dihapus lebih dulu (FK tetap RESTRICT).
      * Aset yang punya riwayat pinjam wajib confirm_code = kode aset. File storage dihapus setelah commit.
+     * Riwayat ikut terhapus, jadi siapa yang menghapus dicatat di log keamanan setelah commit.
      */
-    public function delete(Asset $asset, ?string $confirmCode): void
+    public function delete(Asset $asset, ?string $confirmCode, User $actor): void
     {
-        DB::transaction(function () use ($asset, $confirmCode) {
+        DB::transaction(function () use ($asset, $confirmCode, $actor) {
             $asset = $this->lock($asset);
 
             if ($asset->loans()->exists() && mb_strtoupper(trim((string) $confirmCode)) !== mb_strtoupper($asset->code)) {
@@ -214,6 +216,12 @@ class AssetService
             $asset->delete();
 
             $this->files->deleteFromStorageAfterCommit($paths);
+
+            DB::afterCommit(fn () => Log::channel('security')->info('asset.deleted', [
+                'asset_code' => $asset->code,
+                'user_id' => $actor->id,
+                'username' => $actor->username,
+            ]));
         });
     }
 

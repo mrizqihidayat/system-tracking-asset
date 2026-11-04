@@ -14,6 +14,7 @@ use App\Models\Loan;
 use App\Models\Room;
 use App\Models\RoomStandard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -134,6 +135,49 @@ class PublicAssetTest extends TestCase
             ->assertExactJson(['message' => 'Aset tidak ditemukan.']);
 
         $this->getJson('/api/public/assets/tidakada12345')->assertNotFound();
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function malformedTokenProvider(): array
+    {
+        return [
+            'karakter NUL' => ['abc%00defghij'],
+            'terlalu pendek' => ['abc'],
+            'terlalu panjang' => [str_repeat('a', 13)],
+            'ada simbol' => ['abcdefghij-k'],
+            'kode aset' => ['SHD-PRJ-001'],
+            'wildcard' => ['%25'],
+        ];
+    }
+
+    #[DataProvider('malformedTokenProvider')]
+    public function test_malformed_token_returns_404_without_querying_database(string $token): void
+    {
+        DB::enableQueryLog();
+
+        $this->getJson("/api/public/assets/{$token}")
+            ->assertNotFound()
+            ->assertExactJson(['message' => 'Aset tidak ditemukan.']);
+
+        $this->assertSame([], DB::getQueryLog());
+    }
+
+    public function test_rate_limit_reads_visitor_ip_behind_trusted_proxy(): void
+    {
+        config(['trustedproxy.proxies' => ['10.0.0.1']]);
+
+        $visit = fn (string $ip) => $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.1'])
+            ->withHeader('X-Forwarded-For', $ip)
+            ->getJson("/api/public/assets/{$this->asset->public_token}");
+
+        for ($i = 0; $i < 30; $i++) {
+            $visit('203.0.113.5')->assertOk();
+        }
+
+        $visit('203.0.113.5')->assertTooManyRequests();
+        $visit('203.0.113.6')->assertOk();
     }
 
     public function test_public_endpoint_is_rate_limited(): void
