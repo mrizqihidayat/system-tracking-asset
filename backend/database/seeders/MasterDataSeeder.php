@@ -31,7 +31,7 @@ class MasterDataSeeder extends Seeder
             $building = Building::create(['name' => $buildingName]);
 
             foreach ($rooms as $roomName) {
-                $building->rooms()->create(['name' => $roomName]);
+                $building->rooms()->create(['name' => $roomName, 'is_storage' => in_array($roomName, ['Gudang IHS', 'Gudang MH', 'Main Office SHD'], true)]);
             }
         }
 

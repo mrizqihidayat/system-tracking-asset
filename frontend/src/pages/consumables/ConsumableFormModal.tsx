@@ -33,6 +33,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const [roomId, setRoomId] = useState<number | null>(item?.room?.id ?? null)
   const [buildingPending, setBuildingPending] = useState(false)
   const [roomPending, setRoomPending] = useState(false)
+  const [roomText, setRoomText] = useState('')
   const { data: rooms } = useRooms(buildingId, true)
   const [note, setNote] = useState(item?.note ?? '')
 
@@ -70,9 +71,13 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
     })
   const addRoom = (roomName: string) =>
     guarded(async () => {
-      const r = await createRoom(buildingId!, roomName)
+      const r = await createRoom(buildingId!, roomName, true)
       return { id: r.id, label: r.name }
     })
+
+  /** Lokasi simpan hanya gudang; nama ruangan biasa tidak bisa ditambah ulang, harus ditandai di Data Master. */
+  const isNonStorageRoom = (text: string) => rooms.some((r) => !r.is_storage && r.name.toLowerCase() === text.trim().toLowerCase())
+  const roomBlocked = !!buildingId && isNonStorageRoom(roomText)
 
   const submit = async () => {
     const payload: Record<string, unknown> = {
@@ -154,6 +159,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
                   setBuildingId(id)
                   setRoomId(null)
                   setRoomPending(false)
+                  setRoomText('')
                 }}
                 onCreate={addBuilding}
                 onPendingChange={setBuildingPending}
@@ -164,17 +170,23 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
               <EntityCombobox
                 key={buildingId ?? 'none'}
                 value={roomId}
-                options={buildingId ? rooms.map((r) => ({ id: r.id, label: r.name })) : []}
+                options={buildingId ? rooms.filter((r) => r.is_storage).map((r) => ({ id: r.id, label: r.name })) : []}
                 onChange={setRoomId}
                 onCreate={buildingId ? addRoom : undefined}
                 onPendingChange={setRoomPending}
-                placeholder={buildingId ? 'Misal: Gudang' : 'Pilih gedung dulu'}
+                onTextChange={setRoomText}
+                isExisting={isNonStorageRoom}
+                placeholder={buildingId ? 'Pilih gudang, misal Gudang IHS' : 'Pilih gedung dulu'}
                 disabled={!buildingId}
                 error={errors.room_id}
               />
             </FormField>
           </div>
-          {(buildingPending || roomPending) && <p className="-mt-1 text-xs text-slate-500">Pilih gedung/ruangan dari daftar atau klik Tambah, atau kosongkan.</p>}
+          {roomBlocked ? (
+            <p role="alert" className="-mt-1 text-xs font-medium text-warn-700">Ruangan ini sudah ada tetapi bukan gudang. Tandai sebagai gudang di Data Master.</p>
+          ) : (buildingPending || roomPending) && (
+            <p className="-mt-1 text-xs text-slate-500">Pilih gedung/ruangan dari daftar atau klik Tambah, atau kosongkan.</p>
+          )}
           <FormField label="Catatan (opsional)" error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} />
           </FormField>

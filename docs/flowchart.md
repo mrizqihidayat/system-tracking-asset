@@ -292,7 +292,7 @@ flowchart TD
     A([Mulai]) --> B[Daftar barang: jumlah, minimum, status, lokasi simpan ruangan & gedung, departemen penyedia; filter status, gedung, ruangan & cari]
     B --> C{Pilih aksi}
 
-    C -- Tambah / Ubah data --> T1[Input nama unik, kategori pilih atau tambah baru, satuan, minimum, minta ke, lokasi simpan gedung lalu ruangan bisa tambah baru, catatan; jumlah awal hanya saat tambah, dicatat sebagai saldo awal] --> T2[(Simpan)] --> CEK
+    C -- Tambah / Ubah data --> T1[Input nama unik, kategori pilih atau tambah baru, satuan, minimum, minta ke, lokasi simpan gedung lalu ruangan gudang, ruangan baru otomatis gudang, catatan; jumlah awal hanya saat tambah, dicatat sebagai saldo awal] --> T2[(Simpan)] --> CEK
 
     C -- Catat transaksi --> J0[Pilih jenis: Barang Masuk, Pemakaian ruangan opsional, Koreksi keterangan wajib, Penghapusan alasan wajib; jumlah, keterangan]
     J0 --> J3{Hasil >= 0?}

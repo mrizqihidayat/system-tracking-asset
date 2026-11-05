@@ -171,6 +171,7 @@ class ReportService
                     $summary['shortage_items'],
                     $summary['unchecked_items'],
                     match (true) {
+                        $room->is_storage => 'Gudang',
                         $summary['total_items'] === 0 => 'Belum ada standar',
                         $summary['shortage_items'] > 0 => "Kurang {$summary['shortage_items']} item",
                         default => 'Lengkap',

@@ -29,7 +29,7 @@ class UpdateConsumableRequest extends StoreConsumableRequest
      */
     public function messages(): array
     {
-        return ['quantity.prohibited' => 'Jumlah diubah lewat transaksi stok.'];
+        return [...parent::messages(), 'quantity.prohibited' => 'Jumlah diubah lewat transaksi stok.'];
     }
 
     protected function ignoreId(): ?int

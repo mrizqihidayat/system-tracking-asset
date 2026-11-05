@@ -125,12 +125,16 @@ class RoomReadinessService
     }
 
     /**
-     * Bagian hanya-baca "Stok tersimpan di sini": barang yang lokasi simpannya ruangan ini; tidak dihitung sebagai Ada.
+     * Bagian hanya-baca "Stok tersimpan di sini" (khusus gudang): barang yang lokasi simpannya ruangan ini; tidak dihitung sebagai Ada.
      *
      * @return list<array{id: int, name: string, quantity: int, unit: string, status: string}>
      */
     public function storedStock(Room $room): array
     {
+        if (! $room->is_storage) {
+            return [];
+        }
+
         return Consumable::query()
             ->where('room_id', $room->id)
             ->orderBy('name')
@@ -189,7 +193,7 @@ class RoomReadinessService
 
     /**
      * Ringkasan kesiapan per gedung → ruangan (array, di-cache grup ops); dipakai halaman kelengkapan
-     * dan dashboard. Semua ruangan tampil; ruangan tanpa standar bukan Lengkap dan bukan kurang.
+     * dan dashboard. Semua ruangan tampil; ruangan tanpa standar bukan Lengkap dan bukan kurang; gudang tidak dihitung belum lengkap.
      *
      * @return list<array{id: int, name: string, slug: string, rooms_count: int, incomplete_rooms_count: int, rooms: list<array<string, mixed>>}>
      */
@@ -201,6 +205,7 @@ class RoomReadinessService
                     'id' => $room->id,
                     'name' => $room->name,
                     'slug' => $room->slug,
+                    'is_storage' => $room->is_storage,
                     'last_checked_at' => $room->last_checked_at?->toIso8601String(),
                     'last_checked_by' => $room->lastCheckedBy?->name,
                     ...$this->summarize($room->standards),
@@ -211,7 +216,7 @@ class RoomReadinessService
                     'name' => $building->name,
                     'slug' => $building->slug,
                     'rooms_count' => $rooms->count(),
-                    'incomplete_rooms_count' => $rooms->where('shortage_items', '>', 0)->count(),
+                    'incomplete_rooms_count' => $rooms->where('is_storage', false)->where('shortage_items', '>', 0)->count(),
                     'rooms' => $rooms->values()->all(),
                 ];
             })

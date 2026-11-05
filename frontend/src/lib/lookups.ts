@@ -19,8 +19,8 @@ export const createDepartment = async (name: string) =>
   added(queryKeys.master.departments(), (await api.post<{ data: Department }>('/departments', { name })).data.data)
 export const createBuilding = async (name: string) =>
   added(queryKeys.master.buildings(), (await api.post<{ data: Building }>('/buildings', { name })).data.data)
-export const createRoom = async (buildingId: number, name: string) =>
-  added(queryKeys.master.rooms(buildingId), (await api.post<{ data: Room }>(`/buildings/${buildingId}/rooms`, { name })).data.data)
+export const createRoom = async (buildingId: number, name: string, isStorage = false) =>
+  added(queryKeys.master.rooms(buildingId), (await api.post<{ data: Room }>(`/buildings/${buildingId}/rooms`, { name, is_storage: isStorage })).data.data)
 export const createConsumableCategory = async (name: string) =>
   added(queryKeys.master.consumableCategories(), (await api.post<{ data: ConsumableCategory }>('/consumable-categories', { name })).data.data)
 export const createAssetType = async (name: string) =>

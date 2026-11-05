@@ -15,6 +15,8 @@ interface Props {
   onCreate?: (name: string) => Promise<Option>
   /** Untuk kolom opsional: true selama ada teks ketikan yang belum menjadi pilihan. */
   onPendingChange?: (pending: boolean) => void
+  /** Teks yang sedang diketik, untuk keterangan di luar kolom. */
+  onTextChange?: (text: string) => void
   createLabel?: (text: string) => string
   isExisting?: (text: string) => boolean
   placeholder?: string
@@ -23,7 +25,7 @@ interface Props {
 }
 
 /** Combobox yang mengikat id (bukan teks): pilih dari saran atau tambah nama baru. */
-export default function EntityCombobox({ value, options, onChange, onCreate, onPendingChange, createLabel, isExisting, placeholder, error, disabled }: Props) {
+export default function EntityCombobox({ value, options, onChange, onCreate, onPendingChange, onTextChange, createLabel, isExisting, placeholder, error, disabled }: Props) {
   const [typed, setTyped] = useState<string | null>(null)
   const selectedLabel = options.find((o) => o.id === value)?.label
   const text = typed ?? selectedLabel ?? ''
@@ -41,6 +43,7 @@ export default function EntityCombobox({ value, options, onChange, onCreate, onP
       onChange={(t) => {
         setTyped(t)
         onPendingChange?.(t.trim() !== '')
+        onTextChange?.(t)
         if (value !== null) onChange(null)
       }}
       onSelect={async ({ id, label }) => {

@@ -28,6 +28,7 @@ type FormState = {
   target?: MasterTarget
   createUrl?: string
   withCode?: boolean
+  withStorage?: boolean
 }
 
 interface Data {
@@ -138,13 +139,13 @@ export default function MasterDataPage() {
               >
                 <ul className="divide-y divide-slate-200">
                   {rooms.map((r) => {
-                    const t: MasterTarget = { kind: 'Ruangan', name: r.name, url: `/rooms/${r.id}` }
-                    return childRow(r.name, null, () => setForm({ kind: 'Ruangan', target: t }), () => setDeleting(t), r.id)
+                    const t: MasterTarget = { kind: 'Ruangan', name: r.name, url: `/rooms/${r.id}`, isStorage: r.is_storage }
+                    return childRow(r.name, r.is_storage ? <Badge color="blue">Gudang</Badge> : null, () => setForm({ kind: 'Ruangan', target: t, withStorage: true }), () => setDeleting(t), r.id)
                   })}
                   <li className="py-2">
                     <button
                       className="flex min-h-9 items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"
-                      onClick={() => setForm({ kind: 'Ruangan', createUrl: `/buildings/${b.id}/rooms` })}
+                      onClick={() => setForm({ kind: 'Ruangan', createUrl: `/buildings/${b.id}/rooms`, withStorage: true })}
                     >
                       <Plus size={14} /> Tambah ruangan di {b.name}
                     </button>

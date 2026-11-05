@@ -6,6 +6,7 @@ use App\Rules\UniqueCaseInsensitive;
 use App\Support\DbInteger;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreConsumableRequest extends FormRequest
 {
@@ -26,9 +27,17 @@ class StoreConsumableRequest extends FormRequest
             'quantity' => ['required', 'integer', 'min:0', 'max:'.DbInteger::MAX],
             'min_quantity' => ['required', 'integer', 'min:0', 'max:'.DbInteger::MAX],
             'provider_department_id' => ['required', 'integer', 'exists:departments,id'],
-            'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
+            'room_id' => ['nullable', 'integer', Rule::exists('rooms', 'id')->where('is_storage', true)],
             'note' => ['nullable', 'string', 'max:1000'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['room_id.exists' => 'Lokasi simpan harus ruangan gudang.'];
     }
 
     protected function ignoreId(): ?int

@@ -21,6 +21,7 @@ class RoomResource extends JsonResource
             'building_id' => $this->building_id,
             'name' => $this->name,
             'slug' => $this->slug,
+            'is_storage' => $this->is_storage,
             'building' => BuildingResource::make($this->whenLoaded('building')),
             'last_checked_at' => $this->last_checked_at?->toIso8601String(),
         ];

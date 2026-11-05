@@ -26,6 +26,7 @@ class StoreRoomRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:100', new UniqueCaseInsensitive('rooms', where: ['building_id' => $building->id])],
+            'is_storage' => ['sometimes', 'boolean'],
         ];
     }
 }

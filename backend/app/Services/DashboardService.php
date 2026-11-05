@@ -55,7 +55,8 @@ class DashboardService
     public function roomReadiness(): array
     {
         return array_map(function (array $building) {
-            $rooms = collect($building['rooms']);
+            // Gudang tidak masuk hitungan kesiapan.
+            $rooms = collect($building['rooms'])->where('is_storage', false);
             $incomplete = $rooms->where('shortage_items', '>', 0);
 
             return [
@@ -147,7 +148,7 @@ class DashboardService
      */
     private function incompleteRooms(array $buildings): array
     {
-        $rooms = collect($buildings)->flatMap(fn (array $building) => $building['rooms']);
+        $rooms = collect($buildings)->flatMap(fn (array $building) => $building['rooms'])->where('is_storage', false);
 
         return [
             'incomplete' => $rooms->where('shortage_items', '>', 0)->count(),

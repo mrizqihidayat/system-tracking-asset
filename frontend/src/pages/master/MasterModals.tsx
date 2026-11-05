@@ -15,6 +15,8 @@ export interface MasterTarget {
   url: string
   /** Kode singkat (hanya jenis aset). */
   code?: string
+  /** Tanda gudang (hanya ruangan). */
+  isStorage?: boolean
 }
 
 interface Usage {
@@ -26,22 +28,26 @@ interface Usage {
 
 /** Tambah atau ubah nama (+ kode untuk jenis aset). `createUrl` diisi untuk tambah; `target` untuk ubah. */
 export function MasterFormModal({
-  kind, target, createUrl, withCode, onClose, onDone,
+  kind, target, createUrl, withCode, withStorage, onClose, onDone,
 }: {
   kind: string
   target?: MasterTarget
   createUrl?: string
   withCode?: boolean
+  /** Ruangan: pilihan Gudang / tempat penyimpanan. */
+  withStorage?: boolean
   onClose: () => void
   onDone: () => void
 }) {
   const toast = useToast()
   const [name, setName] = useState(target?.name ?? '')
   const [code, setCode] = useState(target?.code ?? '')
+  const [isStorage, setIsStorage] = useState(target?.isStorage ?? false)
 
   const submit = async () => {
     const payload: Record<string, unknown> = { name: name.trim() }
     if (withCode && code.trim()) payload.code = code.trim().toUpperCase()
+    if (withStorage) payload.is_storage = isStorage
     if (target) await api.put(target.url, payload)
     else await api.post(createUrl!, payload)
     toast.success(target ? `${kind} diperbarui.` : `${kind} ditambahkan.`)
@@ -61,6 +67,16 @@ export function MasterFormModal({
           <FormField label="Nama" required error={errors.name}>
             <Input value={name} onChange={(e) => setName(e.target.value)} error={errors.name} maxLength={100} autoFocus />
           </FormField>
+          {withStorage && (
+            <div>
+              <label className="flex min-h-10 items-center gap-2 text-sm font-medium text-slate-700">
+                <input type="checkbox" className="h-4 w-4" checked={isStorage} onChange={(e) => setIsStorage(e.target.checked)} />
+                Gudang / tempat penyimpanan
+              </label>
+              {errors.is_storage && <span className="block text-xs font-medium text-bad-700">{errors.is_storage}</span>}
+              <p className="text-xs text-slate-500">Hanya ruangan gudang yang bisa menjadi lokasi simpan stok, dan tidak dihitung dalam kesiapan ruangan.</p>
+            </div>
+          )}
           {withCode && (
             <FormField label={target ? 'Kode singkat' : 'Kode singkat (kosong = otomatis)'} required={!!target} error={errors.code}>
               <Input

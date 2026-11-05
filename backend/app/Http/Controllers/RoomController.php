@@ -55,7 +55,7 @@ class RoomController extends Controller
     }
 
     /**
-     * Hanya nama; slug tetap (URL frontend stabil).
+     * Nama & tanda gudang; slug tetap (URL frontend stabil).
      */
     public function update(UpdateRoomRequest $request, Room $room): RoomResource
     {

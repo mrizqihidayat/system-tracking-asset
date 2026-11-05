@@ -23,6 +23,8 @@ export interface Room {
   building_id: number
   name: string
   slug: string
+  /** Gudang / tempat penyimpanan: bisa menjadi lokasi simpan stok. */
+  is_storage: boolean
   building?: Building
 }
 

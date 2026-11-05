@@ -13,6 +13,7 @@ export interface ReadinessRoom extends ReadinessSummary {
   id: number
   name: string
   slug: string
+  is_storage: boolean
   last_checked_at: string | null
   last_checked_by: string | null
 }

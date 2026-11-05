@@ -113,7 +113,7 @@ class ConsumableTest extends TestCase
     {
         // Stok tidak tertaut katalog: catalog_id yang masih dikirim diabaikan.
         $category = ConsumableCategory::factory()->create(['name' => 'ATK']);
-        $gudang = Room::factory()->for(Building::factory()->create(['name' => 'Gedung IHS']))->create(['name' => 'Gudang']);
+        $gudang = Room::factory()->for(Building::factory()->create(['name' => 'Gedung IHS']))->create(['name' => 'Gudang', 'is_storage' => true]);
 
         $id = $this->postJson('/api/consumables', $this->payload(['catalog_id' => 999, 'consumable_category_id' => $category->id, 'room_id' => $gudang->id]))
             ->assertCreated()

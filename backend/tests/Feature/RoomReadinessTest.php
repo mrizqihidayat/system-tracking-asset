@@ -198,6 +198,7 @@ class RoomReadinessTest extends TestCase
 
     public function test_stock_stored_in_room_is_listed_but_not_counted_as_present(): void
     {
+        $this->room->update(['is_storage' => true]);
         $here = Consumable::factory()->create(['name' => 'Tisu', 'room_id' => $this->room->id, 'quantity' => 8, 'min_quantity' => 2, 'unit' => 'dus']);
         Consumable::factory()->create(['name' => 'Kertas', 'room_id' => $this->room->id, 'quantity' => 0]);
         Consumable::factory()->create(['name' => 'Lain', 'room_id' => Room::factory()->create()->id]);

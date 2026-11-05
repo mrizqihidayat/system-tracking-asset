@@ -119,9 +119,9 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | DELETE | `/api/buildings/{id}` | Hapus gedung, ditolak jika masih dipakai | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 | GET | `/api/buildings/{id}/usage` | Pemakaian gedung sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 | GET | `/api/buildings/{id}/rooms` | Daftar ruangan dalam satu gedung | Token | **Tidak** |
-| POST | `/api/buildings/{id}/rooms` | Tambah ruangan di gedung | Token | Ya: Form aset, Kelengkapan Ruangan, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
+| POST | `/api/buildings/{id}/rooms` | Tambah ruangan di gedung, `is_storage` opsional | Token | Ya: Form aset, Form stok, Kelengkapan Ruangan, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
 | GET | `/api/rooms` | Daftar ruangan, filter `building_id` | Token | Ya: Dropdown ruangan, Data Master (`lib/queries/master.ts`) |
-| PUT | `/api/rooms/{id}` | Ubah ruangan | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
+| PUT | `/api/rooms/{id}` | Ubah nama & tanda gudang ruangan | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 | DELETE | `/api/rooms/{id}` | Hapus ruangan, ditolak jika masih dipakai | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 | GET | `/api/rooms/{id}/usage` | Pemakaian ruangan sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 

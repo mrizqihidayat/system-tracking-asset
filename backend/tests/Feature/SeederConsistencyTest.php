@@ -14,6 +14,7 @@ use App\Models\AssetType;
 use App\Models\Consumable;
 use App\Models\Department;
 use App\Models\Loan;
+use App\Models\Room;
 use App\Models\RoomStandard;
 use App\Models\SupplyRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -153,5 +154,6 @@ class SeederConsistencyTest extends TestCase
         $this->assertTrue(RoomStandard::query()->where('consumable_id', $tisu->id)->exists());
         $this->assertSame(0, Consumable::query()->whereNull('room_id')->count());
         $this->assertSame(['Gudang IHS', 'Gudang MH', 'Main Office SHD'], Consumable::with('room')->get()->pluck('room.name')->unique()->sort()->values()->all());
+        $this->assertSame(['Gudang IHS', 'Gudang MH', 'Main Office SHD'], Room::query()->where('is_storage', true)->orderBy('name')->pluck('name')->all());
     }
 }

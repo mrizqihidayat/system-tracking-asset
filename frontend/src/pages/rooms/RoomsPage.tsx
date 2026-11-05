@@ -327,9 +327,12 @@ export default function RoomsPage() {
               {building.rooms.map((r) => (
                 <button key={r.id} type="button" className={chip(r.id === roomId)}
                   onClick={() => navigate(`${BASE}/${building.slug}/${r.slug}`)}
-                  title={r.shortage_items ? `Kurang ${r.shortage_items} item` : r.total_items ? 'Lengkap' : 'Belum ada standar'}>
+                  title={r.is_storage ? 'Gudang' : r.shortage_items ? `Kurang ${r.shortage_items} item` : r.total_items ? 'Lengkap' : 'Belum ada standar'}>
                   {r.name}
-                  {r.shortage_items > 0 && (
+                  {r.is_storage && (
+                    <span className={`ml-2 rounded-full px-1.5 text-xs ${r.id === roomId ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}>Gudang</span>
+                  )}
+                  {!r.is_storage && r.shortage_items > 0 && (
                     <span className={`ml-2 rounded-full px-1.5 text-xs tabular-nums ${r.id === roomId ? 'bg-white/20' : 'bg-bad-50 text-bad-700'}`}>
                       −{r.shortage_items}
                     </span>
@@ -344,7 +347,7 @@ export default function RoomsPage() {
         )}
       </section>
 
-      {room && shortages > 0 && (
+      {room && !room.is_storage && shortages > 0 && (
         <div className="rounded-xl bg-warn-50 px-5 py-4 text-sm text-warn-700">
           <b>{room.name} kurang {shortages} item.</b>
           {consumableRows.some((s) => s.result === 'Kurang') && ' Barang habis pakai dapat diambil dari stok, atau ajukan permintaan jika stok habis.'}
@@ -354,13 +357,13 @@ export default function RoomsPage() {
       {room && (
         <>
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 className="font-semibold">{roomLabel}</h2>
+            <h2 className="flex items-center gap-2 font-semibold">{roomLabel}{room.is_storage && <Badge color="blue">Gudang</Badge>}</h2>
             <span className="text-sm text-slate-500">
               {room.last_checked_at
                 ? `Dicek terakhir ${formatDateTime(room.last_checked_at)} oleh ${room.last_checked_by ?? '-'}`
                 : 'Belum pernah dicek'}
               {checklist && checklist.meta.summary.unchecked_items > 0 && ` · ${checklist.meta.summary.unchecked_items} belum dicek`}
-              {checklist && checklist.meta.summary.total_items === 0 && ' · Belum ada standar'}
+              {checklist && !room.is_storage && checklist.meta.summary.total_items === 0 && ' · Belum ada standar'}
             </span>
           </div>
 

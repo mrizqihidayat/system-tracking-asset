@@ -11,11 +11,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['building_id', 'name', 'last_checked_at', 'last_checked_by'])]
+#[Fillable(['building_id', 'name', 'is_storage', 'last_checked_at', 'last_checked_by'])]
 class Room extends Model
 {
     /** @use HasFactory<RoomFactory> */
     use HasFactory, HasSlug;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_storage' => false,
+    ];
 
     /**
      * Slug ruangan unik per gedung.
@@ -39,6 +46,7 @@ class Room extends Model
     protected function casts(): array
     {
         return [
+            'is_storage' => 'boolean',
             'last_checked_at' => 'datetime',
         ];
     }
@@ -65,6 +73,16 @@ class Room extends Model
     public function assets(): HasMany
     {
         return $this->hasMany(Asset::class);
+    }
+
+    /**
+     * Barang stok yang lokasi simpannya ruangan ini.
+     *
+     * @return HasMany<Consumable, $this>
+     */
+    public function storedConsumables(): HasMany
+    {
+        return $this->hasMany(Consumable::class);
     }
 
     /**

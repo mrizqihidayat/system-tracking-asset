@@ -220,7 +220,7 @@ export default function ConsumablesPage() {
           aria-label="Ruangan lokasi simpan"
         >
           <option value="">Semua ruangan</option>
-          {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          {rooms.filter((r) => r.is_storage).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
         </Select>
       </div>
 
