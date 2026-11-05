@@ -49,6 +49,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/rooms/{room}/usage', [RoomController::class, 'usage'])->whereNumber('room');
     Route::get('/categories/{category}/usage', [CategoryController::class, 'usage'])->whereNumber('category');
     Route::get('/consumable-categories/{consumableCategory}/usage', [ConsumableCategoryController::class, 'usage'])->whereNumber('consumableCategory');
+    Route::get('/asset-types/code-suggestion', [AssetTypeController::class, 'codeSuggestion']);
+    Route::get('/asset-types/{assetType}/next-code', [AssetTypeController::class, 'nextCode'])->whereNumber('assetType');
     Route::get('/asset-types/{assetType}/usage', [AssetTypeController::class, 'usage'])->whereNumber('assetType');
     Route::apiResource('departments', DepartmentController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('buildings', BuildingController::class)->only(['index', 'store', 'update', 'destroy']);

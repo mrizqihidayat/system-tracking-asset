@@ -6,7 +6,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 
 ## Ringkasan
 
-- **92 endpoint API:** 90 dipakai frontend web, 2 tidak dipakai.
+- **94 endpoint API:** 92 dipakai frontend web, 2 tidak dipakai.
 - **6 route non-API:** tidak ada yang dipakai frontend.
 - **Alamat:** semua endpoint API berawalan `/api`. Frontend web mengambil alamat API dari `VITE_API_URL`.
 - **Akses "Token":** wajib header `Authorization: Bearer {token}` dari `POST /api/login`. Tanpa token sah dijawab 401.
@@ -20,7 +20,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Laporan | 1 | 1 | 0 |
 | Data master: departemen | 5 | 5 | 0 |
 | Data master: gedung & ruangan | 11 | 10 | 1 |
-| Data master: kategori & jenis aset | 10 | 10 | 0 |
+| Data master: kategori & jenis aset | 12 | 12 | 0 |
 | Data master: kategori stok | 5 | 5 | 0 |
 | Lookup | 3 | 2 | 1 |
 | Aset | 20 | 20 | 0 |
@@ -28,7 +28,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Kelengkapan ruangan | 7 | 7 | 0 |
 | Permintaan ke departemen lain | 11 | 11 | 0 |
 | Stok habis pakai | 7 | 7 | 0 |
-| **Total** | **92** | **90** | **2** |
+| **Total** | **94** | **92** | **2** |
 
 ## Endpoint API yang tidak dipakai frontend
 
@@ -138,6 +138,8 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | POST | `/api/asset-types` | Tambah jenis aset | Token | Ya: Form jenis aset baru, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
 | PUT/PATCH | `/api/asset-types/{id}` | Ubah jenis aset | Token | Ya: Data Master (`pages/master/MasterModals.tsx`), memakai PUT |
 | DELETE | `/api/asset-types/{id}` | Hapus jenis aset, ditolak jika masih dipakai | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
+| GET | `/api/asset-types/code-suggestion` | Saran kode jenis dari nama | Token | Ya: Form jenis aset baru (`pages/assets/modals/NewAssetTypeModal.tsx`) |
+| GET | `/api/asset-types/{id}/next-code` | Pratinjau kode aset berikutnya, tanpa memakai nomor | Token | Ya: Form aset (`pages/assets/AssetFormPage.tsx`) |
 | GET | `/api/asset-types/{id}/usage` | Pemakaian jenis aset sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 
 ### Data master: kategori stok

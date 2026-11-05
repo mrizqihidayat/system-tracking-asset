@@ -14,13 +14,17 @@ interface Props {
   placeholder?: string
   /** Izinkan menambah nama baru yang tidak ada di saran (tampil "Tambah '…'"). */
   allowCreate?: boolean
+  /** Teks opsi tambah; bawaan: Tambah “…”. */
+  createLabel?: (text: string) => string
+  /** Untuk label pilihan yang memuat info lain: true = nama ketikan sudah ada, opsi tambah disembunyikan. */
+  isExisting?: (text: string) => boolean
   error?: string
   disabled?: boolean
 }
 
 /** Kolom ketik-untuk-mencari; daftar pilihannya sama dengan Select. */
 export default function Combobox({
-  value, onChange, onSelect, options, placeholder, allowCreate, error, disabled,
+  value, onChange, onSelect, options, placeholder, allowCreate, createLabel, isExisting, error, disabled,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
@@ -32,7 +36,7 @@ export default function Combobox({
   const exact = options.some((o) => o.label.toLowerCase() === query)
   // Kolom berisi pilihan yang sudah tepat: tampilkan semua pilihan, bukan hanya yang cocok.
   const filtered = exact ? options : options.filter((o) => o.label.toLowerCase().includes(query))
-  const canCreate = !!allowCreate && query !== '' && !exact
+  const canCreate = !!allowCreate && query !== '' && !exact && !isExisting?.(value.trim())
   const count = filtered.length + (canCreate ? 1 : 0)
 
   const close = useCallback(() => setOpen(false), [])
@@ -140,7 +144,7 @@ export default function Combobox({
               onClick={() => pick(null, value.trim())}
               className={`flex items-center font-medium text-brand-700 ${dropdownOptionClass(active === filtered.length)}`}
             >
-              Tambah “{value.trim()}”
+              {createLabel ? createLabel(value.trim()) : `Tambah “${value.trim()}”`}
             </li>
           )}
         </ul>,

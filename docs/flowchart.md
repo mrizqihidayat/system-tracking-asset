@@ -44,7 +44,7 @@ flowchart TD
     A([Mulai]) --> B[Daftar aset berhalaman: filter kategori, gedung, ruangan, status, sumber, kondisi; cari nama, kode, S/N, kode lama]
     B --> C{Pilih aksi}
 
-    C -- Tambah aset --> T1[Input jenis, nama, merek, S/N, spesifikasi, sumber, PIC, gedung & ruangan, kode keuangan, tgl perolehan, servis berikutnya, kondisi, catatan; jenis, sumber, gedung, ruangan baru bisa langsung ditambah]
+    C -- Tambah aset --> T1[Input jenis, nama, merek, S/N, spesifikasi, sumber, PIC, gedung & ruangan, kode keuangan, tgl perolehan, servis berikutnya, kondisi, catatan; jenis, sumber, gedung, ruangan baru bisa langsung ditambah; jenis baru lewat popup kategori & kode singkat; tampil Kode otomatis di bawah nama]
     T1 --> T1a{Kondisi}
     T1a -- Baik --> T1b[Status Tersedia]
     T1a -- Rusak Berat --> T1c[Status Perbaikan]
@@ -80,7 +80,7 @@ flowchart TD
 
     AK -- Lihat file / label QR --> V1[(Ambil file atau PDF label, buka di tab baru)] --> D1
 
-    AK -- Ubah data --> E1[Form ubah: tanpa kondisi & status]
+    AK -- Ubah data --> E1[Form ubah: tanpa kondisi & status; jenis baru bisa langsung ditambah; tampil Kode otomatis di bawah nama]
     E1 -- Kelola foto & dokumen --> E6[(Unggah, ganti slot, atau hapus file: JPG, PNG, WebP, PDF maks. 5 MB; langsung tersimpan, tanpa riwayat)] --> E1
     E1 -- Batal --> D1
     E1 -- Ubah isian --> E0{Jenis diganti?}

@@ -25,5 +25,5 @@ export const createCategory = async (name: string) =>
   added(queryKeys.master.categories(), (await api.post<{ data: Category }>('/categories', { name })).data.data)
 export const createConsumableCategory = async (name: string) =>
   added(queryKeys.master.consumableCategories(), (await api.post<{ data: ConsumableCategory }>('/consumable-categories', { name })).data.data)
-export const createAssetType = async (categoryId: number, name: string) =>
-  added(queryKeys.master.assetTypes(), (await api.post<{ data: AssetType }>('/asset-types', { category_id: categoryId, name })).data.data)
+export const createAssetType = async (categoryId: number, name: string, code: string) =>
+  added(queryKeys.master.assetTypes(), (await api.post<{ data: AssetType }>('/asset-types', { category_id: categoryId, name, code })).data.data)

@@ -77,6 +77,7 @@ export default function AssetFormPage() {
   const { data: rooms, error: roomsError } = useRooms(form.building_id, true)
   useErrorToast(typesError, departmentsError, buildingsError, roomsError)
   const [preview, setPreview] = useState<{ typeId: number; data: CodePreview } | null>(null)
+  const [nextCode, setNextCode] = useState<{ typeId: number; code: string } | null>(null)
   const [newType, setNewType] = useState<{
     name: string
     resolve: (option: ReturnType<typeof typeOption>) => void
@@ -134,6 +135,23 @@ export default function AssetFormPage() {
   }, [typeChanged, form.asset_type_id, id, toast])
   const activePreview = typeChanged && preview?.typeId === form.asset_type_id ? preview.data : null
 
+  // Pratinjau kode aset baru; nomor baru pasti saat disimpan.
+  useEffect(() => {
+    if (editing || !form.asset_type_id) return
+    const typeId = form.asset_type_id
+    let cancelled = false
+    api
+      .get<{ data: { next_code: string } }>(`/asset-types/${typeId}/next-code`)
+      .then((res) => !cancelled && setNextCode({ typeId, code: res.data.data.next_code }))
+      .catch((e) => !cancelled && toast.error(errorMessage(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [editing, form.asset_type_id, toast])
+  const codeHint = editing
+    ? (typeChanged ? activePreview?.new_code : original?.code)
+    : nextCode?.typeId === form.asset_type_id ? nextCode?.code : undefined
+
   const typeOptions = useMemo(() => types.map(typeOption), [types])
   const departmentOptions = departments.map((d) => ({ id: d.id, label: d.name }))
   const buildingOptions = buildings.map((b) => ({ id: b.id, label: b.name }))
@@ -163,14 +181,11 @@ export default function AssetFormPage() {
       const r = await createRoom(form.building_id!, name)
       return { id: r.id, label: r.name }
     })
-  /** Nama yang sudah ada langsung dipilih; selain itu menunggu popup (batal = teks ketikan tetap). */
-  const addType = (name: string) => {
-    const existing = types.find((t) => t.name.toLowerCase() === name.toLowerCase())
-    if (existing) return Promise.resolve(typeOption(existing))
-    return new Promise<ReturnType<typeof typeOption>>((resolve, reject) =>
+  /** Menunggu popup (batal = teks ketikan tetap). */
+  const addType = (name: string) =>
+    new Promise<ReturnType<typeof typeOption>>((resolve, reject) =>
       setNewType({ name, resolve, reject: () => reject(new Error('Dibatalkan')) }),
     )
-  }
   const cancelNewType = useCallback(() => {
     newType?.reject()
     setNewType(null)
@@ -259,8 +274,10 @@ export default function AssetFormPage() {
               value={form.asset_type_id}
               options={typeOptions}
               onChange={(v) => set('asset_type_id', v)}
-              onCreate={editing ? undefined : addType}
-              placeholder={editing ? 'Ketik untuk mencari jenis…' : 'Ketik untuk mencari atau menambah jenis…'}
+              onCreate={addType}
+              createLabel={(name) => `+ Tambah jenis '${name}'`}
+              isExisting={(name) => types.some((t) => t.name.toLowerCase() === name.toLowerCase())}
+              placeholder="Ketik untuk mencari atau menambah jenis…"
               error={errors.asset_type_id}
             />
           </FormField>
@@ -279,6 +296,7 @@ export default function AssetFormPage() {
           <FormField label="Nama aset" required error={errors.name}>
             <Input value={form.name} onChange={(e) => set('name', e.target.value)} error={errors.name} required maxLength={255} />
           </FormField>
+          {codeHint && <p className="mt-1 text-xs text-slate-500">Kode otomatis: <b>{codeHint}</b></p>}
         </div>
         <FormField label="Merek" error={errors.brand}>
           <Input value={form.brand} onChange={(e) => set('brand', e.target.value)} error={errors.brand} maxLength={100} />
@@ -385,11 +403,12 @@ export default function AssetFormPage() {
     {editing && original && <AssetFilesManager assetId={original.id} />}
     {newType && (
       <NewAssetTypeModal
-        initialName={newType.name}
+        name={newType.name}
         onClose={cancelNewType}
         onCreated={(t) => {
           newType.resolve(typeOption(t))
           setNewType(null)
+          setForm((f) => (f.name.trim() ? f : { ...f, name: t.name }))
         }}
       />
     )}

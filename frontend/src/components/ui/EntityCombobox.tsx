@@ -15,13 +15,15 @@ interface Props {
   onCreate?: (name: string) => Promise<Option>
   /** Untuk kolom opsional: true selama ada teks ketikan yang belum menjadi pilihan. */
   onPendingChange?: (pending: boolean) => void
+  createLabel?: (text: string) => string
+  isExisting?: (text: string) => boolean
   placeholder?: string
   error?: string
   disabled?: boolean
 }
 
 /** Combobox yang mengikat id (bukan teks): pilih dari saran atau tambah nama baru. */
-export default function EntityCombobox({ value, options, onChange, onCreate, onPendingChange, placeholder, error, disabled }: Props) {
+export default function EntityCombobox({ value, options, onChange, onCreate, onPendingChange, createLabel, isExisting, placeholder, error, disabled }: Props) {
   const [typed, setTyped] = useState<string | null>(null)
   const selectedLabel = options.find((o) => o.id === value)?.label
   const text = typed ?? selectedLabel ?? ''
@@ -32,6 +34,8 @@ export default function EntityCombobox({ value, options, onChange, onCreate, onP
       options={options}
       placeholder={placeholder}
       allowCreate={!!onCreate}
+      createLabel={createLabel}
+      isExisting={isExisting}
       error={error}
       disabled={disabled}
       onChange={(t) => {
