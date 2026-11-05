@@ -239,20 +239,22 @@ export default function DashboardPage() {
             <ul className="divide-y divide-slate-100 border-t border-slate-100">
               {readiness?.map((b) => {
                 const incomplete = b.incomplete_rooms_count
-                const complete = b.rooms_count - incomplete
+                const complete = b.rooms_count - incomplete - b.rooms_without_standards
                 return (
                   <li key={b.id} className="space-y-2 px-5 py-3.5">
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-semibold">{b.name}</span>
                       {incomplete > 0 ? (
                         <Badge color="red">{`Kurang ${incomplete} ruangan`}</Badge>
-                      ) : (
+                      ) : complete > 0 ? (
                         <Badge color="green">Lengkap</Badge>
+                      ) : (
+                        <Badge color="amber">Belum ada standar</Badge>
                       )}
                     </div>
                     <ReadinessBar complete={complete} incomplete={incomplete} />
                     <p className="text-sm text-slate-500">
-                      {complete} lengkap · {incomplete} kurang · {b.rooms_count} ruangan
+                      {complete} lengkap · {incomplete} kurang · {b.rooms_without_standards} belum ada standar · {b.rooms_count} ruangan
                     </p>
                     {incomplete > 0 && (
                       <ul className="space-y-1 pt-1 text-sm">

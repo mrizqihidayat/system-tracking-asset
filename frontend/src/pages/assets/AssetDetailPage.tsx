@@ -276,7 +276,7 @@ export default function AssetDetailPage() {
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Panel title="Data aset">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <Field label="Kategori">{asset.asset_type?.category?.name}</Field>
+            <Field label="Jenis aset">{asset.asset_type?.name}</Field>
             <Field label="Sumber">{asset.source_department?.name}</Field>
             <Field label="Gedung">{currentRoom?.building?.name}</Field>
             <Field label="Ruangan saat ini">

@@ -305,30 +305,14 @@ class ConsumableTest extends TestCase
         $this->assertSame(0, $item->fresh()->quantity);
     }
 
-    public function test_changing_provider_updates_source_of_room_standards(): void
-    {
-        $item = $this->consumable();
-        $other = Department::factory()->create(['name' => 'SIT']);
-        $standard = RoomStandard::factory()->create([
-            'source_department_id' => $this->sga->id, 'count_method' => CountMethod::Manual, 'consumable_id' => $item->id,
-        ]);
-        $unrelated = RoomStandard::factory()->create(['source_department_id' => $this->sga->id]);
-
-        $this->putJson("/api/consumables/{$item->id}", ['provider_department_id' => $other->id])->assertOk();
-
-        $this->assertSame($other->id, $standard->fresh()->source_department_id);
-        $this->assertSame($this->sga->id, $unrelated->fresh()->source_department_id);
-    }
-
-    public function test_usage_and_hard_delete_detach_room_standards(): void
+    public function test_usage_and_hard_delete_remove_room_standards(): void
     {
         $item = $this->consumable(['name' => 'Pulpen']);
         $class = Room::factory()->for(Building::factory()->create(['name' => 'Gedung IHS']))->create(['name' => 'Ruang Kelas 1']);
-        $standard = RoomStandard::factory()->for($class)->create([
-            'item_name' => 'ATK peserta', 'count_method' => CountMethod::Manual,
+        $standard = RoomStandard::factory()->for($class)->create(['count_method' => CountMethod::Manual,
             'standard_quantity' => 20, 'actual_quantity' => 15, 'consumable_id' => $item->id,
         ]);
-        $expected = [['room_id' => $class->id, 'room' => 'Ruang Kelas 1', 'building' => 'Gedung IHS', 'item_name' => 'ATK peserta']];
+        $expected = [['room_id' => $class->id, 'room' => 'Ruang Kelas 1', 'building' => 'Gedung IHS', 'item_name' => 'Pulpen']];
 
         $this->getJson("/api/consumables/{$item->id}/usage")->assertOk()->assertExactJson(['data' => ['rooms' => $expected]]);
         $this->getJson("/api/consumables/{$item->id}")->assertJsonPath('meta.used_in_rooms', $expected);
@@ -338,22 +322,19 @@ class ConsumableTest extends TestCase
             ->assertExactJson(['message' => 'Barang Pulpen dihapus.', 'detached_rooms' => $expected]);
 
         $this->assertModelMissing($item);
-        $standard->refresh();
-        $this->assertNull($standard->consumable_id);
-        $this->assertSame(20, $standard->standard_quantity);
-        $this->assertSame(15, $standard->actual_quantity);
+        $this->assertModelMissing($standard);
 
         $this->getJson("/api/consumables/{$item->id}")->assertNotFound();
         $this->postJson('/api/consumables', $this->payload(['name' => 'Pulpen']))->assertCreated();
     }
 
-    public function test_database_sets_null_when_consumable_row_is_deleted_directly(): void
+    public function test_database_removes_standard_when_consumable_row_is_deleted_directly(): void
     {
         $item = $this->consumable();
         $standard = RoomStandard::factory()->create(['consumable_id' => $item->id]);
 
         Consumable::query()->whereKey($item->id)->delete();
 
-        $this->assertNull($standard->fresh()->consumable_id);
+        $this->assertModelMissing($standard);
     }
 }

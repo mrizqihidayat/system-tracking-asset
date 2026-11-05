@@ -9,7 +9,6 @@ use App\Enums\RequestStatus;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\ConsumableCategory;
 use App\Models\Department;
@@ -120,8 +119,7 @@ class ReportTest extends TestCase
 
     public function test_assets_report_has_header_block_columns_and_rows(): void
     {
-        $category = Category::factory()->create(['name' => 'Elektronik']);
-        $type = AssetType::factory()->create(['category_id' => $category->id, 'name' => 'Proyektor']);
+        $type = AssetType::factory()->create(['name' => 'Proyektor']);
         $building = Building::factory()->create(['name' => 'IHS']);
         $room = Room::factory()->create(['building_id' => $building->id, 'name' => 'Ruang 1']);
         $this->asset([
@@ -135,20 +133,19 @@ class ReportTest extends TestCase
         $this->assertSame('Tanpa filter', $rows[1][0]);
         $this->assertStringContainsString('Staf SHD', $rows[2][0]);
         $this->assertSame('Kode', $rows[self::HEADER_INDEX][0]);
-        $this->assertCount(15, $rows[self::HEADER_INDEX]);
+        $this->assertCount(14, $rows[self::HEADER_INDEX]);
 
         $data = $this->dataRows($rows);
         $this->assertCount(1, $data);
         $this->assertSame('SHD-PRJ-001', $data[0][0]);
-        $this->assertSame('Elektronik', $data[0][2]);
-        $this->assertSame('Proyektor', $data[0][3]);
-        $this->assertSame('SHD', $data[0][6]);
-        $this->assertSame('IHS', $data[0][7]);
-        $this->assertSame('Ruang 1', $data[0][8]);
-        $this->assertSame('Baik', $data[0][10]);
-        $this->assertSame('Tersedia', $data[0][11]);
-        $this->assertInstanceOf(DateTimeInterface::class, $data[0][12]);
-        $this->assertSame('2026-11-30', $data[0][13]->format('Y-m-d'));
+        $this->assertSame('Proyektor', $data[0][2]);
+        $this->assertSame('SHD', $data[0][5]);
+        $this->assertSame('IHS', $data[0][6]);
+        $this->assertSame('Ruang 1', $data[0][7]);
+        $this->assertSame('Baik', $data[0][9]);
+        $this->assertSame('Tersedia', $data[0][10]);
+        $this->assertInstanceOf(DateTimeInterface::class, $data[0][11]);
+        $this->assertSame('2026-11-30', $data[0][12]->format('Y-m-d'));
     }
 
     public function test_assets_report_filters_match_the_list_and_include_not_feasible(): void
@@ -180,7 +177,7 @@ class ReportTest extends TestCase
         $row = $this->dataRows($this->sheets($this->report('assets'))['Aset'])[0];
 
         $this->assertSame('=HYPERLINK("http://evil","x")', $row[1]);
-        $this->assertSame('+1+1', $row[4]);
+        $this->assertSame('+1+1', $row[3]);
     }
 
     public function test_loans_report_period_status_and_columns(): void
@@ -226,26 +223,16 @@ class ReportTest extends TestCase
         Room::factory()->create(['building_id' => $building->id, 'name' => 'Gudang']);
         $other = Room::factory()->create(['name' => 'Ruang Lain']);
 
-        RoomStandard::factory()->create([
-            'room_id' => $short->id, 'item_name' => 'Spidol', 'source_department_id' => $this->shd->id,
-            'standard_quantity' => 5, 'count_method' => CountMethod::Manual, 'actual_quantity' => 2,
-        ]);
-        RoomStandard::factory()->create([
-            'room_id' => $short->id, 'item_name' => 'Tisu', 'source_department_id' => $this->deptA->id,
-            'standard_quantity' => 3, 'count_method' => CountMethod::Manual, 'actual_quantity' => null,
-        ]);
-        RoomStandard::factory()->create([
-            'room_id' => $ok->id, 'item_name' => 'Kursi', 'source_department_id' => $this->shd->id,
-            'standard_quantity' => 4, 'count_method' => CountMethod::Qr,
-            'asset_type_id' => ($type = AssetType::factory()->create())->id,
-        ]);
+        $spidol = Consumable::factory()->create(['name' => 'Spidol', 'quantity' => 7, 'unit' => 'pcs']);
+        $tisu = Consumable::factory()->create(['name' => 'Tisu']);
+        RoomStandard::factory()->create(['room_id' => $short->id, 'consumable_id' => $spidol->id, 'standard_quantity' => 5, 'actual_quantity' => 2]);
+        RoomStandard::factory()->create(['room_id' => $short->id, 'consumable_id' => $tisu->id, 'standard_quantity' => 3, 'actual_quantity' => null]);
+        $type = AssetType::factory()->create(['name' => 'Kursi']);
+        RoomStandard::factory()->create(['room_id' => $ok->id, 'standard_quantity' => 4, 'count_method' => CountMethod::Qr, 'asset_type_id' => $type->id]);
         foreach (range(1, 4) as $i) {
-            $this->asset(['room_id' => $ok->id, 'asset_type_id' => $type->id]);
+            $this->asset(['room_id' => $ok->id, 'asset_type_id' => $type->id, 'code' => "SHD-KRS-00{$i}"]);
         }
-        RoomStandard::factory()->create([
-            'room_id' => $other->id, 'item_name' => 'Papan', 'source_department_id' => $this->shd->id,
-            'standard_quantity' => 1, 'actual_quantity' => 1,
-        ]);
+        RoomStandard::factory()->create(['room_id' => $other->id, 'standard_quantity' => 1, 'actual_quantity' => 1]);
 
         $sheets = $this->sheets($this->report('rooms', "?building_id={$building->id}"));
 
@@ -261,13 +248,12 @@ class ReportTest extends TestCase
         $this->assertSame('Lengkap', $summary['Kelas 2'][5]);
         $this->assertSame('Belum ada standar', $summary['Gudang'][5]);
 
-        $detail = collect($this->dataRows($sheets['Detail']))->keyBy(2);
+        $detail = collect($this->dataRows($sheets['Detail']))->keyBy(3);
         $this->assertCount(3, $detail);
-        $this->assertSame(['IHS', 'Kelas 1', 'Spidol', 'SHD', 'Manual', 5, 2, -3, 'Kurang', 'Perlu dilengkapi'], $detail['Spidol']);
+        $this->assertSame(['IHS', 'Kelas 1', 'Barang habis pakai', 'Spidol', '', 5, 2, -3, 'Kurang', 'Stok: 7 pcs'], $detail['Spidol']);
         $this->assertSame('Belum dicek', $detail['Tisu'][8]);
         $this->assertSame('', $detail['Tisu'][6]);
-        $this->assertSame('Minta ke Dept A: Tisu', $detail['Tisu'][9]);
-        $this->assertSame(['QR', 4, 4, 0, 'Sesuai'], [$detail['Kursi'][4], $detail['Kursi'][5], $detail['Kursi'][6], $detail['Kursi'][7], $detail['Kursi'][8]]);
+        $this->assertSame(['Aset', 4, 4, 4, 0, 'Sesuai', 'SHD-KRS-001, SHD-KRS-002, SHD-KRS-003, SHD-KRS-004'], [$detail['Kursi'][2], $detail['Kursi'][4], $detail['Kursi'][5], $detail['Kursi'][6], $detail['Kursi'][7], $detail['Kursi'][8], $detail['Kursi'][9]]);
 
         $everything = $this->sheets($this->report('rooms'));
         $this->assertSame('Tanpa filter', $everything['Ringkasan'][1][0]);

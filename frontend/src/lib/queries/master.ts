@@ -1,5 +1,5 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import type { AssetType, Building, Category, Department, Room } from '../../types/asset'
+import type { AssetType, Building, Department, Room } from '../../types/asset'
 import type { ConsumableCategory, RequestCatalog } from '../../types/supply'
 import { api } from '../api'
 import { MASTER_STALE_TIME } from '../query-client'
@@ -17,7 +17,6 @@ export const masterQueries = {
   buildings: () => master<Building>(queryKeys.master.buildings(), '/buildings'),
   rooms: (buildingId?: number | null) =>
     master<Room>(queryKeys.master.rooms(buildingId), '/rooms', buildingId ? { building_id: buildingId } : undefined),
-  categories: () => master<Category>(queryKeys.master.categories(), '/categories'),
   consumableCategories: () => master<ConsumableCategory>(queryKeys.master.consumableCategories(), '/consumable-categories'),
   assetTypes: () => master<AssetType>(queryKeys.master.assetTypes(), '/asset-types'),
   requestCatalog: () => master<RequestCatalog>(queryKeys.master.requestCatalog(), '/request-catalog'),
@@ -38,7 +37,6 @@ export const useBuildings = () => useMaster(masterQueries.buildings())
 /** `buildingId` kosong + `requireBuilding` → tidak memuat (dropdown ruangan menunggu gedung dipilih). */
 export const useRooms = (buildingId?: number | null, requireBuilding = false) =>
   useMaster(masterQueries.rooms(buildingId), !requireBuilding || !!buildingId)
-export const useCategories = () => useMaster(masterQueries.categories())
 export const useConsumableCategories = () => useMaster(masterQueries.consumableCategories())
 export const useAssetTypes = () => useMaster(masterQueries.assetTypes())
 export const useRequestCatalog = () => useMaster(masterQueries.requestCatalog())

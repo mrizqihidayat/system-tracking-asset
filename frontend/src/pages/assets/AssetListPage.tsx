@@ -13,7 +13,7 @@ import { api, errorMessage } from '../../lib/api'
 import { openInNewTab } from '../../lib/blob'
 import { listConfigs } from '../../lib/queries/list-configs'
 import { useAssets } from '../../lib/queries/lists'
-import { useBuildings, useCategories, useDepartments, useRooms } from '../../lib/queries/master'
+import { useAssetTypes, useBuildings, useDepartments, useRooms } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
 import { CONDITIONS, STATUSES, type AssetListItem } from '../../types/asset'
@@ -30,7 +30,7 @@ export default function AssetListPage() {
 
   const buildingId = list.get('building_id')
   const assets = useAssets(list.params)
-  const { data: categories } = useCategories()
+  const { data: assetTypes } = useAssetTypes()
   const { data: buildings } = useBuildings()
   const { data: departments } = useDepartments()
   const { data: rooms } = useRooms(buildingId ? Number(buildingId) : null, true)
@@ -88,7 +88,7 @@ export default function AssetListPage() {
         </Link>
       ),
     },
-    { header: 'Kategori', cell: (a) => a.category_name ?? '-' },
+    { header: 'Jenis', cell: (a) => a.asset_type_name ?? '-' },
     {
       header: 'Lokasi',
       cell: (a) =>
@@ -184,10 +184,10 @@ export default function AssetListPage() {
         </div>
         <div className={`${filtersOpen ? 'grid' : 'hidden'} gap-3 sm:grid-cols-2 lg:grid lg:grid-cols-7`}>
         {field(
-          'Kategori',
-          <Select clearable value={list.get('category_id')} onChange={(e) => setFilter('category_id', e.target.value)}>
-            <option value="">Semua kategori</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          'Jenis',
+          <Select clearable value={list.get('asset_type_id')} onChange={(e) => setFilter('asset_type_id', e.target.value)}>
+            <option value="">Semua jenis</option>
+            {assetTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </Select>,
         )}
         {field(

@@ -6,10 +6,9 @@ use Database\Factories\AssetTypeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['category_id', 'name', 'code'])]
+#[Fillable(['name', 'code'])]
 class AssetType extends Model
 {
     /** @use HasFactory<AssetTypeFactory> */
@@ -25,14 +24,6 @@ class AssetType extends Model
         return [
             'last_number' => 'integer',
         ];
-    }
-
-    /**
-     * @return BelongsTo<Category, $this>
-     */
-    public function category(): BelongsTo
-    {
-        return $this->belongsTo(Category::class);
     }
 
     /**

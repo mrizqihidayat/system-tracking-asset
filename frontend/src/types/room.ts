@@ -1,6 +1,5 @@
 import type { Department, Room } from './asset'
 
-export type CountMethod = 'QR' | 'Manual'
 export type ChecklistResult = 'Sesuai' | 'Kurang' | 'Belum dicek'
 
 export interface ReadinessSummary {
@@ -27,49 +26,47 @@ export interface ReadinessBuilding {
   rooms: ReadinessRoom[]
 }
 
-/** Stok Habis Pakai: barang beserta penyedianya. Barang departemen lain: penyedia & katalognya. */
-export type Fulfillment =
-  | {
-      type: 'stok'
-      consumable: {
-        id: number
-        name: string
-        unit: string
-        quantity: number
-        provider_department: Department | null
-      }
-    }
-  | {
-      type: 'unit_lain'
-      catalog: { id: number; item_name: string } | null
-      provider_department: Department | null
-    }
+/** Bagian "Aset di ruangan": per jenis. Standar 0 = tanpa baris standar, tampil jumlah Ada tanpa Hasil. */
+export interface RoomAssetGroup {
+  asset_type: { id: number; name: string; code: string }
+  total: number
+  assets: { id: number; code: string; status: string }[]
+  /** Jumlah aset yang tidak dihitung "Ada", per status. */
+  not_counted: Partial<Record<'Dipinjam' | 'Perbaikan' | 'Hilang', number>>
+  standard_id: number | null
+  standard_quantity: number
+  present_quantity: number
+  difference: number | null
+  result: ChecklistResult | null
+}
 
-export interface RoomStandard {
+/** Bagian "Barang habis pakai": barang dari Stok, jumlah Ada diisi saat cek. */
+export interface RoomConsumable {
   id: number
   room_id: number
   item_name: string
-  source_department: Department | null
   standard_quantity: number
-  count_method: CountMethod
-  asset_type: { id: number; name: string; code: string } | null
-  /** Baris aset: aset yang terhitung "Ada". */
-  assets: { id: number; code: string }[]
-  /** Baris aset: jumlah aset jenis ini di ruangan yang tidak dihitung, per status. */
-  not_counted: Partial<Record<'Dipinjam' | 'Perbaikan' | 'Hilang', number>>
+  consumable: {
+    id: number
+    name: string
+    unit: string
+    quantity: number
+    min_quantity: number
+    provider_department: Department | null
+  }
   present_quantity: number | null
   difference: number | null
   shortage: number | null
   result: ChecklistResult
-  fulfillment: Fulfillment | null
-  /** Baris SHD tanpa barang stok: tanpa aksi sampai dilengkapi. */
-  needs_completion: boolean
   can_fill_from_stock: boolean
   can_request: boolean
 }
 
 export interface Checklist {
-  data: RoomStandard[]
+  data: {
+    assets: RoomAssetGroup[]
+    consumables: RoomConsumable[]
+  }
   meta: {
     room: Room & { last_checked_at?: string | null }
     last_checked_by: string | null

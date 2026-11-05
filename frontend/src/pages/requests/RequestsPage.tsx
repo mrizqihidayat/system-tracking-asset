@@ -26,7 +26,7 @@ import CatalogFormModal from './CatalogFormModal'
 import RequestFormModal from './RequestFormModal'
 
 const CATALOG_PER_PAGE = 5
-const PREFILL_PARAMS = ['room_id', 'catalog_id', 'consumable_id', 'room_standard_id']
+const PREFILL_PARAMS = ['room_id', 'catalog_id', 'consumable_id']
 
 const statusColor = {
   Diajukan: 'blue',
@@ -113,7 +113,7 @@ export default function RequestsPage() {
   const catalog = catalogQuery.data
   const history = historyQuery.data
   const suggestions = suggestionsQuery.data ?? []
-  // Dari Kelengkapan Ruangan/Stok: /permintaan?room_id=&consumable_id=|room_standard_id=&item_name=&catalog_id=&quantity= (tanpa katalog: provider_department_id=) → buka form terisi otomatis.
+  // Dari Kelengkapan Ruangan/Stok: /permintaan?room_id=&consumable_id=&item_name=&provider_department_id=&quantity= → buka form terisi otomatis.
   const [modal, setModal] = useState<ModalState>(() => {
     if (!PREFILL_PARAMS.some((k) => params.has(k))) return null
     const num = (k: string) => (params.get(k) ? Number(params.get(k)) : null)
@@ -124,7 +124,6 @@ export default function RequestsPage() {
         room_id: num('room_id'),
         catalog_id: num('catalog_id'),
         consumable_id: num('consumable_id'),
-        room_standard_id: num('room_standard_id'),
         item_name: params.get('item_name') ?? undefined,
         provider_department_id: num('provider_department_id'),
         quantity: num('quantity') ?? undefined,
@@ -306,8 +305,7 @@ export default function RequestsPage() {
                       <div className="min-w-0">
                         <p className="font-medium">{s.item_name} <span className="font-normal tabular-nums text-slate-500">× {s.quantity}</span></p>
                         <p className="text-xs text-slate-500">
-                          {s.catalog_name && s.catalog_name !== s.item_name && `${s.catalog_name} · `}
-                          {s.source === 'stok' ? `Stok ${s.stock_status?.toLowerCase()}` : `Kurang di ${s.room?.name} (${s.room?.building})`}
+                          Stok {s.stock_status.toLowerCase()}
                           {s.has_open_request && ' · sudah ada permintaan Diajukan'}
                         </p>
                       </div>
@@ -319,13 +317,10 @@ export default function RequestsPage() {
                             kind: 'request',
                             request: null,
                             prefill: {
-                              catalog_id: s.catalog_id,
                               consumable_id: s.consumable_id,
-                              room_standard_id: s.consumable_id ? null : s.room_standard_id,
                               item_name: s.item_name,
                               provider_department_id: g.provider_department.id,
                               quantity: s.quantity,
-                              room_id: s.room?.id ?? null,
                             },
                           })
                         }
@@ -416,7 +411,7 @@ export default function RequestsPage() {
       >
         {deleting && deleting.usage.total > 0 ? (
           <>
-            Item ini dipakai di {deleting.usage.supply_requests} permintaan dan {deleting.usage.room_standards} standar ruangan.
+            Item ini dipakai di {deleting.usage.supply_requests} permintaan.
             Tautannya akan dilepas, riwayat tetap tersimpan.
           </>
         ) : (

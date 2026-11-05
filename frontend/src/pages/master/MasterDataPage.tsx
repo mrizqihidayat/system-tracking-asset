@@ -8,18 +8,18 @@ import { PageHeader } from '../../components/ui/Page'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { skeletonWidth } from '../../components/ui/skeleton-width'
 import { invalidate } from '../../lib/queries/invalidate'
-import { useAssetTypes, useBuildings, useCategories, useConsumableCategories, useDepartments, useRooms } from '../../lib/queries/master'
+import { useAssetTypes, useBuildings, useConsumableCategories, useDepartments, useRooms } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
-import type { AssetType, Building, Category, Department, Room } from '../../types/asset'
+import type { AssetType, Building, Department, Room } from '../../types/asset'
 import type { ConsumableCategory } from '../../types/supply'
 import { MasterDeleteModal, MasterFormModal, type MasterTarget } from './MasterModals'
 
-type Tab = 'gedung' | 'departemen' | 'kategori' | 'kategori-stok'
+type Tab = 'gedung' | 'departemen' | 'jenis' | 'kategori-stok'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'gedung', label: 'Gedung & Ruangan' },
   { key: 'departemen', label: 'Departemen' },
-  { key: 'kategori', label: 'Kategori & Jenis aset' },
+  { key: 'jenis', label: 'Jenis aset' },
   { key: 'kategori-stok', label: 'Kategori stok' },
 ]
 
@@ -27,7 +27,6 @@ type FormState = {
   kind: string
   target?: MasterTarget
   createUrl?: string
-  extra?: Record<string, unknown>
   withCode?: boolean
 }
 
@@ -35,7 +34,6 @@ interface Data {
   buildings: Building[]
   rooms: Room[]
   departments: Department[]
-  categories: Category[]
   types: AssetType[]
   consumableCategories: ConsumableCategory[]
 }
@@ -49,7 +47,7 @@ function RowActions({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () =
   )
 }
 
-/** Induk (gedung/kategori) yang bisa dibuka untuk melihat anak (ruangan/jenis aset). */
+/** Gedung yang bisa dibuka untuk melihat ruangannya. */
 function Group({ title, meta, open, onToggle, actions, children }: {
   title: string
   meta: string
@@ -77,11 +75,11 @@ export default function MasterDataPage() {
   const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
   const tab = (TABS.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'gedung') as Tab
-  const queries = [useBuildings(), useRooms(), useDepartments(), useCategories(), useAssetTypes(), useConsumableCategories()] as const
+  const queries = [useBuildings(), useRooms(), useDepartments(), useAssetTypes(), useConsumableCategories()] as const
   useErrorToast(...queries.map((q) => q.error))
-  const [buildings, rooms, departments, categories, types, consumableCategories] = queries
+  const [buildings, rooms, departments, types, consumableCategories] = queries
   const data: Data | null = queries.every((q) => q.isSuccess)
-    ? { buildings: buildings.data, rooms: rooms.data, departments: departments.data, categories: categories.data, types: types.data, consumableCategories: consumableCategories.data }
+    ? { buildings: buildings.data, rooms: rooms.data, departments: departments.data, types: types.data, consumableCategories: consumableCategories.data }
     : null
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [form, setForm] = useState<FormState | null>(null)
@@ -186,45 +184,22 @@ export default function MasterDataPage() {
     )
   }
 
-  if (data && tab === 'kategori') {
+  if (data && tab === 'jenis') {
     body = (
       <>
-        <div className="mb-2 flex justify-end">{addButton('Tambah kategori', () => setForm({ kind: 'Kategori', createUrl: '/categories' }))}</div>
-        {data.categories.length === 0 && <p className="text-sm text-slate-500">Belum ada kategori.</p>}
+        <div className="mb-2 flex justify-end">{addButton('Tambah jenis aset', () => setForm({ kind: 'Jenis aset', createUrl: '/asset-types', withCode: true }))}</div>
+        {data.types.length === 0 && <p className="text-sm text-slate-500">Belum ada jenis aset.</p>}
         <ul className="divide-y divide-slate-100">
-          {data.categories.map((c) => {
-            const types = data.types.filter((t) => t.category_id === c.id)
-            const target: MasterTarget = { kind: 'Kategori', name: c.name, url: `/categories/${c.id}` }
+          {data.types.map((t) => {
+            const target: MasterTarget = { kind: 'Jenis aset', name: t.name, url: `/asset-types/${t.id}`, code: t.code }
             return (
-              <Group
-                key={c.id}
-                title={c.name}
-                meta={`${types.length} jenis aset`}
-                open={!!open[`c${c.id}`]}
-                onToggle={() => toggle(`c${c.id}`)}
-                actions={<RowActions onEdit={() => setForm({ kind: 'Kategori', target })} onDelete={() => setDeleting(target)} />}
-              >
-                <ul className="divide-y divide-slate-200">
-                  {types.map((t) => {
-                    const tt: MasterTarget = { kind: 'Jenis aset', name: t.name, url: `/asset-types/${t.id}`, code: t.code }
-                    return childRow(
-                      t.name,
-                      <AssetCode code={t.code} className="ml-1" />,
-                      () => setForm({ kind: 'Jenis aset', target: tt, withCode: true }),
-                      () => setDeleting(tt),
-                      t.id,
-                    )
-                  })}
-                  <li className="py-2">
-                    <button
-                      className="flex min-h-9 items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"
-                      onClick={() => setForm({ kind: 'Jenis aset', createUrl: '/asset-types', extra: { category_id: c.id }, withCode: true })}
-                    >
-                      <Plus size={14} /> Tambah jenis aset di {c.name}
-                    </button>
-                  </li>
-                </ul>
-              </Group>
+              <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="font-medium">{t.name}</span>
+                  <AssetCode code={t.code} />
+                </span>
+                <RowActions onEdit={() => setForm({ kind: 'Jenis aset', target, withCode: true })} onDelete={() => setDeleting(target)} />
+              </li>
             )
           })}
         </ul>
@@ -259,7 +234,7 @@ export default function MasterDataPage() {
     <div className="max-w-4xl space-y-5">
       <PageHeader
         title="Data Master"
-        description="Ganti nama atau hapus gedung, ruangan, departemen, kategori, jenis aset, dan kategori stok. Data yang masih dipakai tidak bisa dihapus."
+        description="Ganti nama atau hapus gedung, ruangan, departemen, jenis aset, dan kategori stok. Kode jenis aset hanya bisa diubah di sini. Data yang masih dipakai tidak bisa dihapus."
       />
 
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">

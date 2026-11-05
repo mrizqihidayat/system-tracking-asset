@@ -26,13 +26,11 @@ interface Usage {
 
 /** Tambah atau ubah nama (+ kode untuk jenis aset). `createUrl` diisi untuk tambah; `target` untuk ubah. */
 export function MasterFormModal({
-  kind, target, createUrl, extra, withCode, onClose, onDone,
+  kind, target, createUrl, withCode, onClose, onDone,
 }: {
   kind: string
   target?: MasterTarget
   createUrl?: string
-  /** Field tambahan saat tambah, mis. { category_id }. */
-  extra?: Record<string, unknown>
   withCode?: boolean
   onClose: () => void
   onDone: () => void
@@ -42,7 +40,7 @@ export function MasterFormModal({
   const [code, setCode] = useState(target?.code ?? '')
 
   const submit = async () => {
-    const payload: Record<string, unknown> = { ...extra, name: name.trim() }
+    const payload: Record<string, unknown> = { name: name.trim() }
     if (withCode && code.trim()) payload.code = code.trim().toUpperCase()
     if (target) await api.put(target.url, payload)
     else await api.post(createUrl!, payload)

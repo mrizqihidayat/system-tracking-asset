@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['request_date', 'catalog_id', 'consumable_id', 'item_name', 'quantity', 'purpose', 'room_id', 'room_standard_id', 'applied_to', 'provider_department_id', 'request_method', 'lead_time_days', 'must_return', 'status', 'received_at', 'returned_at', 'note', 'created_by'])]
+#[Fillable(['request_date', 'catalog_id', 'consumable_id', 'item_name', 'quantity', 'purpose', 'room_id', 'applied_to', 'provider_department_id', 'request_method', 'lead_time_days', 'must_return', 'status', 'received_at', 'returned_at', 'note', 'created_by'])]
 class SupplyRequest extends Model
 {
     /** @use HasFactory<SupplyRequestFactory> */
@@ -29,8 +29,6 @@ class SupplyRequest extends Model
      * Tujuan penambahan saat Diterima (applied_to), dipakai untuk mengurangi kembali.
      */
     public const APPLIED_TO_STOCK = 'stok';
-
-    public const APPLIED_TO_ROOM = 'ruangan';
 
     /**
      * Dampak perubahan status terakhir, diisi SupplyRequestService::changeStatus() (bukan kolom tabel).
@@ -76,14 +74,6 @@ class SupplyRequest extends Model
     public function consumable(): BelongsTo
     {
         return $this->belongsTo(Consumable::class);
-    }
-
-    /**
-     * @return BelongsTo<RoomStandard, $this>
-     */
-    public function roomStandard(): BelongsTo
-    {
-        return $this->belongsTo(RoomStandard::class);
     }
 
     /**

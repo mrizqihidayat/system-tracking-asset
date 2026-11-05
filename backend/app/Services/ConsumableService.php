@@ -10,12 +10,12 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Stok habis pakai: perubahan jumlah & hapus di DB::transaction() + lockForUpdate().
- * T13 (isi dari stok) memakai adjust() agar stok tidak pernah negatif.
+ * Ambil dari stok memakai adjust() agar stok tidak pernah negatif.
  */
 class ConsumableService
 {
     /**
-     * Ubah data barang; penyedia baru ikut menjadi Sumber di standar ruangan yang memakainya.
+     * Ubah data barang.
      *
      * @param  array<string, mixed>  $data
      */
@@ -24,10 +24,6 @@ class ConsumableService
         return DB::transaction(function () use ($consumable, $data) {
             $consumable = $this->lock($consumable);
             $consumable->update($data);
-
-            if ($consumable->wasChanged('provider_department_id')) {
-                RoomStandard::query()->where('consumable_id', $consumable->id)->update(['source_department_id' => $consumable->provider_department_id]);
-            }
 
             return $consumable;
         });
@@ -82,15 +78,14 @@ class ConsumableService
                 'room_id' => $standard->room_id,
                 'room' => $standard->room->name,
                 'building' => $standard->room->building->name,
-                'item_name' => $standard->item_name,
+                'item_name' => $consumable->name,
             ])
             ->values()
             ->all();
     }
 
     /**
-     * Hapus PERMANEN. Tautan di standar ruangan dilepas (consumable_id = null) dalam transaksi yang sama;
-     * baris standar, jumlah standar, dan "Ada" tetap utuh.
+     * Hapus PERMANEN beserta baris standar ruangan yang memakainya, dalam satu transaksi.
      *
      * @return list<array{room_id: int, room: string, building: string, item_name: string}> ruangan terdampak
      */
@@ -100,7 +95,7 @@ class ConsumableService
             $consumable = $this->lock($consumable);
             $detached = $this->usage($consumable);
 
-            RoomStandard::query()->where('consumable_id', $consumable->id)->update(['consumable_id' => null]);
+            RoomStandard::query()->where('consumable_id', $consumable->id)->delete();
             $consumable->delete();
 
             return $detached;

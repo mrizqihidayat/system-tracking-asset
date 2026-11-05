@@ -6,7 +6,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 
 ## Ringkasan
 
-- **94 endpoint API:** 92 dipakai frontend web, 2 tidak dipakai.
+- **88 endpoint API:** 86 dipakai frontend web, 2 tidak dipakai.
 - **6 route non-API:** tidak ada yang dipakai frontend.
 - **Alamat:** semua endpoint API berawalan `/api`. Frontend web mengambil alamat API dari `VITE_API_URL`.
 - **Akses "Token":** wajib header `Authorization: Bearer {token}` dari `POST /api/login`. Tanpa token sah dijawab 401.
@@ -20,7 +20,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Laporan | 1 | 1 | 0 |
 | Data master: departemen | 5 | 5 | 0 |
 | Data master: gedung & ruangan | 11 | 10 | 1 |
-| Data master: kategori & jenis aset | 12 | 12 | 0 |
+| Data master: jenis aset | 6 | 6 | 0 |
 | Data master: kategori stok | 5 | 5 | 0 |
 | Lookup | 3 | 2 | 1 |
 | Aset | 20 | 20 | 0 |
@@ -28,7 +28,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Kelengkapan ruangan | 7 | 7 | 0 |
 | Permintaan ke departemen lain | 11 | 11 | 0 |
 | Stok habis pakai | 7 | 7 | 0 |
-| **Total** | **94** | **92** | **2** |
+| **Total** | **88** | **86** | **2** |
 
 ## Endpoint API yang tidak dipakai frontend
 
@@ -125,20 +125,14 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | DELETE | `/api/rooms/{id}` | Hapus ruangan, ditolak jika masih dipakai | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 | GET | `/api/rooms/{id}/usage` | Pemakaian ruangan sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 
-### Data master: kategori & jenis aset
+### Data master: jenis aset
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| GET | `/api/categories` | Daftar kategori | Token | Ya: Daftar Aset, form jenis baru, Data Master (`lib/queries/master.ts`) |
-| POST | `/api/categories` | Tambah kategori | Token | Ya: Form jenis aset baru, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
-| PUT/PATCH | `/api/categories/{id}` | Ubah kategori | Token | Ya: Data Master (`pages/master/MasterModals.tsx`), memakai PUT |
-| DELETE | `/api/categories/{id}` | Hapus kategori, ditolak jika masih dipakai | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
-| GET | `/api/categories/{id}/usage` | Pemakaian kategori sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 | GET | `/api/asset-types` | Daftar jenis aset | Token | Ya: Form aset, standar ruangan, Data Master (`lib/queries/master.ts`) |
-| POST | `/api/asset-types` | Tambah jenis aset | Token | Ya: Form jenis aset baru, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
+| POST | `/api/asset-types` | Tambah jenis aset | Token | Ya: Form aset, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
 | PUT/PATCH | `/api/asset-types/{id}` | Ubah jenis aset | Token | Ya: Data Master (`pages/master/MasterModals.tsx`), memakai PUT |
 | DELETE | `/api/asset-types/{id}` | Hapus jenis aset, ditolak jika masih dipakai | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
-| GET | `/api/asset-types/code-suggestion` | Saran kode jenis dari nama | Token | Ya: Form jenis aset baru (`pages/assets/modals/NewAssetTypeModal.tsx`) |
 | GET | `/api/asset-types/{id}/next-code` | Pratinjau kode aset berikutnya, tanpa memakai nomor | Token | Ya: Form aset (`pages/assets/AssetFormPage.tsx`) |
 | GET | `/api/asset-types/{id}/usage` | Pemakaian jenis aset sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 
@@ -200,12 +194,12 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
 | GET | `/api/room-readiness` | Ringkasan kesiapan per gedung dan ruangan | Token | Ya: Kelengkapan Ruangan (`lib/queries/lists.ts`) |
-| GET | `/api/rooms/{id}/checklist` | Checklist standar satu ruangan | Token | Ya: Kelengkapan Ruangan (`lib/queries/lists.ts`) |
+| GET | `/api/rooms/{id}/checklist` | Aset per jenis dan barang habis pakai satu ruangan | Token | Ya: Kelengkapan Ruangan (`lib/queries/lists.ts`) |
 | POST | `/api/rooms/{id}/standards` | Tambah standar ruangan | Token | Ya: Form standar (`pages/rooms/StandardFormModal.tsx`) |
 | POST | `/api/rooms/{id}/check` | Simpan hasil cek ruangan | Token | Ya: Kelengkapan Ruangan (`pages/rooms/RoomsPage.tsx`) |
 | PUT | `/api/room-standards/{id}` | Ubah standar ruangan | Token | Ya: Form standar (`pages/rooms/StandardFormModal.tsx`) |
-| DELETE | `/api/room-standards/{id}` | Hapus standar ruangan | Token | Ya: Popup standar (`pages/rooms/StandardsModal.tsx`) |
-| POST | `/api/room-standards/{id}/fill-from-stock` | Isi kekurangan dari stok | Token | Ya: Kelengkapan Ruangan (`pages/rooms/RoomsPage.tsx`) |
+| DELETE | `/api/room-standards/{id}` | Hapus standar ruangan | Token | Ya: Form standar, Kelengkapan Ruangan (`pages/rooms/StandardFormModal.tsx`, `pages/rooms/RoomsPage.tsx`) |
+| POST | `/api/room-standards/{id}/fill-from-stock` | Ambil kekurangan dari stok | Token | Ya: Kelengkapan Ruangan (`pages/rooms/RoomsPage.tsx`) |
 
 ### Permintaan ke departemen lain
 
@@ -218,7 +212,7 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | GET | `/api/request-catalog/{id}/usage` | Pemakaian item katalog sebelum dihapus | Token | Ya: Permintaan (`pages/requests/RequestsPage.tsx`) |
 | GET | `/api/supply-requests` | Riwayat permintaan, filter dan pencarian | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
 | POST | `/api/supply-requests` | Catat permintaan | Token | Ya: Form permintaan (`pages/requests/RequestFormModal.tsx`) |
-| GET | `/api/supply-requests/suggestions` | Saran permintaan per departemen penyedia | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
+| GET | `/api/supply-requests/suggestions` | Saran permintaan dari stok Menipis/Habis per departemen penyedia | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
 | PUT | `/api/supply-requests/{id}` | Ubah permintaan yang masih Diajukan | Token | Ya: Form permintaan (`pages/requests/RequestFormModal.tsx`) |
 | GET | `/api/supply-requests/{id}/status-impact` | Dampak perubahan status ke stok dan ruangan | Token | Ya: Popup status (`lib/queries/lists.ts`) |
 | PATCH | `/api/supply-requests/{id}/status` | Ubah status permintaan | Token | Ya: Popup status (`pages/requests/RequestsPage.tsx`) |

@@ -8,7 +8,6 @@ use App\Enums\CountMethod;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\Department;
 use App\Models\Loan;
 use App\Models\Room;
@@ -35,7 +34,7 @@ class PublicAssetTest extends TestCase
             ->for(Building::factory()->create(['name' => 'Gedung IHS']))
             ->create(['name' => 'Ruang Kelas 1']);
         $type = AssetType::factory()
-            ->for(Category::factory()->create(['name' => 'Elektronik']))
+
             ->create(['name' => 'Proyektor', 'code' => 'PRJ']);
 
         $this->asset = Asset::factory()->for($type)->for($room)->create([
@@ -56,7 +55,6 @@ class PublicAssetTest extends TestCase
         $response->assertExactJson(['data' => [
             'code' => 'SHD-PRJ-001',
             'name' => 'Proyektor Epson EB-X51',
-            'category' => 'Elektronik',
             'asset_type' => 'Proyektor',
             'source' => ['name' => 'SHD', 'is_internal' => true],
             'building' => 'Gedung IHS',
@@ -94,7 +92,6 @@ class PublicAssetTest extends TestCase
     public function test_room_standard_flag_when_type_is_part_of_room_standard(): void
     {
         RoomStandard::factory()->for($this->asset->room)->create([
-            'item_name' => 'Proyektor kelas',
             'count_method' => CountMethod::Qr,
             'asset_type_id' => $this->asset->asset_type_id,
             'actual_quantity' => null,
@@ -102,7 +99,7 @@ class PublicAssetTest extends TestCase
 
         $this->getJson("/api/public/assets/{$this->asset->public_token}")
             ->assertOk()
-            ->assertJsonPath('data.room_standard', ['is_standard' => true, 'item_name' => 'Proyektor kelas']);
+            ->assertJsonPath('data.room_standard', ['is_standard' => true, 'item_name' => 'Proyektor']);
     }
 
     /**

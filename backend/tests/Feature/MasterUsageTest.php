@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\ConsumableCategory;
 use App\Models\Department;
@@ -86,14 +85,10 @@ class MasterUsageTest extends TestCase
             ->assertJsonPath('data.can_delete', false);
     }
 
-    public function test_category_and_asset_type_usage(): void
+    public function test_asset_type_usage(): void
     {
-        $category = Category::factory()->create();
-        $type = AssetType::factory()->create(['category_id' => $category->id]);
+        $type = AssetType::factory()->create();
         Asset::factory()->create(['asset_type_id' => $type->id]);
-
-        $this->getJson("/api/categories/{$category->id}/usage")
-            ->assertJsonPath('data.items', [['label' => 'jenis aset', 'count' => 1]]);
 
         $this->getJson("/api/asset-types/{$type->id}/usage")
             ->assertJsonPath('data.items.0', ['label' => 'aset', 'count' => 1])

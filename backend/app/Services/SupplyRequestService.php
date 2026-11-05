@@ -3,22 +3,18 @@
 namespace App\Services;
 
 use App\Enums\ConsumableStatus;
-use App\Enums\CountMethod;
 use App\Enums\RequestStatus;
 use App\Models\Consumable;
 use App\Models\RequestCatalog;
-use App\Models\RoomStandard;
 use App\Models\SupplyRequest;
 use App\Models\User;
 use App\Support\AppCache;
-use App\Support\DbInteger;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Permintaan ke departemen lain (SPEC §9): catat, ubah status (transisi terkunci, ikut mengubah stok / Ada ruangan),
+ * Permintaan ke departemen lain (SPEC §9): catat, ubah status (transisi terkunci, ikut mengubah stok),
  * saran permintaan, hapus katalog.
  */
 class SupplyRequestService
@@ -87,7 +83,7 @@ class SupplyRequestService
     }
 
     /**
-     * Pratinjau dampak perubahan status ke stok / Ada ruangan (popup sebelum menyimpan).
+     * Pratinjau dampak perubahan status ke stok (popup sebelum menyimpan).
      *
      * @return array{message: string, clamped: bool}
      */
@@ -116,109 +112,62 @@ class SupplyRequestService
     }
 
     /**
-     * Sasaran & jumlah perubahan. Diterima: barang stok → stok, barang departemen lain → Ada baris standar yang ditautkan.
-     * Dikembalikan/Dibatalkan setelah Diterima: kurangi tujuan yang tercatat, tidak sampai di bawah 0.
+     * Sasaran & jumlah perubahan. Diterima: barang stok bertambah.
+     * Dikembalikan/Dibatalkan setelah Diterima: kurangi lagi, tidak sampai di bawah 0.
      *
-     * @return array{target: Consumable|RoomStandard, adding: bool, amount: int, current: int, clamped: bool}|null
+     * @return array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool}|null
      */
     private function stockEffect(SupplyRequest $request, RequestStatus $to, bool $lock = false): ?array
     {
-        if ($to === RequestStatus::Diterima) {
-            $target = $this->receiveTarget($request, $lock);
-
-            return $target ? ['target' => $target, 'adding' => true, 'amount' => $request->quantity, 'current' => $this->currentAmount($target), 'clamped' => false] : null;
-        }
-
-        if ($request->status !== RequestStatus::Diterima || $request->applied_to === null) {
+        if ($to !== RequestStatus::Diterima && ($request->status !== RequestStatus::Diterima || $request->applied_to === null)) {
             return null;
         }
 
-        $target = $request->applied_to === SupplyRequest::APPLIED_TO_STOCK
-            ? $this->find(Consumable::query(), $request->consumable_id, $lock)
-            : $this->find(RoomStandard::query(), $request->room_standard_id, $lock);
+        $target = $this->consumable($request->consumable_id, $lock);
 
         if (! $target) {
             return null;
         }
 
-        $current = $this->currentAmount($target);
+        if ($to === RequestStatus::Diterima) {
+            return ['target' => $target, 'adding' => true, 'amount' => $request->quantity, 'current' => $target->quantity, 'clamped' => false];
+        }
 
-        return ['target' => $target, 'adding' => false, 'amount' => min($request->quantity, $current), 'current' => $current, 'clamped' => $current < $request->quantity];
+        return ['target' => $target, 'adding' => false, 'amount' => min($request->quantity, $target->quantity), 'current' => $target->quantity, 'clamped' => $target->quantity < $request->quantity];
     }
 
-    private function receiveTarget(SupplyRequest $request, bool $lock): Consumable|RoomStandard|null
-    {
-        return $this->find(Consumable::query(), $request->consumable_id, $lock)
-            ?? $this->find(RoomStandard::query(), $request->room_standard_id, $lock);
-    }
-
-    /**
-     * @template TModel of Consumable|RoomStandard
-     *
-     * @param  Builder<TModel>  $query
-     * @return TModel|null
-     */
-    private function find(Builder $query, ?int $id, bool $lock): Consumable|RoomStandard|null
+    private function consumable(?int $id, bool $lock): ?Consumable
     {
         if (! $id) {
             return null;
         }
 
-        return ($lock ? $query->lockForUpdate() : $query)->find($id);
-    }
-
-    private function currentAmount(Consumable|RoomStandard $target): int
-    {
-        return $target instanceof Consumable ? $target->quantity : (int) $target->actual_quantity;
+        return ($lock ? Consumable::query()->lockForUpdate() : Consumable::query())->find($id);
     }
 
     /**
-     * @param  array{target: Consumable|RoomStandard, adding: bool, amount: int, current: int, clamped: bool}|null  $effect
+     * @param  array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool}|null  $effect
      */
     private function applyEffect(SupplyRequest $request, RequestStatus $to, ?array $effect): void
     {
         if ($effect !== null && $effect['amount'] > 0) {
-            $signed = $effect['adding'] ? $effect['amount'] : -$effect['amount'];
-            $target = $effect['target'];
-
-            if ($target instanceof Consumable) {
-                $this->consumables->adjust($target, $signed);
-            } else {
-                if ($effect['current'] + $signed > DbInteger::MAX) {
-                    throw ValidationException::withMessages(['status' => 'Jumlah Ada melebihi batas.']);
-                }
-
-                $target->update(['actual_quantity' => $effect['current'] + $signed]);
-            }
+            $this->consumables->adjust($effect['target'], $effect['adding'] ? $effect['amount'] : -$effect['amount']);
         }
 
-        if ($to === RequestStatus::Diterima) {
-            $target = $effect['target'] ?? null;
-            $request->applied_to = match (true) {
-                $target instanceof Consumable => SupplyRequest::APPLIED_TO_STOCK,
-                $target instanceof RoomStandard => SupplyRequest::APPLIED_TO_ROOM,
-                default => null,
-            };
-            $request->room_standard_id = $target instanceof RoomStandard ? $target->id : null;
-        } else {
-            $request->applied_to = null;
-        }
+        $request->applied_to = $to === RequestStatus::Diterima && $effect !== null ? SupplyRequest::APPLIED_TO_STOCK : null;
     }
 
     /**
-     * @param  array{target: Consumable|RoomStandard, adding: bool, amount: int, current: int, clamped: bool}|null  $effect
+     * @param  array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool}|null  $effect
      * @return array{message: string, clamped: bool}
      */
     private function impact(?array $effect): array
     {
         if ($effect === null) {
-            return ['message' => 'Tidak mengubah stok atau kelengkapan ruangan.', 'clamped' => false];
+            return ['message' => 'Tidak mengubah stok.', 'clamped' => false];
         }
 
-        $target = $effect['target'];
-        $subject = $target instanceof Consumable
-            ? "Stok {$target->name}"
-            : "Ada {$target->item_name} di {$target->room->name}";
+        $subject = "Stok {$effect['target']->name}";
 
         if ($effect['adding']) {
             return ['message' => "{$subject} akan bertambah {$effect['amount']}.", 'clamped' => false];
@@ -239,20 +188,17 @@ class SupplyRequestService
     /**
      * Pemakaian item katalog (popup sebelum hapus).
      *
-     * @return array{supply_requests: int, room_standards: int, total: int}
+     * @return array{supply_requests: int, total: int}
      */
     public function catalogUsage(RequestCatalog $catalog): array
     {
-        $usage = [
-            'supply_requests' => $catalog->supplyRequests()->count(),
-            'room_standards' => $catalog->roomStandards()->count(),
-        ];
+        $requests = $catalog->supplyRequests()->count();
 
-        return $usage + ['total' => array_sum($usage)];
+        return ['supply_requests' => $requests, 'total' => $requests];
     }
 
     /**
-     * Hapus item katalog walau dipakai: tautan catalog_id di permintaan dan standar ruangan dilepas
+     * Hapus item katalog walau dipakai: tautan catalog_id di permintaan dilepas
      * dalam satu transaksi. Riwayat permintaan tetap utuh (item, departemen, cara, lead time, must_return tersimpan).
      */
     public function deleteCatalog(RequestCatalog $catalog): void
@@ -261,7 +207,6 @@ class SupplyRequestService
             $catalog = RequestCatalog::query()->whereKey($catalog->getKey())->lockForUpdate()->firstOrFail();
 
             $catalog->supplyRequests()->update(['catalog_id' => null]);
-            $catalog->roomStandards()->update(['catalog_id' => null]);
 
             // Observer katalog (deleted) mengosongkan cache master & ops yang memuat tautan tadi.
             $catalog->delete();
@@ -269,8 +214,8 @@ class SupplyRequestService
     }
 
     /**
-     * Saran permintaan per departemen penyedia: kekurangan ruangan (pemenuhan "minta ke", Belum dicek tidak
-     * termasuk) + stok Menipis/Habis. has_open_request = sudah ada permintaan Diajukan untuk item itu.
+     * Saran permintaan per departemen penyedia: hanya dari stok Menipis/Habis.
+     * has_open_request = sudah ada permintaan Diajukan untuk barang itu.
      *
      * @return list<array{provider_department: array{id: int, name: string}, items: list<array<string, mixed>>}>
      */
@@ -286,12 +231,7 @@ class SupplyRequestService
     {
         $open = SupplyRequest::query()->where('status', RequestStatus::Diajukan->value)->get();
 
-        $rooms = $this->roomSuggestions();
-        // Barang yang sudah muncul dari kekurangan ruangan tidak diulang sebagai saran stok.
-        $stock = $this->stockSuggestions()->whereNotIn('consumable_id', $rooms->pluck('consumable_id')->filter()->all());
-
-        $items = $rooms
-            ->concat($stock)
+        $items = $this->stockSuggestions()
             ->map(function (array $item) use ($open) {
                 $item['has_open_request'] = $open->contains(fn (SupplyRequest $request) => $this->matches($request, $item));
 
@@ -312,32 +252,6 @@ class SupplyRequestService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    private function roomSuggestions(): Collection
-    {
-        return RoomStandard::query()
-            ->where('count_method', CountMethod::Manual->value)
-            ->with(['consumable.providerDepartment', 'catalog', 'sourceDepartment', 'room.building'])
-            ->orderBy('room_id')
-            ->orderBy('id')
-            ->get()
-            ->filter(fn (RoomStandard $standard) => $standard->canRequest())
-            ->map(fn (RoomStandard $standard) => [
-                'source' => 'kekurangan_ruangan',
-                'item_name' => $standard->consumable?->name ?? $standard->item_name,
-                'catalog_name' => $standard->catalog?->item_name,
-                'quantity' => $standard->shortage(),
-                'catalog_id' => $standard->catalog_id,
-                'room' => ['id' => $standard->room_id, 'name' => $standard->room->name, 'building' => $standard->room->building->name],
-                'room_standard_id' => $standard->id,
-                'consumable_id' => $standard->consumable_id,
-                'provider_department' => $this->department($standard->consumable?->providerDepartment ?? $standard->sourceDepartment),
-            ])
-            ->values();
-    }
-
-    /**
-     * @return Collection<int, array<string, mixed>>
-     */
     private function stockSuggestions(): Collection
     {
         return Consumable::query()
@@ -346,13 +260,8 @@ class SupplyRequestService
             ->orderBy('name')
             ->get()
             ->map(fn (Consumable $consumable) => [
-                'source' => 'stok',
                 'item_name' => $consumable->name,
-                'catalog_name' => null,
                 'quantity' => max($consumable->min_quantity - $consumable->quantity, 1),
-                'catalog_id' => null,
-                'room' => null,
-                'room_standard_id' => null,
                 'consumable_id' => $consumable->id,
                 'stock_status' => $consumable->status()->value,
                 'provider_department' => $this->department($consumable->providerDepartment),
@@ -368,22 +277,12 @@ class SupplyRequestService
             return false;
         }
 
-        if ($item['room'] !== null && (int) $request->room_id !== (int) $item['room']['id']) {
-            return false;
-        }
-
         // Permintaan tertaut stok dicocokkan per barang.
         if ($request->consumable_id !== null) {
             return (int) $request->consumable_id === (int) $item['consumable_id'];
         }
 
-        if ($request->room_standard_id !== null) {
-            return (int) $request->room_standard_id === (int) $item['room_standard_id'];
-        }
-
-        return $item['catalog_id'] !== null
-            ? (int) $request->catalog_id === (int) $item['catalog_id']
-            : mb_strtolower($request->item_name) === mb_strtolower($item['item_name']);
+        return mb_strtolower($request->item_name) === mb_strtolower($item['item_name']);
     }
 
     /**
@@ -413,12 +312,6 @@ class SupplyRequestService
         // Permintaan tertaut stok memakai nama barang.
         if (! empty($data['consumable_id'])) {
             $data['item_name'] = Consumable::query()->whereKey($data['consumable_id'])->value('name');
-            $data['room_standard_id'] = null;
-        } elseif (! empty($data['room_standard_id'])) {
-            // Barang departemen lain: nama & ruangan mengikuti baris standarnya.
-            $standard = RoomStandard::query()->findOrFail($data['room_standard_id']);
-            $data['item_name'] = $standard->item_name;
-            $data['room_id'] = $standard->room_id;
         }
 
         $data['lead_time_days'] = $catalog?->lead_time_days;

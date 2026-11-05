@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\ConsumableCategory;
 use App\Models\Department;
 use App\Models\Room;
@@ -39,11 +38,6 @@ class MasterDataService
         $this->delete($room, 'Ruangan', $this->usageMap($room));
     }
 
-    public function deleteCategory(Category $category): void
-    {
-        $this->delete($category, 'Kategori', $this->usageMap($category));
-    }
-
     public function deleteConsumableCategory(ConsumableCategory $category): void
     {
         $this->delete($category, 'Kategori stok', $this->usageMap($category));
@@ -59,7 +53,7 @@ class MasterDataService
      *
      * @return array{items: list<array{label: string, count: int}>, total: int, can_delete: bool, reason: ?string}
      */
-    public function usage(Department|Building|Room|Category|ConsumableCategory|AssetType $model): array
+    public function usage(Department|Building|Room|ConsumableCategory|AssetType $model): array
     {
         $items = [];
 
@@ -93,7 +87,6 @@ class MasterDataService
                 'item katalog' => ['request_catalog', 'provider_department_id'],
                 'barang habis pakai' => ['consumables', 'provider_department_id'],
                 'permintaan' => ['supply_requests', 'provider_department_id'],
-                'standar ruangan' => ['room_standards', 'source_department_id'],
             ],
             $model instanceof Building => ['ruangan' => ['rooms', 'building_id']],
             $model instanceof Room => [
@@ -105,7 +98,6 @@ class MasterDataService
                 'permintaan' => ['supply_requests', 'room_id'],
                 'standar ruangan' => ['room_standards', 'room_id'],
             ],
-            $model instanceof Category => ['jenis aset' => ['asset_types', 'category_id']],
             $model instanceof ConsumableCategory => ['barang habis pakai' => ['consumables', 'consumable_category_id']],
             $model instanceof AssetType => [
                 'aset' => ['assets', 'asset_type_id'],

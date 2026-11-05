@@ -7,7 +7,6 @@ use App\Models\Asset;
 use App\Models\AssetCodeHistory;
 use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\Department;
 use App\Models\Loan;
 use App\Models\Room;
@@ -43,15 +42,13 @@ class AssetLifecycleTest extends TestCase
         $this->actingAs($this->staff);
 
         $this->shd = Department::factory()->internal()->create(['name' => 'SHD']);
-        $this->projector = AssetType::factory()->for(Category::factory()->create(['name' => 'Elektronik']))->create(['name' => 'Proyektor', 'code' => 'PRJ']);
+        $this->projector = AssetType::factory()->create(['name' => 'Proyektor', 'code' => 'PRJ']);
         $building = Building::factory()->create(['name' => 'Gedung IHS']);
         $this->classroom = Room::factory()->for($building)->create(['name' => 'Ruang Kelas 1']);
         $this->storage = Room::factory()->for($building)->create(['name' => 'Gudang']);
 
         RoomStandard::factory()->create([
             'room_id' => $this->classroom->id,
-            'item_name' => 'Proyektor',
-            'source_department_id' => $this->shd->id,
             'standard_quantity' => 1,
             'count_method' => CountMethod::Qr,
             'asset_type_id' => $this->projector->id,
@@ -69,7 +66,7 @@ class AssetLifecycleTest extends TestCase
 
     private function checklistRow(): array
     {
-        return $this->getJson("/api/rooms/{$this->classroom->id}/checklist")->assertOk()->json('data.0');
+        return $this->getJson("/api/rooms/{$this->classroom->id}/checklist")->assertOk()->json('data.assets.0');
     }
 
     private function dashboard(): array

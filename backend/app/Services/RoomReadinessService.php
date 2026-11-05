@@ -6,6 +6,7 @@ use App\Enums\AssetStatus;
 use App\Enums\ChecklistResult;
 use App\Enums\CountMethod;
 use App\Models\Asset;
+use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Room;
 use App\Models\RoomStandard;
@@ -16,8 +17,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Kelengkapan ruangan (SPEC §8): checklist, simpan hasil cek, isi dari stok, ringkasan kesiapan.
- * summarize() dipakai ulang T14 (saran permintaan) & T15 (dashboard): Belum dicek bukan kekurangan.
+ * Kelengkapan ruangan (SPEC §8): aset di ruangan, standar, simpan hasil cek, ambil dari stok, ringkasan kesiapan.
+ * summarize() dipakai dashboard & laporan: Belum dicek bukan kekurangan.
  */
 class RoomReadinessService
 {
@@ -31,7 +32,7 @@ class RoomReadinessService
         AssetStatus::TidakLayakPakai,
     ];
 
-    public const RELATIONS = ['sourceDepartment', 'assetType', 'consumable.providerDepartment', 'catalog'];
+    public const RELATIONS = ['assetType', 'consumable.providerDepartment'];
 
     public function __construct(private ConsumableService $consumables) {}
 
@@ -44,8 +45,7 @@ class RoomReadinessService
     }
 
     /**
-     * Isi jumlah "Ada", kode aset, dan jumlah aset yang tidak dihitung pada baris QR dengan satu query
-     * (dikelompokkan per ruangan & jenis aset). Tidak Layak Pakai tidak diambil: tidak ditampilkan sama sekali.
+     * Isi jumlah "Ada" baris QR dengan satu query (dikelompokkan per ruangan & jenis aset).
      *
      * @param  Collection<int, RoomStandard>  $standards
      * @return Collection<int, RoomStandard>
@@ -58,28 +58,68 @@ class RoomReadinessService
             return $standards;
         }
 
-        $assets = Asset::query()
+        $counts = Asset::query()
             ->whereIn('room_id', $qr->pluck('room_id')->unique()->values())
-            ->whereIn('asset_type_id', $qr->pluck('asset_type_id')->filter()->unique()->values())
-            ->where('status', '!=', AssetStatus::TidakLayakPakai->value)
-            ->orderBy('code')
-            ->select('id', 'code', 'status', 'room_id', 'asset_type_id')
+            ->whereIn('asset_type_id', $qr->pluck('asset_type_id')->unique()->values())
+            ->whereNotIn('status', array_map(fn (AssetStatus $s) => $s->value, self::EXCLUDED_STATUSES))
+            ->selectRaw('room_id, asset_type_id, count(*) as total')
+            ->groupBy('room_id', 'asset_type_id')
             ->toBase()
             ->get()
-            ->groupBy(fn ($asset) => "{$asset->room_id}:{$asset->asset_type_id}");
-
-        $excluded = array_map(fn (AssetStatus $s) => $s->value, self::EXCLUDED_STATUSES);
+            ->keyBy(fn ($row) => "{$row->room_id}:{$row->asset_type_id}");
 
         foreach ($qr as $standard) {
-            [$notCounted, $counted] = ($assets["{$standard->room_id}:{$standard->asset_type_id}"] ?? collect())
-                ->partition(fn ($asset) => in_array($asset->status, $excluded, true));
-
-            $standard->qrPresentQuantity = $counted->count();
-            $standard->qrAssets = $counted->map(fn ($asset) => ['id' => (int) $asset->id, 'code' => $asset->code])->values()->all();
-            $standard->qrNotCounted = $notCounted->countBy('status')->all();
+            $standard->qrPresentQuantity = (int) ($counts["{$standard->room_id}:{$standard->asset_type_id}"]->total ?? 0);
         }
 
         return $standards;
+    }
+
+    /**
+     * Bagian "Aset di ruangan": aset berlokasi asal di ruangan ini per jenis (Tidak Layak Pakai tidak tampil).
+     * Tanpa baris standar berarti standar 0: tampil jumlah Ada tanpa Hasil. Standar > 0 tampil walau asetnya 0.
+     *
+     * @param  Collection<int, RoomStandard>  $standards  sudah melewati checklist()
+     * @return list<array<string, mixed>>
+     */
+    public function assetGroups(Room $room, Collection $standards): array
+    {
+        $excluded = array_map(fn (AssetStatus $s) => $s->value, self::EXCLUDED_STATUSES);
+
+        $assets = Asset::query()
+            ->where('room_id', $room->id)
+            ->where('status', '!=', AssetStatus::TidakLayakPakai->value)
+            ->orderBy('code')
+            ->select('id', 'code', 'status', 'asset_type_id')
+            ->toBase()
+            ->get()
+            ->groupBy('asset_type_id');
+
+        $standardsByType = $standards->filter(fn (RoomStandard $s) => $s->count_method === CountMethod::Qr)->keyBy('asset_type_id');
+
+        return AssetType::query()
+            ->whereKey($assets->keys()->merge($standardsByType->keys())->unique()->values())
+            ->orderBy('name')
+            ->get()
+            ->map(function (AssetType $type) use ($assets, $standardsByType, $excluded) {
+                $rows = $assets->get($type->id, collect());
+                $standard = $standardsByType->get($type->id);
+                $notCounted = $rows->filter(fn ($asset) => in_array($asset->status, $excluded, true));
+                $present = $rows->count() - $notCounted->count();
+
+                return [
+                    'asset_type' => ['id' => $type->id, 'name' => $type->name, 'code' => $type->code],
+                    'total' => $rows->count(),
+                    'assets' => $rows->map(fn ($asset) => ['id' => (int) $asset->id, 'code' => $asset->code, 'status' => $asset->status])->values()->all(),
+                    'not_counted' => (object) $notCounted->countBy('status')->all(),
+                    'standard_id' => $standard?->id,
+                    'standard_quantity' => $standard?->standard_quantity ?? 0,
+                    'present_quantity' => $present,
+                    'difference' => $standard === null ? null : $present - $standard->standard_quantity,
+                    'result' => $standard?->checklistResult()->value,
+                ];
+            })
+            ->all();
     }
 
     /**
@@ -103,7 +143,7 @@ class RoomReadinessService
             'total_items' => $total,
             'shortage_items' => $shortage,
             'unchecked_items' => $unchecked,
-            'is_complete' => $shortage === 0,
+            'is_complete' => $total > 0 && $shortage === 0,
         ];
     }
 
@@ -126,7 +166,7 @@ class RoomReadinessService
 
     /**
      * Ringkasan kesiapan per gedung → ruangan (array, di-cache grup ops); dipakai halaman kelengkapan
-     * dan dashboard. Ruangan tanpa standar = lengkap.
+     * dan dashboard. Semua ruangan tampil; ruangan tanpa standar bukan Lengkap dan bukan kurang.
      *
      * @return list<array{id: int, name: string, slug: string, rooms_count: int, incomplete_rooms_count: int, rooms: list<array<string, mixed>>}>
      */
@@ -148,7 +188,7 @@ class RoomReadinessService
                     'name' => $building->name,
                     'slug' => $building->slug,
                     'rooms_count' => $rooms->count(),
-                    'incomplete_rooms_count' => $rooms->where('is_complete', false)->count(),
+                    'incomplete_rooms_count' => $rooms->where('shortage_items', '>', 0)->count(),
                     'rooms' => $rooms->values()->all(),
                 ];
             })
@@ -171,7 +211,7 @@ class RoomReadinessService
                 $standard = $standards->get($row['id']);
 
                 if (! $standard || $standard->count_method !== CountMethod::Manual) {
-                    throw ValidationException::withMessages(['items' => 'Hanya baris Manual ruangan ini yang bisa diisi.']);
+                    throw ValidationException::withMessages(['items' => 'Hanya barang habis pakai ruangan ini yang bisa diisi.']);
                 }
 
                 $standard->update(['actual_quantity' => $row['actual_quantity']]);
@@ -184,7 +224,7 @@ class RoomReadinessService
     }
 
     /**
-     * Isi dari stok SHD: jumlah = min(kekurangan, stok). Stok berkurang & Ada bertambah dalam satu transaksi;
+     * Ambil dari stok: jumlah = min(kekurangan, stok). Stok berkurang & Ada bertambah dalam satu transaksi;
      * sisa kekurangan tetap tercatat.
      *
      * @return array{standard: RoomStandard, filled: int, remaining_shortage: int, stock_remaining: int}
@@ -194,8 +234,8 @@ class RoomReadinessService
         return DB::transaction(function () use ($standard) {
             $standard = RoomStandard::query()->whereKey($standard->getKey())->lockForUpdate()->firstOrFail();
 
-            if ($standard->count_method !== CountMethod::Manual || ! $standard->consumable_id) {
-                throw ValidationException::withMessages(['standard' => 'Baris ini tidak ditautkan ke stok SHD.']);
+            if ($standard->count_method !== CountMethod::Manual) {
+                throw ValidationException::withMessages(['standard' => 'Baris ini bukan barang stok.']);
             }
 
             $shortage = $standard->shortage();

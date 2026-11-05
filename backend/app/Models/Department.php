@@ -55,12 +55,4 @@ class Department extends Model
     {
         return $this->hasMany(SupplyRequest::class, 'provider_department_id');
     }
-
-    /**
-     * @return HasMany<RoomStandard, $this>
-     */
-    public function roomStandards(): HasMany
-    {
-        return $this->hasMany(RoomStandard::class, 'source_department_id');
-    }
 }

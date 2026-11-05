@@ -4,13 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Asset;
 use App\Models\AssetType;
-use App\Models\Category;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Saran kode jenis & pratinjau kode aset untuk form aset (T26t).
+ * Kode jenis otomatis dari nama & pratinjau kode aset untuk form aset.
  */
 class AssetTypeCodeEndpointsTest extends TestCase
 {
@@ -27,34 +26,24 @@ class AssetTypeCodeEndpointsTest extends TestCase
     {
         $this->app['auth']->forgetGuards();
 
-        $this->getJson('/api/asset-types/code-suggestion?name=Laptop')->assertUnauthorized();
         $this->getJson('/api/asset-types/1/next-code')->assertUnauthorized();
     }
 
-    public function test_suggestion_follows_name_and_skips_taken_codes(): void
+    public function test_store_generates_code_from_name_and_skips_taken_codes(): void
     {
-        $this->getJson('/api/asset-types/code-suggestion?name=Laptop')->assertOk()->assertExactJson(['data' => ['code' => 'LPT']]);
+        $this->postJson('/api/asset-types', ['name' => 'Laptop'])->assertCreated()->assertJsonPath('data.code', 'LPT');
+        $this->postJson('/api/asset-types', ['name' => 'Laptop Pro', 'code' => 'LPP'])->assertCreated();
 
-        AssetType::factory()->create(['code' => 'LPT']);
-        $this->getJson('/api/asset-types/code-suggestion?name=Laptop')->assertJsonPath('data.code', 'LPT2');
-
-        // Kode yang tersisa di kode aset milik jenis lain juga tidak disarankan.
+        // Kode yang tersisa di kode aset milik jenis lain juga tidak dipakai.
         Asset::factory()->create(['code' => 'SHD-KRS-001', 'asset_type_id' => AssetType::factory()->create(['code' => 'MJA'])->id]);
-        $this->getJson('/api/asset-types/code-suggestion?name=Kursi')->assertJsonPath('data.code', 'KRS2');
-    }
-
-    public function test_suggestion_is_null_when_name_has_no_letters_and_name_is_required(): void
-    {
-        $this->getJson('/api/asset-types/code-suggestion?name=123')->assertOk()->assertJsonPath('data.code', null);
-        $this->getJson('/api/asset-types/code-suggestion')->assertUnprocessable()->assertJsonValidationErrors('name');
+        $this->postJson('/api/asset-types', ['name' => 'Kursi'])->assertCreated()->assertJsonPath('data.code', 'KRS2');
+        $this->getJson('/api/asset-types/code-suggestion?name=Laptop')->assertStatus(405);
     }
 
     public function test_store_rejects_name_without_letters_when_code_is_empty(): void
     {
-        $categoryId = Category::factory()->create()->id;
-
         foreach ([['name' => '123'], ['name' => '!!!', 'code' => '']] as $payload) {
-            $this->postJson('/api/asset-types', [...$payload, 'category_id' => $categoryId])
+            $this->postJson('/api/asset-types', $payload)
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors(['code' => 'Kode singkat tidak dapat dibuat dari nama ini, isi kode secara manual.']);
         }
@@ -62,7 +51,7 @@ class AssetTypeCodeEndpointsTest extends TestCase
         $this->assertDatabaseCount('asset_types', 0);
 
         // Dengan kode manual, nama yang sama diterima.
-        $this->postJson('/api/asset-types', ['name' => '123', 'code' => 'ANG', 'category_id' => $categoryId])
+        $this->postJson('/api/asset-types', ['name' => '123', 'code' => 'ANG'])
             ->assertCreated()
             ->assertJsonPath('data.code', 'ANG');
     }

@@ -216,9 +216,8 @@ class Asset extends Model
     protected function forList(Builder $query): void
     {
         $query->select(['assets.id', 'assets.code', 'assets.name', 'assets.condition', 'assets.status'])->addSelect([
-            'category_name' => Category::query()
-                ->select('categories.name')
-                ->join('asset_types', 'asset_types.category_id', '=', 'categories.id')
+            'asset_type_name' => AssetType::query()
+                ->select('asset_types.name')
                 ->whereColumn('asset_types.id', 'assets.asset_type_id'),
             'room_name' => Room::query()
                 ->select('rooms.name')
@@ -243,7 +242,7 @@ class Asset extends Model
     protected function filter(Builder $query, array $filters): void
     {
         $query
-            ->when($filters['category_id'] ?? null, fn ($query, $id) => $query->whereHas('assetType', fn ($type) => $type->where('category_id', $id)))
+            ->when($filters['asset_type_id'] ?? null, fn ($query, $id) => $query->where('asset_type_id', $id))
             ->when($filters['building_id'] ?? null, fn ($query, $id) => $query->whereHas('room', fn ($room) => $room->where('building_id', $id)))
             ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id))
             ->when($filters['source_department_id'] ?? null, fn ($query, $id) => $query->where('source_department_id', $id))

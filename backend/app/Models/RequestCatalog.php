@@ -43,12 +43,4 @@ class RequestCatalog extends Model
     {
         return $this->hasMany(SupplyRequest::class, 'catalog_id');
     }
-
-    /**
-     * @return HasMany<RoomStandard, $this>
-     */
-    public function roomStandards(): HasMany
-    {
-        return $this->hasMany(RoomStandard::class, 'catalog_id');
-    }
 }

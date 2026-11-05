@@ -28,7 +28,6 @@ class StoreSupplyRequestRequest extends FormRequest
             'request_date' => ['nullable', 'date'],
             'catalog_id' => ['nullable', 'integer', 'exists:request_catalog,id', $this->catalogMatchesProvider()],
             'consumable_id' => ['nullable', 'integer', 'exists:consumables,id', 'prohibits:catalog_id'],
-            'room_standard_id' => ['nullable', 'integer', 'exists:room_standards,id'],
             'item_name' => ['required_without:catalog_id', 'nullable', 'string', 'max:150'],
             'must_return' => ['nullable', 'boolean'],
             'quantity' => ['required', 'integer', 'min:1', 'max:'.DbInteger::MAX],

@@ -3,9 +3,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import { buttonClass } from '../../components/ui/button-class'
 import { controlClass } from '../../components/ui/control-class'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import { PageHeader } from '../../components/ui/Page'
@@ -19,9 +19,9 @@ import { queryKeys } from '../../lib/queries/keys'
 import { useChecklist, useReadiness } from '../../lib/queries/lists'
 import { prefetchRoomOptions } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
-import type { Checklist, ChecklistResult, RoomStandard } from '../../types/room'
+import type { Checklist, ChecklistResult, RoomAssetGroup, RoomConsumable } from '../../types/room'
 import NameModal from './NameModal'
-import StandardsModal from './StandardsModal'
+import StandardFormModal, { type StandardTarget } from './StandardFormModal'
 
 const BASE = '/kelengkapan-ruangan'
 
@@ -35,33 +35,23 @@ const chip = (active: boolean) =>
 // HP: chip digeser horizontal; sm ke atas: membungkus.
 const chipRow = '-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0'
 
-const requestUrl = (roomId: number, s?: RoomStandard) => {
-  const p = new URLSearchParams({ room_id: String(roomId) })
-  const f = s?.fulfillment
-  if (f?.type === 'stok') {
-    p.set('consumable_id', String(f.consumable.id))
-    p.set('item_name', f.consumable.name)
-    if (f.consumable.provider_department) p.set('provider_department_id', String(f.consumable.provider_department.id))
-  } else if (f?.type === 'unit_lain' && s) {
-    p.set('room_standard_id', String(s.id))
-    p.set('item_name', s.item_name)
-    if (f.catalog) p.set('catalog_id', String(f.catalog.id))
-    else if (f.provider_department) p.set('provider_department_id', String(f.provider_department.id))
-  }
-  if (s?.shortage) p.set('quantity', String(s.shortage))
+const requestUrl = (roomId: number, s: RoomConsumable) => {
+  const p = new URLSearchParams({ room_id: String(roomId), consumable_id: String(s.consumable.id), item_name: s.consumable.name })
+  if (s.consumable.provider_department) p.set('provider_department_id', String(s.consumable.provider_department.id))
+  if (s.shortage) p.set('quantity', String(s.shortage))
   return `/permintaan?${p}`
 }
 
-const MAX_ASSET_CODES = 3
+const MAX_ASSET_CODES = 5
 const NOT_COUNTED_LABELS = { Dipinjam: 'sedang dipinjam', Perbaikan: 'dalam perbaikan', Hilang: 'hilang' } as const
 
-/** Kode aset yang terhitung "Ada" (klik menuju detail) + keterangan aset yang tidak dihitung. */
-function AssetCodes({ standard }: { standard: RoomStandard }) {
-  const shown = standard.assets.slice(0, MAX_ASSET_CODES)
-  const hidden = standard.assets.slice(MAX_ASSET_CODES)
+/** Kode aset (klik menuju detail) + keterangan aset yang tidak dihitung "Ada". */
+function AssetCodes({ group }: { group: RoomAssetGroup }) {
+  const shown = group.assets.slice(0, MAX_ASSET_CODES)
+  const hidden = group.assets.slice(MAX_ASSET_CODES)
   const notCounted = (Object.keys(NOT_COUNTED_LABELS) as (keyof typeof NOT_COUNTED_LABELS)[])
-    .filter((status) => standard.not_counted[status])
-    .map((status) => `${standard.not_counted[status]} ${NOT_COUNTED_LABELS[status]}`)
+    .filter((status) => group.not_counted[status])
+    .map((status) => `${group.not_counted[status]} ${NOT_COUNTED_LABELS[status]}`)
 
   return (
     <span className="block text-xs text-slate-500">
@@ -79,6 +69,13 @@ function AssetCodes({ standard }: { standard: RoomStandard }) {
   )
 }
 
+const differenceCell = (difference: number | null) =>
+  difference === null ? (
+    <span className="text-slate-500">—</span>
+  ) : (
+    <span className={`tabular-nums ${difference < 0 ? 'font-semibold text-bad-700' : ''}`}>{difference}</span>
+  )
+
 export default function RoomsPage() {
   const { building: buildingSlug, room: roomSlug } = useParams()
   const navigate = useNavigate()
@@ -90,7 +87,10 @@ export default function RoomsPage() {
   const [actualFrom, setActualFrom] = useState<Checklist | null>(null)
   const [saving, setSaving] = useState(false)
   const [filling, setFilling] = useState<number | null>(null)
-  const [modal, setModal] = useState<'standards' | 'building' | 'room' | null>(null)
+  const [modal, setModal] = useState<'building' | 'room' | null>(null)
+  const [standardTarget, setStandardTarget] = useState<StandardTarget | null>(null)
+  const [removing, setRemoving] = useState<RoomConsumable | null>(null)
+  const [busy, setBusy] = useState(false)
 
   // "Buat permintaan" membuka form berisi gedung & ruangan: datanya disiapkan dari sini.
   useEffect(() => prefetchRoomOptions(queryClient), [queryClient])
@@ -104,12 +104,12 @@ export default function RoomsPage() {
   const checklist = checklistQuery.data ?? null
   useErrorToast(readiness.error, checklistQuery.error)
 
-  // Data checklist baru (ruangan lain / setelah simpan) → isi ulang kolom Ada baris Manual.
+  // Data checklist baru (ruangan lain / setelah simpan) → isi ulang kolom Ada barang habis pakai.
   if (checklist && checklist !== actualFrom) {
     setActualFrom(checklist)
     setActual(
       Object.fromEntries(
-        checklist.data.filter((s) => s.count_method === 'Manual').map((s) => [s.id, s.present_quantity?.toString() ?? '']),
+        checklist.data.consumables.map((s) => [s.id, s.present_quantity?.toString() ?? '']),
       ),
     )
   }
@@ -120,11 +120,12 @@ export default function RoomsPage() {
   // Checklist ruangan lain yang masih tampil dianggap belum dimuat.
   const checklistReady = checklist !== null && checklist.meta.room.id === roomId
 
-  // Pratinjau langsung: baris Manual memakai angka yang sedang diketik.
-  const rows = useMemo(
+  const assetRows = checklistReady ? checklist.data.assets : []
+
+  // Pratinjau langsung: barang habis pakai memakai angka yang sedang diketik.
+  const consumableRows = useMemo(
     () =>
-      (checklistReady ? checklist.data : []).map((s) => {
-        if (s.count_method !== 'Manual') return s
+      (checklistReady ? checklist.data.consumables : []).map((s) => {
         const raw = actual[s.id] ?? ''
         const present = raw === '' ? null : Number(raw)
         const difference = present === null ? null : present - s.standard_quantity
@@ -159,14 +160,13 @@ export default function RoomsPage() {
   }
 
   const totalRooms = buildings.reduce((n, b) => n + b.rooms_count, 0)
-  const manualRows = rows.filter((s) => s.count_method === 'Manual')
-  const shortages = rows.filter((s) => s.result === 'Kurang')
+  const shortages = assetRows.filter((g) => g.result === 'Kurang').length + consumableRows.filter((s) => s.result === 'Kurang').length
   const roomLabel = room && building ? `${room.name} · ${building.name}` : ''
-  const canSave = !!roomId && manualRows.length > 0
+  const canSave = !!roomId && consumableRows.length > 0
 
   const saveCheck = async () => {
     if (!roomId) return
-    const items = manualRows
+    const items = consumableRows
       .filter((s) => (actual[s.id] ?? '') !== '')
       .map((s) => ({ id: s.id, actual_quantity: Number(actual[s.id]) }))
     setSaving(true)
@@ -181,7 +181,7 @@ export default function RoomsPage() {
     }
   }
 
-  const fillFromStock = async (s: RoomStandard) => {
+  const fillFromStock = async (s: RoomConsumable) => {
     setFilling(s.id)
     try {
       const res = await api.post<{ message: string }>(`/room-standards/${s.id}/fill-from-stock`)
@@ -194,94 +194,100 @@ export default function RoomsPage() {
     }
   }
 
-  // Kalimat banner: "Kekurangan dapat diisi dari stok atau diminta ke departemen penyedia."
-  const hasRequestable = shortages.some((s) => s.can_request)
-  const ways = [
-    ...(shortages.some((s) => s.can_fill_from_stock) ? ['diisi dari stok'] : []),
-    ...(hasRequestable ? ['diminta ke departemen penyedia'] : []),
-  ]
-  const waysText = ways.length ? ` Kekurangan dapat ${ways.join(' atau ')}.` : ''
+  const removeConsumable = async () => {
+    if (!removing) return
+    setBusy(true)
+    try {
+      await api.delete(`/room-standards/${removing.id}`)
+      toast.success(`${removing.item_name} dilepas dari ${room?.name}.`)
+      setRemoving(null)
+      await reloadAll()
+    } catch (e) {
+      toast.error(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
-  const columns: Column<RoomStandard>[] = [
+  const assetColumns: Column<RoomAssetGroup>[] = [
     {
-      header: 'Perlengkapan standar',
+      header: 'Jenis aset',
+      mobile: 'title',
+      cell: (g) => (
+        <>
+          <span className="font-medium">{g.asset_type.name}</span>
+          <AssetCodes group={g} />
+        </>
+      ),
+    },
+    { header: 'Jumlah', cell: (g) => <span className="tabular-nums">{g.total}</span> },
+    { header: 'Standar', cell: (g) => <span className="tabular-nums">{g.standard_quantity}</span> },
+    { header: 'Ada', cell: (g) => <span className="tabular-nums">{g.present_quantity}</span> },
+    { header: 'Selisih', cell: (g) => differenceCell(g.difference) },
+    {
+      header: 'Hasil',
+      mobile: 'badge',
+      cell: (g) => (g.result ? <Badge color={resultColor[g.result]}>{g.result}</Badge> : <span className="text-slate-500">—</span>),
+    },
+    {
+      header: 'Aksi',
+      cell: (g) => (
+        <button type="button" className="text-xs font-semibold text-brand-700 hover:underline" onClick={() => setStandardTarget({ kind: 'asset', group: g })}>
+          Atur standar
+        </button>
+      ),
+    },
+  ]
+
+  const consumableColumns: Column<RoomConsumable>[] = [
+    {
+      header: 'Barang',
       mobile: 'title',
       cell: (s) => (
         <>
           <span className="font-medium">{s.item_name}</span>
-          {s.needs_completion ? (
-            <span className="block text-xs font-medium text-warn-700">Perlu dilengkapi</span>
-          ) : s.count_method === 'QR' ? (
-            <AssetCodes standard={s} />
-          ) : (
-            <span className="block text-xs text-slate-500">{s.fulfillment?.type === 'unit_lain' ? 'Barang departemen lain' : 'Stok Habis Pakai'}</span>
-          )}
+          <span className="block text-xs text-slate-500">
+            Stok {s.consumable.quantity} {s.consumable.unit} · {s.consumable.provider_department?.name ?? '-'}
+          </span>
         </>
       ),
-    },
-    {
-      header: 'Sumber',
-      cell: (s) => (s.source_department ? (s.source_department.is_internal ? `Milik ${s.source_department.name}` : s.source_department.name) : '-'),
     },
     { header: 'Standar', cell: (s) => <span className="tabular-nums">{s.standard_quantity}</span> },
     {
       header: 'Ada',
-      cell: (s) =>
-        s.count_method === 'Manual' ? (
-          <input
-            type="number"
-            min={0}
-            value={actual[s.id] ?? ''}
-            onChange={(e) => setActual((a) => ({ ...a, [s.id]: e.target.value }))}
-            placeholder="—"
-            aria-label={`Jumlah ada ${s.item_name}`}
-            inputMode="numeric"
-            className={`${controlClass()} w-24! tabular-nums`}
-          />
-        ) : (
-          s.present_quantity
-        ),
+      cell: (s) => (
+        <input
+          type="number"
+          min={0}
+          value={actual[s.id] ?? ''}
+          onChange={(e) => setActual((a) => ({ ...a, [s.id]: e.target.value }))}
+          placeholder="—"
+          aria-label={`Jumlah ada ${s.item_name}`}
+          inputMode="numeric"
+          className={`${controlClass()} w-24! tabular-nums`}
+        />
+      ),
     },
-    {
-      header: 'Selisih',
-      cell: (s) =>
-        s.difference === null ? (
-          <span className="text-slate-500">—</span>
-        ) : (
-          <span className={`tabular-nums ${s.difference < 0 ? 'font-semibold text-bad-700' : ''}`}>{s.difference}</span>
-        ),
-    },
+    { header: 'Selisih', cell: (s) => differenceCell(s.difference) },
     { header: 'Hasil', mobile: 'badge', cell: (s) => <Badge color={resultColor[s.result]}>{s.result}</Badge> },
     {
-      header: 'Pemenuhan',
-      cell: (s) => {
-        if (s.needs_completion) {
-          return (
-            <button type="button" className="text-xs font-semibold text-brand-700 hover:underline" onClick={() => setModal('standards')}>
-              Lengkapi
-            </button>
-          )
-        }
-        const f = s.fulfillment
-        const text = !f
-          ? '-'
-          : f.type === 'unit_lain'
-            ? `Minta ke ${f.provider_department?.name ?? 'departemen penyedia'}`
-            : `Stok: ${f.consumable.name} (${f.consumable.quantity} ${f.consumable.unit})`
-        return (
-          <div className="space-y-1">
-            <span className="block text-xs text-slate-600">{text}</span>
-            {s.can_fill_from_stock && (
-              <Button variant="secondary" className="min-h-8! px-3! text-xs!" loading={filling === s.id} onClick={() => fillFromStock(s)}>
-                Isi dari stok
-              </Button>
-            )}
-            {s.can_request && roomId && (
-              <Link to={requestUrl(roomId, s)} className="block text-xs font-semibold text-brand-700 hover:underline">Buat permintaan</Link>
-            )}
+      header: 'Aksi',
+      cell: (s) => (
+        <div className="space-y-1">
+          {s.can_fill_from_stock && (
+            <Button variant="secondary" className="min-h-8! px-3! text-xs!" loading={filling === s.id} onClick={() => fillFromStock(s)}>
+              Ambil dari stok
+            </Button>
+          )}
+          {s.can_request && roomId && (
+            <Link to={requestUrl(roomId, s)} className="block text-xs font-semibold text-brand-700 hover:underline">Ajukan permintaan</Link>
+          )}
+          <div className="flex gap-3 text-xs">
+            <button type="button" className="font-semibold text-brand-700 hover:underline" onClick={() => setStandardTarget({ kind: 'consumable', row: s })}>Ubah</button>
+            <button type="button" className="font-semibold text-bad-700 hover:underline" onClick={() => setRemoving(s)}>Hapus</button>
           </div>
-        )
-      },
+        </div>
+      ),
     },
   ]
 
@@ -289,11 +295,10 @@ export default function RoomsPage() {
     <div className={`space-y-5 ${canSave ? 'pb-20 lg:pb-0' : ''}`}>
       <PageHeader
         title="Kelengkapan Ruangan"
-        description={`Isi ruangan dibanding standar perlengkapan · ${totalRooms} ruangan di ${buildings.length} gedung`}
+        description={`Aset dan barang habis pakai per ruangan · ${totalRooms} ruangan di ${buildings.length} gedung`}
         actions={
           <>
             <ExportButton type="rooms" filters={() => ({ building_id: building?.id })} />
-            <Button variant="secondary" disabled={!roomId} onClick={() => setModal('standards')}>Atur standar ruangan</Button>
             <Button loading={saving} disabled={!canSave} onClick={saveCheck} className="max-lg:hidden!">Simpan hasil cek</Button>
           </>
         }
@@ -338,44 +343,64 @@ export default function RoomsPage() {
         )}
       </section>
 
-      {room && shortages.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-xl bg-warn-50 px-5 py-4 text-sm text-warn-700 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            <b>{room.name} kurang {shortages.length} item.</b>
-            {waysText}
-          </p>
-          {hasRequestable && roomId && (
-            <Link to={requestUrl(roomId)} className={buttonClass('secondary', 'shrink-0')}>
-              Buat permintaan
-            </Link>
-          )}
+      {room && shortages > 0 && (
+        <div className="rounded-xl bg-warn-50 px-5 py-4 text-sm text-warn-700">
+          <b>{room.name} kurang {shortages} item.</b>
+          {consumableRows.some((s) => s.result === 'Kurang') && ' Barang habis pakai dapat diambil dari stok, atau ajukan permintaan jika stok habis.'}
         </div>
       )}
 
       {room && (
-        <section className="space-y-3">
+        <>
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 className="font-semibold">Checklist {roomLabel}</h2>
+            <h2 className="font-semibold">{roomLabel}</h2>
             <span className="text-sm text-slate-500">
               {room.last_checked_at
                 ? `Dicek terakhir ${formatDateTime(room.last_checked_at)} oleh ${room.last_checked_by ?? '-'}`
                 : 'Belum pernah dicek'}
               {checklist && checklist.meta.summary.unchecked_items > 0 && ` · ${checklist.meta.summary.unchecked_items} belum dicek`}
+              {checklist && checklist.meta.summary.total_items === 0 && ' · Belum ada standar'}
             </span>
           </div>
-          <DataTable
-            columns={columns}
-            rows={rows}
-            rowKey={(s) => s.id}
-            loading={!checklistReady}
-            emptyText="Belum ada standar perlengkapan. Klik “Atur standar ruangan” untuk menambah."
-          />
-          {manualRows.length > 0 && (
-            <p className="text-xs text-slate-500">
-              Isi kolom Ada untuk barang stok, lalu klik “Simpan hasil cek”. Baris aset dihitung otomatis dari aset di ruangan ini.
-            </p>
-          )}
-        </section>
+
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-semibold">Aset di ruangan</h3>
+                <p className="text-sm text-slate-500">Otomatis dari aset berlokasi asal di ruangan ini. Standar opsional per jenis.</p>
+              </div>
+              <Button variant="secondary" onClick={() => setStandardTarget({ kind: 'asset', group: null })}>
+                <Plus size={16} /> Tambah standar jenis
+              </Button>
+            </div>
+            <DataTable
+              columns={assetColumns}
+              rows={assetRows}
+              rowKey={(g) => g.asset_type.id}
+              loading={!checklistReady}
+              emptyText="Belum ada aset di ruangan ini."
+            />
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-semibold">Barang habis pakai</h3>
+                <p className="text-sm text-slate-500">Barang dari Stok dengan jumlah standar. Isi kolom Ada, lalu klik “Simpan hasil cek”.</p>
+              </div>
+              <Button variant="secondary" onClick={() => setStandardTarget({ kind: 'consumable', row: null })}>
+                <Plus size={16} /> Tambah barang
+              </Button>
+            </div>
+            <DataTable
+              columns={consumableColumns}
+              rows={consumableRows}
+              rowKey={(s) => s.id}
+              loading={!checklistReady}
+              emptyText="Belum ada barang habis pakai. Klik “Tambah barang” untuk menambah."
+            />
+          </section>
+        </>
       )}
       {canSave && (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
@@ -386,15 +411,31 @@ export default function RoomsPage() {
         <p className="text-sm text-slate-500">Belum ada ruangan di {building.name}. Tambah ruangan dengan tombol +.</p>
       )}
 
-      {modal === 'standards' && roomId && (
-        <StandardsModal
+      {standardTarget && roomId && (
+        <StandardFormModal
           roomId={roomId}
           roomName={roomLabel}
-          standards={checklist?.data ?? []}
-          onClose={() => setModal(null)}
-          onChanged={reloadAll}
+          target={standardTarget}
+          usedAssetTypeIds={assetRows.map((g) => g.asset_type.id)}
+          usedConsumableIds={consumableRows.map((s) => s.consumable.id)}
+          onClose={() => setStandardTarget(null)}
+          onDone={() => {
+            setStandardTarget(null)
+            reloadAll()
+          }}
         />
       )}
+      <ConfirmDialog
+        open={removing !== null}
+        title="Lepas barang dari ruangan"
+        confirmLabel="Lepas"
+        danger
+        loading={busy}
+        onConfirm={removeConsumable}
+        onClose={() => setRemoving(null)}
+      >
+        Lepas "{removing?.item_name}" dari {roomLabel}? Stok barang tidak berubah.
+      </ConfirmDialog>
       {modal === 'building' && (
         <NameModal
           title="Tambah gedung"
@@ -412,6 +453,7 @@ export default function RoomsPage() {
         <NameModal
           title={`Tambah ruangan — ${building.name}`}
           label="Nama ruangan"
+          placeholder="Misal: Lt. 8 – Ruang A"
           onClose={() => setModal(null)}
           onSubmit={async (name) => {
             const r = await createRoom(building.id, name)

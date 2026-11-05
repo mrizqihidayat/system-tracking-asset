@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\CachesMasterList;
-use App\Http\Requests\AssetTypeCodeSuggestionRequest;
 use App\Http\Requests\StoreAssetTypeRequest;
 use App\Http\Requests\UpdateAssetTypeRequest;
 use App\Http\Resources\AssetTypeResource;
@@ -23,30 +22,11 @@ class AssetTypeController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $request->validate(['category_id' => ['nullable', 'integer']]);
-        $categoryId = $request->integer('category_id');
-
-        return $this->masterList($request, "asset-types:{$categoryId}", fn () => AssetTypeResource::collection(
+        return $this->masterList($request, 'asset-types', fn () => AssetTypeResource::collection(
             $this->applySearch(AssetType::query(), $request->query('search'))
-                ->with('category')
-                ->when($categoryId, fn ($query) => $query->where('category_id', $categoryId))
                 ->orderBy('name')
                 ->get()
         )->resolve($request));
-    }
-
-    /**
-     * Saran kode jenis dari nama (popup tambah jenis); null bila nama tanpa huruf atau tidak ada kode tersisa.
-     */
-    public function codeSuggestion(AssetTypeCodeSuggestionRequest $request): JsonResponse
-    {
-        try {
-            $code = $this->codes->assetTypeCode($request->validated('name'));
-        } catch (LogicException) {
-            $code = null;
-        }
-
-        return response()->json(['data' => ['code' => $code]]);
     }
 
     /**
@@ -70,7 +50,7 @@ class AssetTypeController extends Controller
             throw ValidationException::withMessages(['code' => 'Kode singkat tidak dapat dibuat dari nama ini, isi kode secara manual.']);
         }
 
-        $assetType = AssetType::create($data)->load('category');
+        $assetType = AssetType::create($data);
 
         return AssetTypeResource::make($assetType)->response()->setStatusCode(201);
     }
@@ -82,7 +62,7 @@ class AssetTypeController extends Controller
     {
         $assetType->update($request->validated());
 
-        return AssetTypeResource::make($assetType->load('category'));
+        return AssetTypeResource::make($assetType);
     }
 
     /**

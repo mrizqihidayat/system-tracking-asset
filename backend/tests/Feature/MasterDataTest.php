@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\Department;
 use App\Models\RequestCatalog;
@@ -37,7 +36,6 @@ class MasterDataTest extends TestCase
             'buildings' => ['GET', '/api/buildings'],
             'building rooms' => ['GET', '/api/buildings/1/rooms'],
             'rooms' => ['GET', '/api/rooms'],
-            'categories' => ['GET', '/api/categories'],
             'consumable categories' => ['GET', '/api/consumable-categories'],
             'asset types' => ['GET', '/api/asset-types'],
             'store asset type' => ['POST', '/api/asset-types'],
@@ -91,7 +89,7 @@ class MasterDataTest extends TestCase
 
     public function test_required_name_message_is_indonesian(): void
     {
-        $this->postJson('/api/categories', [])
+        $this->postJson('/api/buildings', [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['name' => 'Nama wajib diisi.']);
     }
@@ -172,54 +170,34 @@ class MasterDataTest extends TestCase
             ->assertJsonPath('data.0.name', 'Ruang Kelas 1');
     }
 
-    public function test_categories_list_with_type_count_and_store(): void
-    {
-        AssetType::factory()->count(2)->for(Category::factory()->create(['name' => 'Elektronik']))->create();
-
-        $this->getJson('/api/categories')
-            ->assertOk()
-            ->assertJsonPath('data.0.asset_types_count', 2);
-
-        $this->postJson('/api/categories', ['name' => 'Furnitur'])
-            ->assertCreated()
-            ->assertJsonPath('data.name', 'Furnitur');
-    }
-
     public function test_store_asset_type_generates_code_when_empty(): void
     {
-        $category = Category::factory()->create();
-
-        $this->postJson('/api/asset-types', ['category_id' => $category->id, 'name' => 'Laptop'])
+        $this->postJson('/api/asset-types', ['name' => 'Laptop'])
             ->assertCreated()
             ->assertJsonPath('data.code', 'LPT')
-            ->assertJsonPath('data.category.id', $category->id);
+            ->assertJsonMissingPath('data.category');
 
-        $this->postJson('/api/asset-types', ['category_id' => $category->id, 'name' => 'Laptop Gaming'])
+        $this->postJson('/api/asset-types', ['name' => 'Laptop Gaming'])
             ->assertCreated()
             ->assertJsonPath('data.code', 'LG'.'M');
     }
 
     public function test_store_asset_type_accepts_manual_code_uppercased(): void
     {
-        $category = Category::factory()->create();
-
-        $this->postJson('/api/asset-types', ['category_id' => $category->id, 'name' => 'Proyektor', 'code' => ' prj '])
+        $this->postJson('/api/asset-types', ['name' => 'Proyektor', 'code' => ' prj '])
             ->assertCreated()
             ->assertJsonPath('data.code', 'PRJ');
     }
 
-    public function test_store_asset_type_validates_code_and_category(): void
+    public function test_store_asset_type_validates_code(): void
     {
         AssetType::factory()->create(['code' => 'PRJ']);
 
-        $this->postJson('/api/asset-types', ['category_id' => 999, 'name' => 'Proyektor', 'code' => 'prj'])
+        $this->postJson('/api/asset-types', ['name' => 'Proyektor', 'code' => 'prj'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors([
-                'category_id' => 'Kategori tidak ditemukan.',
-                'code' => 'Kode sudah digunakan.',
-            ]);
+            ->assertJsonValidationErrors(['code' => 'Kode sudah digunakan.']);
 
-        $this->postJson('/api/asset-types', ['category_id' => Category::factory()->create()->id, 'name' => 'Kamera', 'code' => 'K-1'])
+        $this->postJson('/api/asset-types', ['name' => 'Kamera', 'code' => 'K-1'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['code' => 'Format kode tidak valid.']);
     }
@@ -250,16 +228,10 @@ class MasterDataTest extends TestCase
             ->assertJsonValidationErrors(['name', 'code']);
     }
 
-    public function test_asset_types_filter_by_category_and_search(): void
+    public function test_asset_types_search(): void
     {
-        $electronics = Category::factory()->create();
-        AssetType::factory()->for($electronics)->create(['name' => 'Laptop']);
+        AssetType::factory()->create(['name' => 'Laptop']);
         AssetType::factory()->create(['name' => 'Kursi']);
-
-        $this->getJson("/api/asset-types?category_id={$electronics->id}")
-            ->assertOk()
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.name', 'Laptop');
 
         $this->getJson('/api/asset-types?search=KUR')
             ->assertOk()
@@ -318,9 +290,7 @@ class MasterDataTest extends TestCase
     {
         $projector = AssetType::factory()->create(['name' => 'Proyektor', 'code' => 'PRO']);
         Asset::factory()->for($projector)->create(['code' => 'SHD-PRJ-001']);
-        $category = Category::factory()->create();
-
-        $this->postJson('/api/asset-types', ['category_id' => $category->id, 'name' => 'Printer', 'code' => 'PRJ'])
+        $this->postJson('/api/asset-types', ['name' => 'Printer', 'code' => 'PRJ'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['code' => 'Kode pernah dipakai jenis lain.']);
 
@@ -338,7 +308,7 @@ class MasterDataTest extends TestCase
     {
         $old = AssetType::factory()->create(['code' => 'OLD']);
         $asset = Asset::factory()->for($old)->create(['code' => 'SHD-FLP-003']);
-        $payload = ['category_id' => Category::factory()->create()->id, 'name' => 'Flipchart', 'code' => 'FLP'];
+        $payload = ['name' => 'Flipchart', 'code' => 'FLP'];
 
         $this->postJson('/api/asset-types', $payload)
             ->assertUnprocessable()
@@ -502,19 +472,6 @@ class MasterDataTest extends TestCase
         $this->assertModelMissing($empty);
     }
 
-    public function test_category_update_and_delete_rules(): void
-    {
-        $category = Category::factory()->create(['name' => 'Elektronik']);
-        $type = AssetType::factory()->create(['category_id' => $category->id]);
-
-        $this->putJson("/api/categories/{$category->id}", ['name' => 'Elektronik 2'])->assertOk();
-        $this->deleteJson("/api/categories/{$category->id}")->assertUnprocessable();
-
-        $type->delete();
-        $this->deleteJson("/api/categories/{$category->id}")->assertOk();
-        $this->assertModelMissing($category);
-    }
-
     public function test_consumable_category_crud_and_delete_rules(): void
     {
         $id = $this->postJson('/api/consumable-categories', ['name' => ' ATK '])
@@ -526,8 +483,6 @@ class MasterDataTest extends TestCase
         $this->postJson('/api/consumable-categories', ['name' => 'atk'])->assertJsonValidationErrors(['name' => 'Nama sudah digunakan.']);
         $this->postJson('/api/consumable-categories', [])->assertJsonValidationErrors('name');
 
-        // Terpisah dari kategori aset.
-        $this->postJson('/api/categories', ['name' => 'ATK'])->assertCreated();
         $this->getJson('/api/consumable-categories')->assertOk()->assertJsonCount(1, 'data');
 
         $this->putJson("/api/consumable-categories/{$id}", ['name' => 'atk'])->assertOk()->assertJsonPath('data.name', 'atk');

@@ -1,6 +1,6 @@
 import { TriangleAlert } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AssetCode } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -11,9 +11,8 @@ import { PageHeader } from '../../components/ui/Page'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import AssetFilesManager from './AssetFilesManager'
-import NewAssetTypeModal from './modals/NewAssetTypeModal'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
-import { createBuilding, createDepartment, createRoom } from '../../lib/lookups'
+import { createAssetType, createBuilding, createDepartment, createRoom } from '../../lib/lookups'
 import { invalidate } from '../../lib/queries/invalidate'
 import { assetQueries } from '../../lib/queries/lists'
 import { useAssetTypes, useBuildings, useDepartments, useRooms } from '../../lib/queries/master'
@@ -46,7 +45,7 @@ const empty: FormState = {
 
 const orNull = (v: string) => (v.trim() === '' ? null : v.trim())
 
-const typeOption = (t: AssetType) => ({ id: t.id, label: `${t.name} (${t.code}) — ${t.category?.name ?? ''}` })
+const typeOption = (t: AssetType) => ({ id: t.id, label: `${t.name} (${t.code})` })
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -78,11 +77,6 @@ export default function AssetFormPage() {
   useErrorToast(typesError, departmentsError, buildingsError, roomsError)
   const [preview, setPreview] = useState<{ typeId: number; data: CodePreview } | null>(null)
   const [nextCode, setNextCode] = useState<{ typeId: number; code: string } | null>(null)
-  const [newType, setNewType] = useState<{
-    name: string
-    resolve: (option: ReturnType<typeof typeOption>) => void
-    reject: () => void
-  } | null>(null)
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -181,15 +175,13 @@ export default function AssetFormPage() {
       const r = await createRoom(form.building_id!, name)
       return { id: r.id, label: r.name }
     })
-  /** Menunggu popup (batal = teks ketikan tetap). */
+  /** Kode dibuat otomatis oleh server; hanya bisa diubah di Data Master. Nama aset terisi jika masih kosong. */
   const addType = (name: string) =>
-    new Promise<ReturnType<typeof typeOption>>((resolve, reject) =>
-      setNewType({ name, resolve, reject: () => reject(new Error('Dibatalkan')) }),
-    )
-  const cancelNewType = useCallback(() => {
-    newType?.reject()
-    setNewType(null)
-  }, [newType])
+    guarded(async () => {
+      const t = await createAssetType(name)
+      setForm((f) => (f.name.trim() ? f : { ...f, name: t.name }))
+      return typeOption(t)
+    })
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -342,7 +334,7 @@ export default function AssetFormPage() {
             options={roomOptions}
             onChange={(v) => set('room_id', v)}
             onCreate={form.building_id ? addRoom : undefined}
-            placeholder={form.building_id ? 'Ketik nama ruangan…' : 'Pilih gedung dulu'}
+            placeholder={form.building_id ? 'Ketik nama ruangan, misal Lt. 8 – Ruang A' : 'Pilih gedung dulu'}
             disabled={!form.building_id}
             error={errors.room_id}
           />
@@ -401,17 +393,6 @@ export default function AssetFormPage() {
       </div>
     </form>
     {editing && original && <AssetFilesManager assetId={original.id} />}
-    {newType && (
-      <NewAssetTypeModal
-        name={newType.name}
-        onClose={cancelNewType}
-        onCreated={(t) => {
-          newType.resolve(typeOption(t))
-          setNewType(null)
-          setForm((f) => (f.name.trim() ? f : { ...f, name: t.name }))
-        }}
-      />
-    )}
     </div>
   )
 }

@@ -2,10 +2,11 @@
 
 namespace App\Services;
 
+use App\Enums\CountMethod;
 use App\Enums\ReportType;
 use App\Models\Asset;
+use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\Department;
 use App\Models\Loan;
@@ -50,14 +51,13 @@ class ReportService
     private function assets(array $filters): Report
     {
         $rows = Asset::query()
-            ->with(['assetType.category', 'sourceDepartment', 'room.building'])
+            ->with(['assetType', 'sourceDepartment', 'room.building'])
             ->filter($filters)
             ->orderBy('code')
             ->lazy(self::CHUNK)
             ->map(fn (Asset $asset) => [
                 $asset->code,
                 $asset->name,
-                $asset->assetType->category->name,
                 $asset->assetType->name,
                 $asset->brand,
                 $asset->serial_number,
@@ -73,7 +73,7 @@ class ReportService
             ]);
 
         $columns = [
-            ReportColumn::text('Kode', 16), ReportColumn::text('Nama', 30), ReportColumn::text('Kategori', 18),
+            ReportColumn::text('Kode', 16), ReportColumn::text('Nama', 30),
             ReportColumn::text('Jenis', 18), ReportColumn::text('Merek', 16), ReportColumn::text('No. Seri', 18),
             ReportColumn::text('Sumber', 14), ReportColumn::text('Gedung (asal)', 18), ReportColumn::text('Ruangan (asal)', 18),
             ReportColumn::text('PIC', 18), ReportColumn::text('Kondisi', 12), ReportColumn::text('Status', 16),
@@ -81,7 +81,7 @@ class ReportService
         ];
 
         $summary = $this->summary([
-            'Kategori' => $this->nameOf(Category::class, $filters['category_id'] ?? null),
+            'Jenis' => $this->nameOf(AssetType::class, $filters['asset_type_id'] ?? null),
             'Gedung' => $this->nameOf(Building::class, $filters['building_id'] ?? null),
             'Ruangan' => $this->nameOf(Room::class, $filters['room_id'] ?? null),
             'Sumber' => $this->nameOf(Department::class, $filters['source_department_id'] ?? null),
@@ -143,7 +143,7 @@ class ReportService
     }
 
     /**
-     * Sheet Ringkasan (per ruangan) + Detail (per item standar). Ruangan tanpa standar tetap muncul.
+     * Sheet Ringkasan (per ruangan) + Detail (aset per jenis & barang habis pakai). Ruangan tanpa standar tetap muncul.
      *
      * @param  array<string, mixed>  $filters
      */
@@ -178,7 +178,14 @@ class ReportService
                     $room->lastCheckedBy?->name,
                 ];
 
-                foreach ($room->standards->sortBy('id') as $standard) {
+                foreach ($this->readiness->assetGroups($room, $room->standards) as $group) {
+                    $detailRows[] = [
+                        $building->name, $room->name, 'Aset', $group['asset_type']['name'], $group['total'], $group['standard_quantity'],
+                        $group['present_quantity'], $group['difference'], $group['result'], implode(', ', array_column($group['assets'], 'code')),
+                    ];
+                }
+
+                foreach ($room->standards->where('count_method', CountMethod::Manual)->sortBy('id') as $standard) {
                     $detailRows[] = $this->standardRow($building, $room, $standard);
                 }
             }
@@ -191,10 +198,10 @@ class ReportService
         ];
 
         $detailColumns = [
-            ReportColumn::text('Gedung', 20), ReportColumn::text('Ruangan', 22), ReportColumn::text('Item', 28),
-            ReportColumn::text('Sumber', 14), ReportColumn::text('Metode', 10), ReportColumn::int('Standar'),
+            ReportColumn::text('Gedung', 20), ReportColumn::text('Ruangan', 22), ReportColumn::text('Bagian', 16),
+            ReportColumn::text('Item', 28), ReportColumn::int('Jumlah aset'), ReportColumn::int('Standar'),
             ReportColumn::int('Ada'), ReportColumn::int('Selisih'), ReportColumn::text('Hasil', 12),
-            ReportColumn::text('Pemenuhan', 36),
+            ReportColumn::text('Kode aset / stok', 36),
         ];
 
         $summary = $this->summary(['Gedung' => $this->nameOf(Building::class, $filters['building_id'] ?? null)]);
@@ -215,25 +222,15 @@ class ReportService
         return [
             $building->name,
             $room->name,
+            'Barang habis pakai',
             $standard->item_name,
-            $standard->sourceDepartment->name,
-            $this->value($standard->count_method),
+            null,
             $standard->standard_quantity,
             $present,
             $present === null ? null : $present - $standard->standard_quantity,
             $standard->checklistResult()->value,
-            $this->fulfillment($standard),
+            "Stok: {$standard->consumable->quantity} {$standard->consumable->unit}",
         ];
-    }
-
-    private function fulfillment(RoomStandard $standard): ?string
-    {
-        return match (true) {
-            $standard->needsCompletion() => 'Perlu dilengkapi',
-            $standard->isOtherUnit() => "Minta ke {$standard->sourceDepartment->name}: {$standard->item_name}",
-            $standard->consumable !== null => "Stok: {$standard->consumable->name}",
-            default => null,
-        };
     }
 
     /**

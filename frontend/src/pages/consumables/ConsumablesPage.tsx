@@ -290,7 +290,7 @@ export default function ConsumablesPage() {
         {deleting && deleting.usage.length > 0 ? (
           <>
             Hapus permanen. Barang ini dipakai di standar:{' '}
-            <b>{deleting.usage.map((u) => `${u.room} (${u.building})`).join(', ')}</b>. Tautannya akan dilepas dan baris standar itu menjadi “Perlu dilengkapi”.
+            <b>{deleting.usage.map((u) => `${u.room} (${u.building})`).join(', ')}</b>. Barang itu ikut dilepas dari ruangan-ruangan tersebut.
           </>
         ) : (
           'Hapus permanen barang ini? Tindakan ini tidak bisa dibatalkan.'

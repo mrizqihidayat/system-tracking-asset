@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Kelengkapan ruangan (SPEC §8): standar per ruangan (diisi manual), checklist, simpan hasil cek, isi dari stok.
+ * Kelengkapan ruangan (SPEC §8): aset di ruangan, standar per jenis/barang, simpan hasil cek, ambil dari stok.
  */
 class RoomStandardController extends Controller
 {
@@ -33,19 +33,13 @@ class RoomStandardController extends Controller
     }
 
     /**
-     * Ubah definisi standar saja; jumlah Ada baris Manual tetap (kosong jika cara hitung berubah).
+     * Ubah definisi standar saja; jumlah Ada tetap selama barangnya sama.
      */
     public function update(StoreRoomStandardRequest $request, RoomStandard $roomStandard): RoomStandardResource
     {
-        $data = [
-            'asset_type_id' => null,
-            'consumable_id' => null,
-            'fulfillment_note' => null,
-            'catalog_id' => null,
-            ...$request->standardData(),
-        ];
+        $data = $request->standardData();
 
-        if ($data['count_method'] !== $roomStandard->count_method->value) {
+        if ((int) $data['consumable_id'] !== (int) $roomStandard->consumable_id) {
             $data['actual_quantity'] = null;
         }
 
@@ -56,9 +50,10 @@ class RoomStandardController extends Controller
 
     public function destroy(RoomStandard $roomStandard): JsonResponse
     {
+        $name = $roomStandard->item_name;
         $roomStandard->delete();
 
-        return response()->json(['message' => "Standar {$roomStandard->item_name} dihapus."]);
+        return response()->json(['message' => "Standar {$name} dihapus."]);
     }
 
     public function check(SaveRoomCheckRequest $request, Room $room): JsonResponse
@@ -74,8 +69,8 @@ class RoomStandardController extends Controller
 
         return response()->json([
             'message' => $result['remaining_shortage'] > 0
-                ? "Diisi {$result['filled']}, masih kurang {$result['remaining_shortage']}."
-                : "Diisi {$result['filled']}, sudah sesuai standar.",
+                ? "Diambil {$result['filled']}, masih kurang {$result['remaining_shortage']}."
+                : "Diambil {$result['filled']}, sudah sesuai standar.",
             'filled' => $result['filled'],
             'remaining_shortage' => $result['remaining_shortage'],
             'stock_remaining' => $result['stock_remaining'],
@@ -88,7 +83,12 @@ class RoomStandardController extends Controller
         $standards = $this->readiness->checklist($room);
 
         return response()->json([
-            'data' => RoomStandardResource::collection($standards),
+            'data' => [
+                'assets' => $this->readiness->assetGroups($room, $standards),
+                'consumables' => RoomStandardResource::collection(
+                    $standards->filter(fn (RoomStandard $standard) => $standard->count_method === CountMethod::Manual)->values(),
+                ),
+            ],
             'meta' => [
                 'room' => RoomResource::make($room->load(['building', 'lastCheckedBy'])),
                 'last_checked_by' => $room->lastCheckedBy?->name,

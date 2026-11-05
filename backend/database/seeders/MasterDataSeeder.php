@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\ConsumableCategory;
 use App\Models\Department;
 use App\Services\CodeGenerator;
@@ -36,27 +35,21 @@ class MasterDataSeeder extends Seeder
             }
         }
 
-        foreach (['ATK', 'Printer', 'Elektronik', 'Pelatihan'] as $name) {
+        foreach (['ATK', 'Printer', 'Elektronik', 'Pelatihan', 'Kebersihan', 'Konsumsi', 'K3'] as $name) {
             ConsumableCategory::create(['name' => $name]);
         }
 
         // Kode null = otomatis dari nama; Proyektor memakai kode yang diedit (contoh SPEC).
-        $categories = [
-            'Elektronik' => ['Proyektor' => 'PRJ', 'Laptop' => null, 'Speaker Aktif' => null, 'Mikrofon Nirkabel' => null, 'Layar Proyektor' => null],
-            'Furnitur' => ['Meja Peserta' => null, 'Kursi' => null],
-            'Alat Pelatihan' => ['Papan Tulis' => null, 'Flipchart' => null],
+        $types = [
+            'Proyektor' => 'PRJ', 'Laptop' => null, 'Speaker Aktif' => null, 'Mikrofon Nirkabel' => null, 'Layar Proyektor' => null,
+            'Meja Peserta' => null, 'Kursi' => null, 'Papan Tulis' => null, 'Flipchart' => null,
         ];
 
-        foreach ($categories as $categoryName => $types) {
-            $category = Category::create(['name' => $categoryName]);
-
-            foreach ($types as $typeName => $code) {
-                AssetType::create([
-                    'category_id' => $category->id,
-                    'name' => $typeName,
-                    'code' => $code ?? $codes->assetTypeCode($typeName),
-                ]);
-            }
+        foreach ($types as $typeName => $code) {
+            AssetType::create([
+                'name' => $typeName,
+                'code' => $code ?? $codes->assetTypeCode($typeName),
+            ]);
         }
     }
 }

@@ -30,7 +30,6 @@ class AssetDetailExtrasTest extends TestCase
     public function test_room_standard_with_quantity_when_type_is_in_room_standard(): void
     {
         RoomStandard::factory()->for($this->asset->room)->create([
-            'item_name' => 'Proyektor kelas',
             'count_method' => CountMethod::Qr,
             'asset_type_id' => $this->asset->asset_type_id,
             'standard_quantity' => 3,
@@ -39,7 +38,7 @@ class AssetDetailExtrasTest extends TestCase
 
         $this->getJson("/api/assets/{$this->asset->id}")
             ->assertOk()
-            ->assertJsonPath('data.room_standard', ['is_standard' => true, 'item_name' => 'Proyektor kelas', 'quantity' => 3]);
+            ->assertJsonPath('data.room_standard', ['is_standard' => true, 'item_name' => $this->asset->assetType->name, 'quantity' => 3]);
     }
 
     public function test_room_standard_false_without_standard(): void

@@ -31,7 +31,7 @@ class IndexAssetRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category_id' => ['nullable', 'integer'],
+            'asset_type_id' => ['nullable', 'integer'],
             'building_id' => ['nullable', 'integer'],
             'room_id' => ['nullable', 'integer'],
             'source_department_id' => ['nullable', 'integer'],

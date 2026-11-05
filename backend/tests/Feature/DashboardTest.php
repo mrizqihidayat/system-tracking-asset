@@ -132,11 +132,11 @@ class DashboardTest extends TestCase
         Room::factory()->create(['building_id' => $building->id, 'name' => 'Kosong']);
 
         RoomStandard::factory()->create([
-            'room_id' => $short->id, 'source_department_id' => $this->shd->id,
+            'room_id' => $short->id,
             'standard_quantity' => 5, 'count_method' => CountMethod::Manual, 'actual_quantity' => 2,
         ]);
         RoomStandard::factory()->create([
-            'room_id' => $unchecked->id, 'source_department_id' => $this->shd->id,
+            'room_id' => $unchecked->id,
             'standard_quantity' => 5, 'count_method' => CountMethod::Manual, 'actual_quantity' => null,
         ]);
 
@@ -242,7 +242,7 @@ class DashboardTest extends TestCase
             Loan::factory()->create(['asset_id' => $asset->id, 'due_date' => today()->subDays($i), 'destination_room_id' => Room::factory()->create()->id]);
             Consumable::factory()->create(['name' => "Stok {$i}", 'quantity' => 0, 'provider_department_id' => $this->deptA->id]);
             SupplyRequest::factory()->create(['catalog_id' => $catalog->id, 'provider_department_id' => $this->deptA->id, 'room_id' => Room::factory()->create()->id]);
-            RoomStandard::factory()->create(['room_id' => Room::factory()->create()->id, 'source_department_id' => $this->shd->id, 'count_method' => CountMethod::Qr, 'asset_type_id' => $asset->asset_type_id, 'actual_quantity' => null]);
+            RoomStandard::factory()->create(['room_id' => Room::factory()->create()->id, 'count_method' => CountMethod::Qr, 'asset_type_id' => $asset->asset_type_id, 'actual_quantity' => null]);
         };
 
         $seed(1);

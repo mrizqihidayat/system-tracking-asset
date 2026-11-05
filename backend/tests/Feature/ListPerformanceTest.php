@@ -6,8 +6,8 @@ use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\Consumable;
+use App\Models\ConsumableCategory;
 use App\Models\Department;
 use App\Models\RequestCatalog;
 use App\Models\Room;
@@ -67,8 +67,7 @@ class ListPerformanceTest extends TestCase
     public function test_asset_list_returns_only_table_columns(): void
     {
         $room = Room::factory()->for(Building::factory()->create(['name' => 'Gedung A']))->create(['name' => 'Ruang 1']);
-        $category = Category::factory()->create(['name' => 'Elektronik']);
-        $type = AssetType::factory()->for($category)->create();
+        $type = AssetType::factory()->create(['name' => 'Elektronik']);
         $source = Department::factory()->create(['is_internal' => false]);
         $asset = Asset::factory()->create([
             'asset_type_id' => $type->id,
@@ -78,14 +77,14 @@ class ListPerformanceTest extends TestCase
 
         $row = $this->getJson('/api/assets')
             ->assertOk()
-            ->assertJsonPath('data.0.category_name', 'Elektronik')
+            ->assertJsonPath('data.0.asset_type_name', 'Elektronik')
             ->assertJsonPath('data.0.room_name', 'Ruang 1')
             ->assertJsonPath('data.0.building_name', 'Gedung A')
             ->assertJsonPath('data.0.source_is_internal', false)
             ->json('data.0');
 
         $this->assertSame(
-            ['id', 'code', 'name', 'category_name', 'room_name', 'building_name', 'source_is_internal', 'condition', 'status'],
+            ['id', 'code', 'name', 'asset_type_name', 'room_name', 'building_name', 'source_is_internal', 'condition', 'status'],
             array_keys($row),
         );
 
@@ -111,17 +110,17 @@ class ListPerformanceTest extends TestCase
 
     public function test_master_list_is_cached_and_invalidated_on_change(): void
     {
-        Category::factory()->create(['name' => 'Elektronik']);
+        ConsumableCategory::factory()->create(['name' => 'Elektronik']);
 
-        $this->getJson('/api/categories')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/consumable-categories')->assertOk()->assertJsonCount(1, 'data');
 
         // Panggilan kedua dari cache: tidak ada query ke tabel kategori.
-        $this->queryCount('/api/categories');
+        $this->queryCount('/api/consumable-categories');
         $this->assertSame(0, collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'categories'))->count());
 
-        $this->postJson('/api/categories', ['name' => 'Furnitur'])->assertCreated();
+        $this->postJson('/api/consumable-categories', ['name' => 'Furnitur'])->assertCreated();
 
-        $this->getJson('/api/categories')->assertOk()->assertJsonCount(2, 'data');
+        $this->getJson('/api/consumable-categories')->assertOk()->assertJsonCount(2, 'data');
     }
 
     public function test_cached_lists_keep_nested_relations_when_store_serializes(): void
@@ -143,11 +142,11 @@ class ListPerformanceTest extends TestCase
 
     public function test_master_search_is_not_served_from_cache(): void
     {
-        Category::factory()->create(['name' => 'Elektronik']);
-        Category::factory()->create(['name' => 'Furnitur']);
+        ConsumableCategory::factory()->create(['name' => 'Elektronik']);
+        ConsumableCategory::factory()->create(['name' => 'Furnitur']);
 
-        $this->getJson('/api/categories')->assertOk()->assertJsonCount(2, 'data');
-        $this->getJson('/api/categories?search=furn')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/consumable-categories')->assertOk()->assertJsonCount(2, 'data');
+        $this->getJson('/api/consumable-categories?search=furn')->assertOk()->assertJsonCount(1, 'data');
     }
 
     public function test_dashboard_cache_is_invalidated_when_asset_changes(): void

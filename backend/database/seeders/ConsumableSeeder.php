@@ -29,6 +29,11 @@ class ConsumableSeeder extends Seeder
             ['Tinta Printer Hitam', 'Printer', 'botol', 2, 2, 'SIT', 'Gudang MH'],
             ['Baterai AA', 'Elektronik', 'pcs', 0, 8, 'SIT', 'Gudang IHS'],
             ['Name Tag Peserta', 'Pelatihan', 'pcs', 80, 25, 'SGA', 'Main Office SHD'],
+            // Barang dari departemen lain: dicatat di stok, lalu diambil ke ruangan.
+            ['Tisu', 'Kebersihan', 'dus', 1, 2, 'SGA', 'Gudang IHS'],
+            ['Air Mineral Botol', 'Konsumsi', 'botol', 24, 12, 'SGA', 'Gudang MH'],
+            ['Kotak P3K', 'K3', 'pcs', 2, 1, 'SSO', 'Main Office SHD'],
+            ['Kabel HDMI 10 m', 'Elektronik', 'pcs', 3, 1, 'SIT', 'Main Office SHD'],
         ];
 
         foreach ($rows as [$name, $category, $unit, $quantity, $minimum, $provider, $location]) {

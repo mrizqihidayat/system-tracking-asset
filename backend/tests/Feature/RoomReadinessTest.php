@@ -9,7 +9,6 @@ use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Consumable;
 use App\Models\Department;
-use App\Models\RequestCatalog;
 use App\Models\Room;
 use App\Models\RoomStandard;
 use App\Models\User;
@@ -23,8 +22,6 @@ class RoomReadinessTest extends TestCase
 
     private User $user;
 
-    private Department $shd;
-
     private Department $deptA;
 
     private Room $room;
@@ -35,7 +32,7 @@ class RoomReadinessTest extends TestCase
 
         $this->user = User::factory()->create(['name' => 'Staf SHD']);
         $this->actingAs($this->user);
-        $this->shd = Department::factory()->internal()->create(['name' => 'SHD']);
+        Department::factory()->internal()->create(['name' => 'SHD']);
         $this->deptA = Department::factory()->create(['name' => 'Dept A']);
         $this->room = Room::factory()->create(['name' => 'Ruang Kelas 1']);
     }
@@ -44,7 +41,6 @@ class RoomReadinessTest extends TestCase
     {
         return RoomStandard::factory()->create([
             'room_id' => $this->room->id,
-            'source_department_id' => $this->shd->id,
             'standard_quantity' => 5,
             'count_method' => CountMethod::Manual,
             'actual_quantity' => null,
@@ -52,20 +48,19 @@ class RoomReadinessTest extends TestCase
         ]);
     }
 
-    private function payload(array $overrides = []): array
+    private function assetStandard(AssetType $type, int $quantity = 1): RoomStandard
     {
-        return [
-            'item_name' => 'ATK peserta',
-            'source_department_id' => $this->shd->id,
-            'standard_quantity' => 10,
-            'count_method' => 'Manual',
-            ...$overrides,
-        ];
+        return $this->standard(['count_method' => CountMethod::Qr, 'asset_type_id' => $type->id, 'standard_quantity' => $quantity]);
+    }
+
+    private function checklist(): array
+    {
+        return $this->getJson("/api/rooms/{$this->room->id}/checklist")->assertOk()->json();
     }
 
     public function test_quantities_above_integer_column_limit_are_rejected(): void
     {
-        $this->postJson("/api/rooms/{$this->room->id}/standards", $this->payload(['standard_quantity' => 2147483648]))
+        $this->postJson("/api/rooms/{$this->room->id}/standards", ['consumable_id' => Consumable::factory()->create()->id, 'standard_quantity' => 2147483648])
             ->assertJsonValidationErrors('standard_quantity');
 
         $manual = $this->standard();
@@ -90,7 +85,44 @@ class RoomReadinessTest extends TestCase
         $this->postJson("/api/rooms/{$this->room->id}/standards/copy", ['from_room_id' => $other->id])->assertNotFound();
     }
 
-    public function test_qr_row_counts_assets_of_type_in_room_excluding_unavailable_statuses(): void
+    public function test_room_without_standard_still_lists_assets_grouped_by_type(): void
+    {
+        $proyektor = AssetType::factory()->create(['name' => 'Proyektor', 'code' => 'PRJ']);
+        $kursi = AssetType::factory()->create(['name' => 'Kursi', 'code' => 'KRS']);
+        $make = fn (AssetType $type, string $code, AssetStatus $status) => Asset::factory()->create([
+            'code' => $code, 'asset_type_id' => $type->id, 'room_id' => $this->room->id, 'status' => $status,
+        ]);
+
+        $second = $make($proyektor, 'SHD-PRJ-002', AssetStatus::Dipinjam);
+        $first = $make($proyektor, 'SHD-PRJ-001', AssetStatus::Tersedia);
+        $make($proyektor, 'SHD-PRJ-003', AssetStatus::Perbaikan);
+        $make($proyektor, 'SHD-PRJ-004', AssetStatus::TidakLayakPakai);
+        $make($kursi, 'SHD-KRS-001', AssetStatus::Tersedia);
+        Asset::factory()->create(['asset_type_id' => $proyektor->id, 'status' => AssetStatus::Tersedia]);
+
+        $response = $this->checklist();
+        $groups = $response['data']['assets'];
+
+        $this->assertSame(['Kursi', 'Proyektor'], array_column(array_column($groups, 'asset_type'), 'name'));
+        $this->assertSame(3, $groups[1]['total']);
+        $this->assertSame(
+            [
+                ['id' => $first->id, 'code' => 'SHD-PRJ-001', 'status' => 'Tersedia'],
+                ['id' => $second->id, 'code' => 'SHD-PRJ-002', 'status' => 'Dipinjam'],
+            ],
+            array_slice($groups[1]['assets'], 0, 2),
+        );
+        $this->assertSame(['Dipinjam' => 1, 'Perbaikan' => 1], $groups[1]['not_counted']);
+        // Standar 0: jumlah Ada tampil, tanpa Selisih/Hasil dan tidak dihitung Kurang.
+        $this->assertNull($groups[1]['standard_id']);
+        $this->assertSame(0, $groups[1]['standard_quantity']);
+        $this->assertSame(1, $groups[1]['present_quantity']);
+        $this->assertNull($groups[1]['difference']);
+        $this->assertNull($groups[1]['result']);
+        $this->assertSame(['total_items' => 0, 'shortage_items' => 0, 'unchecked_items' => 0, 'is_complete' => false], $response['meta']['summary']);
+    }
+
+    public function test_asset_standard_counts_only_available_statuses(): void
     {
         $type = AssetType::factory()->create();
         $make = fn (AssetStatus $status, ?Room $room = null) => Asset::factory()->create([
@@ -103,239 +135,180 @@ class RoomReadinessTest extends TestCase
         $make(AssetStatus::Hilang);
         $make(AssetStatus::TidakLayakPakai);
         $make(AssetStatus::Tersedia, Room::factory()->create());
-        $standard = $this->standard(['count_method' => CountMethod::Qr, 'asset_type_id' => $type->id, 'standard_quantity' => 3]);
+        $standard = $this->assetStandard($type, 3);
 
-        $this->getJson("/api/rooms/{$this->room->id}/checklist")
-            ->assertOk()
-            ->assertJsonPath('data.0.id', $standard->id)
-            ->assertJsonPath('data.0.present_quantity', 2)
-            ->assertJsonPath('data.0.difference', -1)
-            ->assertJsonPath('data.0.result', 'Kurang')
-            ->assertJsonPath('meta.summary.shortage_items', 1);
+        $response = $this->checklist();
+        $group = $response['data']['assets'][0];
+
+        $this->assertSame($standard->id, $group['standard_id']);
+        $this->assertSame(3, $group['standard_quantity']);
+        $this->assertSame(2, $group['present_quantity']);
+        $this->assertSame(-1, $group['difference']);
+        $this->assertSame('Kurang', $group['result']);
+        $this->assertSame(1, $response['meta']['summary']['shortage_items']);
     }
 
-    public function test_manual_row_without_check_is_unchecked_and_zero_is_shortage(): void
+    public function test_type_with_standard_but_no_asset_is_shown_as_shortage(): void
+    {
+        // Standar 0 tanpa aset tidak tampil.
+        AssetType::factory()->create(['name' => 'Kursi']);
+        $this->assetStandard(AssetType::factory()->create(['name' => 'Flipchart']));
+
+        $this->assertCount(1, $this->checklist()['data']['assets']);
+
+        $group = $this->checklist()['data']['assets'][0];
+
+        $this->assertSame('Flipchart', $group['asset_type']['name']);
+        $this->assertSame(0, $group['total']);
+        $this->assertSame([], $group['assets']);
+        $this->assertSame('Kurang', $group['result']);
+    }
+
+    public function test_checklist_reads_assets_without_query_per_type(): void
+    {
+        foreach (range(1, 3) as $i) {
+            $type = AssetType::factory()->create();
+            Asset::factory()->create(['asset_type_id' => $type->id, 'room_id' => $this->room->id]);
+            $this->assetStandard($type);
+        }
+
+        DB::enableQueryLog();
+        $this->checklist();
+        $assetQueries = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains($query['query'], 'from "assets"'));
+
+        $this->assertCount(2, $assetQueries);
+    }
+
+    public function test_consumable_without_check_is_unchecked_and_zero_is_shortage(): void
     {
         $this->standard(['actual_quantity' => null]);
         $this->standard(['actual_quantity' => 0]);
         $this->standard(['actual_quantity' => 5]);
 
-        $this->getJson("/api/rooms/{$this->room->id}/checklist")
-            ->assertOk()
-            ->assertJsonPath('data.0.result', 'Belum dicek')
-            ->assertJsonPath('data.0.difference', null)
-            ->assertJsonPath('data.1.result', 'Kurang')
-            ->assertJsonPath('data.1.difference', -5)
-            ->assertJsonPath('data.2.result', 'Sesuai')
-            ->assertJsonPath('meta.summary', [
-                'total_items' => 3, 'shortage_items' => 1, 'unchecked_items' => 1, 'is_complete' => false,
-            ]);
+        $response = $this->checklist();
+        $rows = $response['data']['consumables'];
+
+        $this->assertSame('Belum dicek', $rows[0]['result']);
+        $this->assertNull($rows[0]['difference']);
+        $this->assertSame('Kurang', $rows[1]['result']);
+        $this->assertSame(-5, $rows[1]['difference']);
+        $this->assertSame('Sesuai', $rows[2]['result']);
+        $this->assertSame(['total_items' => 3, 'shortage_items' => 1, 'unchecked_items' => 1, 'is_complete' => false], $response['meta']['summary']);
     }
 
-    public function test_store_stock_row_takes_source_from_consumable_provider(): void
+    public function test_store_consumable_row_uses_stock_item_and_provider(): void
     {
-        $consumable = Consumable::factory()->create(['provider_department_id' => $this->deptA->id]);
+        $consumable = Consumable::factory()->create(['name' => 'Tisu', 'provider_department_id' => $this->deptA->id]);
 
-        // Sumber yang dikirim diabaikan: selalu penyedia barang.
-        $this->postJson("/api/rooms/{$this->room->id}/standards", $this->payload(['consumable_id' => $consumable->id]))
+        $this->postJson("/api/rooms/{$this->room->id}/standards", ['consumable_id' => $consumable->id, 'standard_quantity' => 10])
             ->assertCreated()
+            ->assertJsonPath('data.item_name', 'Tisu')
+            ->assertJsonPath('data.count_method', 'Manual')
             ->assertJsonPath('data.result', 'Belum dicek')
-            ->assertJsonPath('data.source_department.name', 'Dept A')
-            ->assertJsonPath('data.needs_completion', false)
-            ->assertJsonPath('data.fulfillment.type', 'stok')
-            ->assertJsonPath('data.fulfillment.consumable.id', $consumable->id)
-            ->assertJsonPath('data.fulfillment.consumable.provider_department.name', 'Dept A');
+            ->assertJsonPath('data.consumable.id', $consumable->id)
+            ->assertJsonPath('data.consumable.provider_department.name', 'Dept A')
+            ->assertJsonPath('data.asset_type', null);
     }
 
-    public function test_store_asset_row_keeps_chosen_source(): void
+    public function test_store_asset_type_standard(): void
     {
-        $type = AssetType::factory()->create();
+        $type = AssetType::factory()->create(['name' => 'Proyektor']);
 
-        $this->postJson("/api/rooms/{$this->room->id}/standards", $this->payload(['count_method' => 'QR', 'asset_type_id' => $type->id, 'source_department_id' => $this->deptA->id]))
+        $this->postJson("/api/rooms/{$this->room->id}/standards", ['asset_type_id' => $type->id, 'standard_quantity' => 2])
             ->assertCreated()
-            ->assertJsonPath('data.source_department.name', 'Dept A')
-            ->assertJsonPath('data.needs_completion', false)
-            ->assertJsonPath('data.fulfillment', null);
+            ->assertJsonPath('data.item_name', 'Proyektor')
+            ->assertJsonPath('data.count_method', 'QR')
+            ->assertJsonPath('data.present_quantity', 0)
+            ->assertJsonPath('data.consumable', null);
     }
 
     public function test_standard_validation_rules(): void
     {
         $consumable = Consumable::factory()->create();
-        $catalog = RequestCatalog::factory()->create(['provider_department_id' => $this->deptA->id]);
         $type = AssetType::factory()->create();
         $url = "/api/rooms/{$this->room->id}/standards";
-        $stock = ['consumable_id' => $consumable->id];
 
-        $this->postJson($url, $this->payload(['count_method' => 'QR']))->assertJsonValidationErrors('asset_type_id');
-        $this->postJson($url, $this->payload(['count_method' => 'QR', 'asset_type_id' => $type->id, 'source_department_id' => null]))
-            ->assertJsonValidationErrors('source_department_id');
-        $this->postJson($url, $this->payload(['count_method' => 'QR', 'asset_type_id' => $type->id, ...$stock]))
-            ->assertJsonValidationErrors('consumable_id');
-        $this->postJson($url, $this->payload())->assertJsonValidationErrors('consumable_id');
-        $this->postJson($url, $this->payload([...$stock, 'asset_type_id' => $type->id]))->assertJsonValidationErrors('asset_type_id');
-        $this->postJson($url, $this->payload([...$stock, 'fulfillment_note' => 'Gudang']))->assertJsonValidationErrors('fulfillment_note');
-        $this->postJson($url, $this->payload([...$stock, 'catalog_id' => $catalog->id]))->assertJsonValidationErrors('catalog_id');
-        $this->postJson($url, $this->payload([...$stock, 'actual_quantity' => 3]))->assertJsonValidationErrors('actual_quantity');
-        $this->postJson($url, $this->payload([...$stock, 'standard_quantity' => 0]))->assertJsonValidationErrors('standard_quantity');
+        $this->postJson($url, ['standard_quantity' => 1])
+            ->assertJsonValidationErrors(['asset_type_id' => 'Pilih jenis aset atau barang stok.']);
+        $this->postJson($url, ['asset_type_id' => $type->id, 'consumable_id' => $consumable->id, 'standard_quantity' => 1])
+            ->assertJsonValidationErrors(['asset_type_id' => 'Pilih salah satu: jenis aset atau barang stok.']);
+        $this->postJson($url, ['consumable_id' => $consumable->id, 'actual_quantity' => 3, 'standard_quantity' => 1])->assertJsonValidationErrors('actual_quantity');
+        $this->postJson($url, ['consumable_id' => $consumable->id, 'standard_quantity' => 0])->assertJsonValidationErrors('standard_quantity');
+        $this->postJson($url, ['consumable_id' => 999, 'standard_quantity' => 1])->assertJsonValidationErrors('consumable_id');
+        $this->assertDatabaseCount('room_standards', 0);
+    }
+
+    public function test_same_type_or_item_only_once_per_room(): void
+    {
+        $consumable = Consumable::factory()->create();
+        $type = AssetType::factory()->create();
+        $url = "/api/rooms/{$this->room->id}/standards";
+
+        $row = $this->postJson($url, ['consumable_id' => $consumable->id, 'standard_quantity' => 1])->assertCreated()->json('data.id');
+        $this->postJson($url, ['asset_type_id' => $type->id, 'standard_quantity' => 1])->assertCreated();
+
+        $this->postJson($url, ['consumable_id' => $consumable->id, 'standard_quantity' => 2])
+            ->assertJsonValidationErrors(['consumable_id' => 'Barang ini sudah ada di ruangan ini.']);
+        $this->postJson($url, ['asset_type_id' => $type->id, 'standard_quantity' => 2])
+            ->assertJsonValidationErrors(['asset_type_id' => 'Jenis aset ini sudah punya standar di ruangan ini.']);
+
+        // Ubah barisnya sendiri tetap boleh; ruangan lain boleh memakai barang yang sama.
+        $this->putJson("/api/room-standards/{$row}", ['consumable_id' => $consumable->id, 'standard_quantity' => 3])->assertOk();
+        $this->postJson('/api/rooms/'.Room::factory()->create()->id.'/standards', ['consumable_id' => $consumable->id, 'standard_quantity' => 1])->assertCreated();
     }
 
     public function test_update_changes_definition_only_and_delete_is_permanent(): void
     {
-        $consumable = Consumable::factory()->create();
+        $consumable = Consumable::factory()->create(['name' => 'Tisu']);
         $standard = $this->standard(['actual_quantity' => 4, 'consumable_id' => $consumable->id]);
         $payload = ['consumable_id' => $consumable->id];
 
-        $this->putJson("/api/room-standards/{$standard->id}", $this->payload([...$payload, 'standard_quantity' => 6]))
+        $this->putJson("/api/room-standards/{$standard->id}", [...$payload, 'standard_quantity' => 6])
             ->assertOk()
             ->assertJsonPath('data.standard_quantity', 6)
             ->assertJsonPath('data.present_quantity', 4);
 
-        $this->putJson("/api/room-standards/{$standard->id}", $this->payload([...$payload, 'actual_quantity' => 9]))
+        $this->putJson("/api/room-standards/{$standard->id}", [...$payload, 'standard_quantity' => 6, 'actual_quantity' => 9])
             ->assertJsonValidationErrors('actual_quantity');
+
+        // Ganti barang: jumlah Ada lama tidak berlaku.
+        $this->putJson("/api/room-standards/{$standard->id}", ['consumable_id' => Consumable::factory()->create()->id, 'standard_quantity' => 6])
+            ->assertOk()
+            ->assertJsonPath('data.present_quantity', null);
 
         $this->deleteJson("/api/room-standards/{$standard->id}")->assertOk();
         $this->assertDatabaseMissing('room_standards', ['id' => $standard->id]);
     }
 
-    public function test_qr_row_lists_counted_asset_codes_and_not_counted_statuses(): void
-    {
-        $type = AssetType::factory()->create();
-        $asset = fn (string $code, AssetStatus $status) => Asset::factory()->create([
-            'code' => $code, 'asset_type_id' => $type->id, 'room_id' => $this->room->id, 'status' => $status,
-        ]);
-
-        $second = $asset('SHD-PRJ-002', AssetStatus::Tersedia);
-        $first = $asset('SHD-PRJ-001', AssetStatus::Tersedia);
-        $asset('SHD-PRJ-003', AssetStatus::Dipinjam);
-        $asset('SHD-PRJ-004', AssetStatus::Dipinjam);
-        $asset('SHD-PRJ-005', AssetStatus::Perbaikan);
-        $asset('SHD-PRJ-006', AssetStatus::Hilang);
-        $asset('SHD-PRJ-007', AssetStatus::TidakLayakPakai);
-        Asset::factory()->create(['code' => 'SHD-PRJ-008', 'asset_type_id' => $type->id, 'status' => AssetStatus::Tersedia]);
-
-        $this->standard(['count_method' => CountMethod::Qr, 'asset_type_id' => $type->id, 'standard_quantity' => 2]);
-
-        $this->getJson("/api/rooms/{$this->room->id}/checklist")
-            ->assertOk()
-            ->assertJsonPath('data.0.present_quantity', 2)
-            ->assertJsonPath('data.0.assets', [['id' => $first->id, 'code' => 'SHD-PRJ-001'], ['id' => $second->id, 'code' => 'SHD-PRJ-002']])
-            ->assertExactJsonStructure(['data' => [['id', 'room_id', 'item_name', 'source_department', 'standard_quantity', 'count_method', 'asset_type', 'assets', 'not_counted', 'present_quantity', 'difference', 'shortage', 'result', 'fulfillment', 'needs_completion', 'can_fill_from_stock', 'can_request']], 'meta'])
-            ->assertJsonPath('data.0.not_counted', ['Dipinjam' => 2, 'Perbaikan' => 1, 'Hilang' => 1]);
-    }
-
-    public function test_checklist_reads_qr_assets_with_one_query(): void
-    {
-        foreach (range(1, 3) as $i) {
-            $type = AssetType::factory()->create();
-            Asset::factory()->create(['asset_type_id' => $type->id, 'room_id' => $this->room->id]);
-            $this->standard(['count_method' => CountMethod::Qr, 'asset_type_id' => $type->id]);
-        }
-
-        DB::enableQueryLog();
-        $this->getJson("/api/rooms/{$this->room->id}/checklist")->assertOk();
-        $assetQueries = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains($query['query'], 'from "assets"'));
-
-        $this->assertCount(1, $assetQueries);
-    }
-
-    public function test_row_without_assets_and_stock_row_have_empty_asset_data(): void
-    {
-        $this->standard(['count_method' => CountMethod::Qr, 'asset_type_id' => AssetType::factory()->create()->id]);
-        $this->standard(['consumable_id' => Consumable::factory()->create()->id]);
-
-        $this->getJson("/api/rooms/{$this->room->id}/checklist")
-            ->assertOk()
-            ->assertJsonPath('data.0.assets', [])
-            ->assertJsonPath('data.0.not_counted', [])
-            ->assertJsonPath('data.1.assets', [])
-            ->assertJsonPath('data.1.not_counted', []);
-    }
-
     public function test_actions_follow_stock(): void
     {
-        $url = "/api/rooms/{$this->room->id}/checklist";
-        $row = fn (RoomStandard $standard) => collect($this->getJson($url)->assertOk()->json('data'))->firstWhere('id', $standard->id);
+        $row = fn (RoomStandard $standard) => collect($this->checklist()['data']['consumables'])->firstWhere('id', $standard->id);
 
         $inStock = Consumable::factory()->create(['quantity' => 3]);
         $outOfStock = Consumable::factory()->create(['quantity' => 0]);
+        $plenty = Consumable::factory()->create(['quantity' => 3]);
 
         $fill = $this->standard(['actual_quantity' => 0, 'consumable_id' => $inStock->id]);
         $request = $this->standard(['actual_quantity' => 0, 'consumable_id' => $outOfStock->id]);
-        $requestOnly = $this->standard(['actual_quantity' => 0, 'source_department_id' => $this->deptA->id]);
-        $enough = $this->standard(['actual_quantity' => 5, 'consumable_id' => $inStock->id]);
+        $enough = $this->standard(['actual_quantity' => 5, 'consumable_id' => $plenty->id]);
 
         $this->assertTrue($row($fill)['can_fill_from_stock']);
         $this->assertFalse($row($fill)['can_request']);
         $this->assertFalse($row($request)['can_fill_from_stock']);
         $this->assertTrue($row($request)['can_request']);
-        $this->assertFalse($row($requestOnly)['can_fill_from_stock']);
-        $this->assertTrue($row($requestOnly)['can_request']);
         $this->assertFalse($row($enough)['can_fill_from_stock']);
         $this->assertFalse($row($enough)['can_request']);
 
-        // Stok habis di tengah pengisian → aksi berganti ke Buat permintaan.
+        // Stok habis di tengah pengambilan → aksi berganti ke Ajukan permintaan.
         $this->postJson("/api/room-standards/{$fill->id}/fill-from-stock")->assertOk()->assertJsonPath('remaining_shortage', 2);
         $this->assertFalse($row($fill)['can_fill_from_stock']);
         $this->assertTrue($row($fill)['can_request']);
     }
 
-    public function test_other_unit_row_is_stored_without_stock_and_cannot_be_filled(): void
-    {
-        $url = "/api/rooms/{$this->room->id}/standards";
-        $catalog = RequestCatalog::factory()->create(['provider_department_id' => $this->deptA->id, 'item_name' => 'Tisu Dus']);
-        $otherCatalog = RequestCatalog::factory()->create();
-
-        $this->postJson($url, $this->payload(['source_department_id' => $this->deptA->id, 'catalog_id' => $otherCatalog->id]))
-            ->assertJsonValidationErrors(['catalog_id' => 'Katalog harus dari departemen yang sama.']);
-
-        $id = $this->postJson($url, $this->payload(['item_name' => 'Tisu', 'source_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]))
-            ->assertCreated()
-            ->assertJsonPath('data.needs_completion', false)
-            ->assertJsonPath('data.fulfillment.type', 'unit_lain')
-            ->assertJsonPath('data.fulfillment.catalog.item_name', 'Tisu Dus')
-            ->assertJsonPath('data.fulfillment.provider_department.name', 'Dept A')
-            ->assertJsonPath('data.can_request', false)
-            ->json('data.id');
-
-        $this->postJson("/api/rooms/{$this->room->id}/check", ['items' => [['id' => $id, 'actual_quantity' => 1]]])->assertOk();
-
-        $row = collect($this->getJson("/api/rooms/{$this->room->id}/checklist")->json('data'))->firstWhere('id', $id);
-        $this->assertTrue($row['can_request']);
-        $this->assertFalse($row['can_fill_from_stock']);
-
-        $this->postJson("/api/room-standards/{$id}/fill-from-stock")->assertJsonValidationErrors('standard');
-
-        // Katalog dihapus: tetap Barang departemen lain, tanpa katalog.
-        $this->deleteJson("/api/request-catalog/{$catalog->id}")->assertOk();
-        $this->getJson("/api/rooms/{$this->room->id}/checklist")->assertOk()->assertJsonPath('data.0.needs_completion', false)->assertJsonPath('data.0.fulfillment.catalog', null);
-    }
-
-    public function test_shd_row_without_stock_needs_completion(): void
-    {
-        $old = $this->standard(['actual_quantity' => 1, 'fulfillment_note' => 'Gudang']);
-        $consumable = Consumable::factory()->create(['provider_department_id' => $this->deptA->id]);
-
-        $row = collect($this->getJson("/api/rooms/{$this->room->id}/checklist")->assertOk()->json('data'))->firstWhere('id', $old->id);
-
-        $this->assertTrue($row['needs_completion']);
-        $this->assertNull($row['fulfillment']);
-        $this->assertFalse($row['can_fill_from_stock']);
-        $this->assertFalse($row['can_request']);
-        $this->assertSame('Kurang', $row['result']);
-
-        // Dilengkapi lewat PUT: catatan lama dilepas, jumlah Ada tetap, sumber mengikuti penyedia.
-        $this->putJson("/api/room-standards/{$old->id}", $this->payload(['consumable_id' => $consumable->id]))
-            ->assertOk()
-            ->assertJsonPath('data.needs_completion', false)
-            ->assertJsonPath('data.present_quantity', 1)
-            ->assertJsonPath('data.source_department.name', 'Dept A');
-        $this->assertNull($old->fresh()->fulfillment_note);
-    }
-
-    public function test_save_check_stores_manual_quantities_and_checker(): void
+    public function test_save_check_stores_consumable_quantities_and_checker(): void
     {
         $manual = $this->standard();
-        $qr = $this->standard(['count_method' => CountMethod::Qr, 'asset_type_id' => AssetType::factory()->create()->id]);
+        $qr = $this->assetStandard(AssetType::factory()->create());
         $otherRoom = RoomStandard::factory()->create();
         $url = "/api/rooms/{$this->room->id}/check";
 
@@ -345,7 +318,7 @@ class RoomReadinessTest extends TestCase
 
         $this->postJson($url, ['items' => [['id' => $manual->id, 'actual_quantity' => 3]]])
             ->assertOk()
-            ->assertJsonPath('data.0.present_quantity', 3)
+            ->assertJsonPath('data.consumables.0.present_quantity', 3)
             ->assertJsonPath('meta.last_checked_by', 'Staf SHD');
 
         $this->room->refresh();
@@ -382,21 +355,22 @@ class RoomReadinessTest extends TestCase
         $this->assertSame(8, $consumable->fresh()->quantity);
     }
 
-    public function test_fill_from_stock_rejects_unchecked_or_unlinked_rows(): void
+    public function test_fill_from_stock_rejects_unchecked_or_asset_rows(): void
     {
         $consumable = Consumable::factory()->create(['quantity' => 10]);
         $unchecked = $this->standard(['consumable_id' => $consumable->id]);
-        $unlinked = $this->standard(['actual_quantity' => 0]);
+        $asset = $this->assetStandard(AssetType::factory()->create());
 
         $this->postJson("/api/room-standards/{$unchecked->id}/fill-from-stock")->assertJsonValidationErrors('standard');
-        $this->postJson("/api/room-standards/{$unlinked->id}/fill-from-stock")->assertJsonValidationErrors('standard');
+        $this->postJson("/api/room-standards/{$asset->id}/fill-from-stock")->assertJsonValidationErrors('standard');
         $this->assertSame(10, $consumable->fresh()->quantity);
     }
 
-    public function test_readiness_summary_per_building(): void
+    public function test_readiness_lists_all_rooms_and_room_without_standard_is_not_complete(): void
     {
         $building = $this->room->building;
         $complete = Room::factory()->create(['building_id' => $building->id, 'name' => 'Ruang Rapat']);
+        $empty = Room::factory()->create(['building_id' => $building->id, 'name' => 'Lt. 8 – Ruang A']);
         RoomStandard::factory()->create(['room_id' => $complete->id, 'standard_quantity' => 2, 'actual_quantity' => 2]);
         $this->standard(['actual_quantity' => 1]);
         $this->standard(['actual_quantity' => null]);
@@ -406,11 +380,13 @@ class RoomReadinessTest extends TestCase
         $data = collect($response->json('data'))->keyBy('id');
         $rooms = collect($data[$building->id]['rooms'])->keyBy('id');
 
-        $this->assertSame(2, $data[$building->id]['rooms_count']);
+        $this->assertSame(3, $data[$building->id]['rooms_count']);
         $this->assertSame(1, $data[$building->id]['incomplete_rooms_count']);
         $this->assertSame(1, $rooms[$this->room->id]['shortage_items']);
         $this->assertSame(1, $rooms[$this->room->id]['unchecked_items']);
         $this->assertTrue($rooms[$complete->id]['is_complete']);
+        $this->assertFalse($rooms[$empty->id]['is_complete']);
+        $this->assertSame(0, $rooms[$empty->id]['total_items']);
         $this->assertCount(2, $data);
     }
 }

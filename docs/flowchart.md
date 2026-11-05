@@ -41,10 +41,10 @@ Menu Lisensi Digital tampil nonaktif di sidebar (Fase 2).
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Daftar aset berhalaman: filter kategori, gedung, ruangan, status, sumber, kondisi; cari nama, kode, S/N, kode lama]
+    A([Mulai]) --> B[Daftar aset berhalaman: filter jenis, gedung, ruangan, status, sumber, kondisi; cari nama, kode, S/N, kode lama]
     B --> C{Pilih aksi}
 
-    C -- Tambah aset --> T1[Input jenis, nama, merek, S/N, spesifikasi, sumber, PIC, gedung & ruangan, kode keuangan, tgl perolehan, servis berikutnya, kondisi, catatan; jenis, sumber, gedung, ruangan baru bisa langsung ditambah; jenis baru lewat popup kategori & kode singkat; tampil Kode otomatis di bawah nama]
+    C -- Tambah aset --> T1[Input jenis, nama, merek, S/N, spesifikasi, sumber, PIC, gedung & ruangan, kode keuangan, tgl perolehan, servis berikutnya, kondisi, catatan; jenis, sumber, gedung, ruangan baru bisa langsung ditambah; jenis baru cukup nama, kode otomatis; tampil Kode otomatis di bawah nama]
     T1 --> T1a{Kondisi}
     T1a -- Baik --> T1b[Status Tersedia]
     T1a -- Rusak Berat --> T1c[Status Perbaikan]
@@ -220,35 +220,30 @@ flowchart TD
 ```mermaid
 flowchart TD
     A([Mulai]) --> A1[Otomatis membuka gedung & ruangan pertama]
-    A1 --> B[Pilih gedung & ruangan, lencana jumlah kurang; checklist: perlengkapan, sumber, standar, ada, selisih, hasil, pemenuhan]
+    A1 --> B[Pilih gedung & ruangan, lencana jumlah kurang, semua ruangan tampil; dua bagian: Aset di ruangan & Barang habis pakai]
     B --> C{Pilih aksi}
 
-    C -- Tambah gedung / ruangan --> N1[Input nama] --> N2[(Simpan, slug otomatis, buka data baru)] --> B
+    C -- Tambah gedung / ruangan --> N1[Input nama, lantai ditulis di nama ruangan] --> N2[(Simpan, slug otomatis, buka data baru)] --> B
 
-    C -- Atur standar ruangan --> S1[Popup daftar standar ruangan]
-    S1 --> S2{Aksi standar}
-    S2 -- Tutup --> B
-    S2 -- Hapus --> S3[Konfirmasi] --> S4[(Hard delete standar)] --> S1
-    S2 -- Tambah / Ubah --> S5{Pilih tipe}
-    S5 -- Aset --> S6[Pilih jenis aset & sumber default Milik SHD, nama, jumlah standar]
-    S5 -- Stok Habis Pakai --> S8[Pilih barang dari Stok, nama, jumlah standar; sumber otomatis dari penyedia]
-    S5 -- Barang departemen lain --> S9[Pilih departemen penyedia, katalog opsional, nama, jumlah standar]
-    S6 & S8 & S9 --> S7[(Simpan standar)] --> S1
+    C -- Atur standar jenis aset --> S1[Isi jumlah standar; bawaan 0, tampil jumlah Ada tanpa Hasil] --> S2{Standar}
+    S2 -- 0 --> S3[(Hapus baris standar bila ada)] --> B
+    S2 -- Lebih dari 0 --> S4[(Simpan: tampil Standar, Ada, Selisih, Hasil; tetap tampil walau aset 0)] --> B
 
-    C -- Baris Perlu dilengkapi --> K11[Baris SHD tanpa barang stok; klik Lengkapi: edit baris & pilih tipe] --> S1
+    C -- Tambah / Ubah barang --> S5[Pilih barang dari Stok, jumlah standar minimal 1] --> S6[(Simpan, sekali per ruangan)] --> B
+    C -- Lepas barang --> S7[Konfirmasi] --> S8[(Hapus baris standar, stok tidak berubah)] --> B
 
-    C -- Cek ruangan --> K3[(Ada baris Aset dihitung otomatis: lokasi asal di ruangan ini, bukan Dipinjam, Perbaikan, Hilang, Tidak Layak Pakai)]
-    K3 --> K4[Staf mengisi Ada baris Stok & Barang departemen lain; selisih & hasil langsung terhitung di layar]
+    C -- Cek ruangan --> K3[(Ada aset dihitung otomatis: lokasi asal di ruangan ini, bukan Dipinjam, Perbaikan, Hilang, Tidak Layak Pakai)]
+    K3 --> K4[Staf mengisi Ada barang habis pakai; selisih & hasil langsung terhitung di layar]
     K4 --> K5[(Simpan hasil cek + waktu & staf; isian kosong = Belum dicek, bukan kurang)]
-    K5 --> K6{Ada baris Kurang?}
+    K5 --> K6{Ada baris Kurang dengan standar lebih dari 0?}
     K6 -- Tidak --> B
-    K6 -- Ya --> K7{Tipe baris}
-    K7 -- Aset / Perlu dilengkapi --> K8[Tanpa aksi kekurangan; kode aset menaut ke Detail Aset] --> B
-    K7 -- Stok masih ada --> F1[Klik Isi dari stok] --> F2[(Isi = min kekurangan, stok; stok berkurang, Ada bertambah)]
+    K6 -- Ya --> K7{Bagian}
+    K7 -- Aset --> K8[Tanpa aksi kekurangan; kode aset menaut ke Detail Aset] --> B
+    K7 -- Barang, stok masih ada --> F1[Klik Ambil dari stok] --> F2[(Jumlah = min kekurangan, stok; stok berkurang, Ada bertambah)]
     F2 --> F3{Masih kurang?}
     F3 -- Tidak --> B
-    F3 -- Ya --> F4[Sisa tetap tercatat kurang; stok 0 berganti ke Buat permintaan] --> B
-    K7 -- Barang departemen lain / stok 0 --> K9[Klik Buat permintaan: form terisi item, penyedia, jumlah, ruangan; tombol di banner hanya mengisi ruangan] --> K10[[Permintaan]]
+    F3 -- Ya --> F4[Sisa tetap tercatat kurang; stok 0 berganti ke Ajukan permintaan] --> B
+    K7 -- Barang, stok 0 --> K9[Klik Ajukan permintaan: form terisi barang, penyedia, jumlah, ruangan] --> K10[[Permintaan]]
 
     C -- Ekspor Excel --> X1[(Laporan Kelengkapan .xlsx gedung aktif: sheet Ringkasan & Detail)] --> B
     C -- Pindah menu --> Z([Selesai])
@@ -258,16 +253,16 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Saran permintaan per departemen penyedia, katalog, riwayat + filter status & cari; Diajukan yang lewat lead time tampil Belum direspons]
+    A([Mulai]) --> B[Saran permintaan dari stok Menipis/Habis per departemen penyedia, katalog, riwayat + filter status & cari; Diajukan yang lewat lead time tampil Belum direspons]
     B --> C{Pilih aksi}
 
     C -- Kelola katalog --> K0{Aksi katalog}
     K0 -- Tambah / Ubah --> K1[Input item, departemen penyedia, perlu dikembalikan, lead time, catatan] --> K2[(Simpan katalog)] --> B
-    K0 -- Hapus --> K3[(Ambil pemakaian katalog)] --> K4[Popup jumlah permintaan & standar ruangan yang tautannya dilepas] --> K5[(Hapus katalog, tautan dikosongkan, riwayat tetap)] --> B
+    K0 -- Hapus --> K3[(Ambil pemakaian katalog)] --> K4[Popup jumlah permintaan yang tautannya dilepas] --> K5[(Hapus katalog, tautan dikosongkan, riwayat tetap)] --> B
 
     C -- Buat permintaan --> P0{Dibuka dari}
     P0 -- Tombol Buat permintaan --> P1[Form kosong]
-    P0 -- Saran / Kelengkapan Ruangan / Stok --> P1a[Form terisi item, penyedia, jumlah, ruangan; barang stok: tertaut barang, tanpa katalog; Barang departemen lain: tertaut baris standar, katalog bila ada]
+    P0 -- Saran / Kelengkapan Ruangan / Stok --> P1a[Form terisi nama barang, penyedia, jumlah, ruangan; tertaut barang stok, tanpa katalog]
     P1 & P1a --> P2[Pilih item katalog atau Item lain + departemen penyedia; pengembalian barang default dari katalog; cara permintaan Memo, Form, Email, WhatsApp, Lainnya; jumlah, tanggal, kegiatan, ruangan, catatan]
     P2 --> P3[(Simpan status Diajukan; item diganti melepas tautan; snapshot lead time & pengembalian)]
     P3 --> P4[Staf mengirim permintaan di luar sistem] --> B
@@ -276,7 +271,7 @@ flowchart TD
     U0 -- Dikembalikan / Dibatalkan --> U3[Tanpa aksi] --> B
     U0 -- Diajukan --> U1{Aksi}
     U1 -- Ubah --> P2
-    U1 -- Tandai Diterima --> M1[Popup dampak, catatan opsional] --> I1[(Status Diterima; barang stok: stok bertambah; barang departemen lain: Ada baris standar bertambah; tanpa tautan: tidak berubah)] --> B
+    U1 -- Tandai Diterima --> M1[Popup dampak, catatan opsional] --> I1[(Status Diterima; barang stok: stok bertambah; tanpa tautan: tidak berubah)] --> B
     U1 -- Tandai Dibatalkan --> M2[Popup dampak, catatan opsional] --> I2[(Status Dibatalkan; tidak mengubah apa pun)] --> B
     U0 -- Diterima --> U2{Aksi}
     U2 -- Tandai Dikembalikan, jika pengembalian dipilih Dikembalikan --> M3[Popup dampak, catatan opsional]
@@ -303,14 +298,14 @@ flowchart TD
     J3 -- Tidak --> J4[Tolak: stok tidak cukup, angka dikembalikan] --> B
     J3 -- Ya --> J5[(Simpan dengan lock)] --> CEK
 
-    R0[Isi dari stok di Kelengkapan Ruangan] --> R1[(Stok berkurang otomatis, tidak pernah negatif)] --> CEK
+    R0[Ambil dari stok di Kelengkapan Ruangan] --> R1[(Stok berkurang otomatis, tidak pernah negatif)] --> CEK
     R2[Status permintaan tertaut barang ini berubah] --> R3[(Diterima: stok bertambah; Dikembalikan / Dibatalkan setelah Diterima: stok berkurang, minimal 0)] --> CEK
 
     C -- Hapus --> H0[(Ambil usage: ruangan yang standarnya memakai barang ini)]
     H0 --> H1{Dipakai di standar?}
-    H1 -- Ya --> H2[Peringatan: hapus permanen, tautan dilepas, standar menjadi Perlu dilengkapi]
+    H1 -- Ya --> H2[Peringatan: hapus permanen, barang ikut terlepas dari ruangan]
     H1 -- Tidak --> H3[Konfirmasi hapus permanen]
-    H2 & H3 --> H4[(Hard delete; consumable_id di standar terkait dikosongkan, standar tetap utuh)] --> B
+    H2 & H3 --> H4[(Hard delete beserta baris standar ruangan yang memakainya)] --> B
 
     C -- Menu Ajukan / Lihat permintaan, penyedia departemen lain --> S6a[[Permintaan]]
 
@@ -329,7 +324,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Tab Gedung & Ruangan, Departemen, Kategori & Jenis aset, Kategori stok]
+    A([Mulai]) --> B[Tab Gedung & Ruangan, Departemen, Jenis aset, Kategori stok]
     B --> C{Pilih aksi}
 
     C -- Departemen SHD --> C1[Tanpa aksi: tidak dapat diubah atau dihapus] --> B

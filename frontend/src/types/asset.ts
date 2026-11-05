@@ -26,17 +26,10 @@ export interface Room {
   building?: Building
 }
 
-export interface Category {
-  id: number
-  name: string
-}
-
 export interface AssetType {
   id: number
-  category_id: number
   name: string
   code: string
-  category?: Category
 }
 
 export interface ActiveLoan {
@@ -76,7 +69,7 @@ export interface Asset {
 
 /** Baris `GET /assets`: hanya kolom tabel; data lengkap dari `GET /assets/{id}`. */
 export interface AssetListItem extends Pick<Asset, 'id' | 'code' | 'name' | 'condition' | 'status'> {
-  category_name: string | null
+  asset_type_name: string | null
   room_name: string | null
   building_name: string | null
   source_is_internal: boolean

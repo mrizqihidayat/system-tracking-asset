@@ -79,7 +79,6 @@ return [
     'attributes' => [
         'name' => 'nama',
         'code' => 'kode',
-        'category_id' => 'kategori',
         'building_id' => 'gedung',
         'room_id' => 'ruangan',
         'search' => 'pencarian',

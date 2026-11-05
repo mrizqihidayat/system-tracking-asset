@@ -3,7 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\CountMethod;
-use App\Models\Department;
+use App\Models\Consumable;
 use App\Models\Room;
 use App\Models\RoomStandard;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -22,10 +22,9 @@ class RoomStandardFactory extends Factory
     {
         return [
             'room_id' => Room::factory(),
-            'item_name' => fake()->words(2, true),
-            'source_department_id' => Department::factory(),
             'standard_quantity' => fake()->numberBetween(1, 30),
             'count_method' => CountMethod::Manual,
+            'consumable_id' => fn (array $attributes) => $attributes['count_method'] === CountMethod::Qr ? null : Consumable::factory(),
             'actual_quantity' => 0,
         ];
     }

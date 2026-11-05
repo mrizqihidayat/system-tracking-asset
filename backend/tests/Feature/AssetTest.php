@@ -11,7 +11,6 @@ use App\Models\AssetCodeHistory;
 use App\Models\AssetFile;
 use App\Models\AssetType;
 use App\Models\Building;
-use App\Models\Category;
 use App\Models\Department;
 use App\Models\Loan;
 use App\Models\Room;
@@ -44,9 +43,8 @@ class AssetTest extends TestCase
         $this->staff = User::factory()->create(['name' => 'Staf SHD']);
         $this->actingAs($this->staff);
 
-        $electronics = Category::factory()->create(['name' => 'Elektronik']);
-        $this->projector = AssetType::factory()->for($electronics)->create(['name' => 'Proyektor', 'code' => 'PRJ']);
-        $this->laptop = AssetType::factory()->for($electronics)->create(['name' => 'Laptop', 'code' => 'LPT']);
+        $this->projector = AssetType::factory()->create(['name' => 'Proyektor', 'code' => 'PRJ']);
+        $this->laptop = AssetType::factory()->create(['name' => 'Laptop', 'code' => 'LPT']);
         $this->shd = Department::factory()->internal()->create(['name' => 'SHD']);
         $this->room = Room::factory()->for(Building::factory()->create(['name' => 'Gedung IHS']))->create(['name' => 'Ruang Kelas 1']);
     }
@@ -110,7 +108,6 @@ class AssetTest extends TestCase
             ->assertJsonPath('data.code', 'SHD-PRJ-001')
             ->assertJsonPath('data.condition', 'Baik')
             ->assertJsonPath('data.status', 'Tersedia')
-            ->assertJsonPath('data.asset_type.category.name', 'Elektronik')
             ->assertJsonPath('data.room.building.name', 'Gedung IHS')
             ->assertJsonPath('data.source_department.is_internal', true);
 
@@ -177,14 +174,14 @@ class AssetTest extends TestCase
     {
         $otherRoom = Room::factory()->for(Building::factory()->create(['name' => 'Millennials Hub']))->create();
         $unit = Department::factory()->create(['name' => 'SIT']);
-        $furniture = AssetType::factory()->for(Category::factory()->create(['name' => 'Furnitur']))->create(['code' => 'KRS']);
+        $furniture = AssetType::factory()->create(['code' => 'KRS']);
 
         $this->createAsset();
         $this->createAsset(['asset_type_id' => $this->laptop->id, 'name' => 'Laptop Lenovo', 'serial_number' => 'SN-XYZ-99', 'room_id' => $otherRoom->id]);
         $this->createAsset(['asset_type_id' => $furniture->id, 'name' => 'Kursi', 'source_department_id' => $unit->id, 'condition' => 'Rusak Berat']);
 
         $this->getJson('/api/assets')->assertOk()->assertJsonCount(3, 'data')->assertJsonPath('meta.total', 3);
-        $this->getJson("/api/assets?category_id={$furniture->category_id}")->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Kursi');
+        $this->getJson("/api/assets?asset_type_id={$furniture->id}")->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Kursi');
         $this->getJson("/api/assets?building_id={$otherRoom->building_id}")->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Laptop Lenovo');
         $this->getJson("/api/assets?room_id={$this->room->id}")->assertJsonCount(2, 'data');
         $this->getJson("/api/assets?source_department_id={$unit->id}")->assertJsonCount(1, 'data');
@@ -362,8 +359,7 @@ class AssetTest extends TestCase
             'asset_id' => $asset->id, 'borrower_name' => 'Andi', 'borrower_unit' => 'SGA',
             'purpose' => 'Rapat', 'due_date' => today()->addDay()->toDateString(),
         ])->assertCreated();
-        RoomStandard::factory()->for($this->room)->create([
-            'item_name' => 'Laptop kelas', 'count_method' => CountMethod::Qr, 'asset_type_id' => $this->laptop->id, 'actual_quantity' => null,
+        RoomStandard::factory()->for($this->room)->create(['count_method' => CountMethod::Qr, 'asset_type_id' => $this->laptop->id, 'actual_quantity' => null,
         ]);
 
         $this->getJson("/api/assets/{$asset->id}/delete-impact")
@@ -373,7 +369,7 @@ class AssetTest extends TestCase
             ->assertJsonPath('data.files_count', 1)
             ->assertJsonPath('data.requires_confirm_code', true)
             ->assertJsonPath('data.affected_room_standards.0.room', 'Ruang Kelas 1')
-            ->assertJsonPath('data.affected_room_standards.0.item_name', 'Laptop kelas');
+            ->assertJsonPath('data.affected_room_standards.0.item_name', 'Laptop');
 
         $this->deleteJson("/api/assets/{$asset->id}")
             ->assertUnprocessable()

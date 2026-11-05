@@ -56,7 +56,7 @@ class DashboardService
     {
         return array_map(function (array $building) {
             $rooms = collect($building['rooms']);
-            $incomplete = $rooms->where('is_complete', false);
+            $incomplete = $rooms->where('shortage_items', '>', 0);
 
             return [
                 'id' => $building['id'],
@@ -150,7 +150,7 @@ class DashboardService
         $rooms = collect($buildings)->flatMap(fn (array $building) => $building['rooms']);
 
         return [
-            'incomplete' => $rooms->where('is_complete', false)->count(),
+            'incomplete' => $rooms->where('shortage_items', '>', 0)->count(),
             'total_rooms' => $rooms->count(),
             'total_buildings' => count($buildings),
             'incomplete_buildings' => collect($buildings)->where('incomplete_rooms_count', '>', 0)->count(),
