@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Enums\AssetStatus;
 use App\Enums\ChecklistResult;
 use App\Enums\CountMethod;
+use App\Enums\StockTransactionType;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
+use App\Models\Consumable;
 use App\Models\Room;
 use App\Models\RoomStandard;
 use App\Models\User;
@@ -123,6 +125,27 @@ class RoomReadinessService
     }
 
     /**
+     * Bagian hanya-baca "Stok tersimpan di sini": barang yang lokasi simpannya ruangan ini; tidak dihitung sebagai Ada.
+     *
+     * @return list<array{id: int, name: string, quantity: int, unit: string, status: string}>
+     */
+    public function storedStock(Room $room): array
+    {
+        return Consumable::query()
+            ->where('room_id', $room->id)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Consumable $consumable) => [
+                'id' => $consumable->id,
+                'name' => $consumable->name,
+                'quantity' => $consumable->quantity,
+                'unit' => $consumable->unit,
+                'status' => $consumable->status()->value,
+            ])
+            ->all();
+    }
+
+    /**
      * @param  iterable<RoomStandard>  $standards
      * @return array{total_items: int, shortage_items: int, unchecked_items: int, is_complete: bool}
      */
@@ -224,14 +247,14 @@ class RoomReadinessService
     }
 
     /**
-     * Ambil dari stok: jumlah = min(kekurangan, stok). Stok berkurang & Ada bertambah dalam satu transaksi;
+     * Ambil dari stok: jumlah = min(kekurangan, stok). Pemakaian tercatat di kartu stok & Ada bertambah dalam satu transaksi;
      * sisa kekurangan tetap tercatat.
      *
      * @return array{standard: RoomStandard, filled: int, remaining_shortage: int, stock_remaining: int}
      */
-    public function fillFromStock(RoomStandard $standard): array
+    public function fillFromStock(RoomStandard $standard, User $user): array
     {
-        return DB::transaction(function () use ($standard) {
+        return DB::transaction(function () use ($standard, $user) {
             $standard = RoomStandard::query()->whereKey($standard->getKey())->lockForUpdate()->firstOrFail();
 
             if ($standard->count_method !== CountMethod::Manual) {
@@ -255,14 +278,17 @@ class RoomReadinessService
                 throw ValidationException::withMessages(['standard' => "Stok {$consumable->name} habis."]);
             }
 
-            $consumable = $this->consumables->adjust($consumable, -$filled);
+            $transaction = $this->consumables->record($consumable, StockTransactionType::Pemakaian, -$filled, [
+                'note' => 'Ambil dari stok',
+                'room_id' => $standard->room_id,
+            ], $user);
             $standard->update(['actual_quantity' => $standard->actual_quantity + $filled]);
 
             return [
                 'standard' => $standard,
                 'filled' => $filled,
                 'remaining_shortage' => $shortage - $filled,
-                'stock_remaining' => $consumable->quantity,
+                'stock_remaining' => $transaction->balance_after,
             ];
         });
     }

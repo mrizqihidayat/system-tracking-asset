@@ -12,6 +12,7 @@ use App\Models\RoomStandard;
 use App\Services\RoomReadinessService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * Kelengkapan ruangan (SPEC §8): aset di ruangan, standar per jenis/barang, simpan hasil cek, ambil dari stok.
@@ -63,9 +64,9 @@ class RoomStandardController extends Controller
         return $this->checklistResponse($room);
     }
 
-    public function fillFromStock(RoomStandard $roomStandard): JsonResponse
+    public function fillFromStock(Request $request, RoomStandard $roomStandard): JsonResponse
     {
-        $result = $this->readiness->fillFromStock($roomStandard);
+        $result = $this->readiness->fillFromStock($roomStandard, $request->user());
 
         return response()->json([
             'message' => $result['remaining_shortage'] > 0
@@ -88,6 +89,7 @@ class RoomStandardController extends Controller
                 'consumables' => RoomStandardResource::collection(
                     $standards->filter(fn (RoomStandard $standard) => $standard->count_method === CountMethod::Manual)->values(),
                 ),
+                'stored_stock' => $this->readiness->storedStock($room),
             ],
             'meta' => [
                 'room' => RoomResource::make($room->load(['building', 'lastCheckedBy'])),

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import Combobox from '../../components/ui/Combobox'
 import EntityCombobox from '../../components/ui/EntityCombobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
-import { createConsumableCategory } from '../../lib/lookups'
-import { useConsumableCategories, useDepartments, useStorageLocations } from '../../lib/queries/master'
+import { createBuilding, createConsumableCategory, createRoom } from '../../lib/lookups'
+import { useBuildings, useConsumableCategories, useDepartments, useRooms } from '../../lib/queries/master'
 import type { ConsumableItem, ConsumableUsage } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 
@@ -20,7 +19,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const toast = useToast()
   const { data: departments } = useDepartments()
   const { data: categories } = useConsumableCategories()
-  const { data: locations } = useStorageLocations()
+  const { data: buildings } = useBuildings()
   const [usedIn, setUsedIn] = useState<ConsumableUsage[]>([])
   const [name, setName] = useState(item?.name ?? '')
   const [categoryId, setCategoryId] = useState<number | null>(item?.consumable_category_id ?? null)
@@ -30,7 +29,11 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const [quantity, setQuantity] = useState(String(item?.quantity ?? 0))
   const [minQuantity, setMinQuantity] = useState(String(item?.min_quantity ?? 0))
   const [providerId, setProviderId] = useState<number | null>(item?.provider_department?.id ?? null)
-  const [location, setLocation] = useState(item?.storage_location ?? '')
+  const [buildingId, setBuildingId] = useState<number | null>(item?.room?.building_id ?? null)
+  const [roomId, setRoomId] = useState<number | null>(item?.room?.id ?? null)
+  const [buildingPending, setBuildingPending] = useState(false)
+  const [roomPending, setRoomPending] = useState(false)
+  const { data: rooms } = useRooms(buildingId, true)
   const [note, setNote] = useState(item?.note ?? '')
 
   useEffect(() => {
@@ -52,6 +55,25 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
     }
   }
 
+  const guarded = async <T,>(fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn()
+    } catch (e) {
+      toast.error(fieldErrors(e).name ?? errorMessage(e))
+      throw e
+    }
+  }
+  const addBuilding = (buildingName: string) =>
+    guarded(async () => {
+      const b = await createBuilding(buildingName)
+      return { id: b.id, label: b.name }
+    })
+  const addRoom = (roomName: string) =>
+    guarded(async () => {
+      const r = await createRoom(buildingId!, roomName)
+      return { id: r.id, label: r.name }
+    })
+
   const submit = async () => {
     const payload: Record<string, unknown> = {
       name: name.trim(),
@@ -59,7 +81,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
       unit: unit.trim(),
       min_quantity: Number(minQuantity),
       provider_department_id: providerId,
-      storage_location: location.trim() || null,
+      room_id: roomId,
       note: note.trim() || null,
     }
     if (item) {
@@ -75,7 +97,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
     <ActionModal
       title={item ? `Ubah ${item.name}` : 'Tambah barang habis pakai'}
       submitLabel="Simpan"
-      submitDisabled={!name.trim() || !unit.trim() || !providerId || categoryPending}
+      submitDisabled={!name.trim() || !unit.trim() || !providerId || categoryPending || buildingPending || roomPending}
       onClose={onClose}
       onSubmit={submit}
     >
@@ -116,24 +138,43 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
               <Input type="number" min={0} value={minQuantity} onChange={(e) => setMinQuantity(e.target.value)} error={errors.min_quantity} />
             </FormField>
           </div>
-          {item && <p className="-mt-1 text-xs text-slate-500">Jumlah diubah lewat tombol − / + atau klik angka di tabel.</p>}
+          {item && <p className="-mt-1 text-xs text-slate-500">Jumlah diubah lewat Catat transaksi di tabel.</p>}
+          <FormField label="Minta ke (departemen penyedia)" required error={errors.provider_department_id}>
+            <Select value={providerId ?? ''} onChange={(e) => setProviderId(Number(e.target.value) || null)} error={errors.provider_department_id}>
+              <option value="">Pilih departemen</option>
+              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </Select>
+          </FormField>
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Minta ke (departemen penyedia)" required error={errors.provider_department_id}>
-              <Select value={providerId ?? ''} onChange={(e) => setProviderId(Number(e.target.value) || null)} error={errors.provider_department_id}>
-                <option value="">Pilih departemen</option>
-                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </Select>
+            <FormField label="Gedung lokasi simpan (opsional)">
+              <EntityCombobox
+                value={buildingId}
+                options={buildings.map((b) => ({ id: b.id, label: b.name }))}
+                onChange={(id) => {
+                  setBuildingId(id)
+                  setRoomId(null)
+                  setRoomPending(false)
+                }}
+                onCreate={addBuilding}
+                onPendingChange={setBuildingPending}
+                placeholder="Ketik nama gedung…"
+              />
             </FormField>
-            <FormField label="Lokasi simpan (opsional)" error={errors.storage_location}>
-              <Combobox
-                value={location}
-                onChange={setLocation}
-                options={locations.map((l) => ({ id: l, label: l }))}
-                placeholder="Misal: Main Office SHD"
-                error={errors.storage_location}
+            <FormField label="Ruangan lokasi simpan (opsional)" error={errors.room_id}>
+              <EntityCombobox
+                key={buildingId ?? 'none'}
+                value={roomId}
+                options={buildingId ? rooms.map((r) => ({ id: r.id, label: r.name })) : []}
+                onChange={setRoomId}
+                onCreate={buildingId ? addRoom : undefined}
+                onPendingChange={setRoomPending}
+                placeholder={buildingId ? 'Misal: Gudang' : 'Pilih gedung dulu'}
+                disabled={!buildingId}
+                error={errors.room_id}
               />
             </FormField>
           </div>
+          {(buildingPending || roomPending) && <p className="-mt-1 text-xs text-slate-500">Pilih gedung/ruangan dari daftar atau klik Tambah, atau kosongkan.</p>}
           <FormField label="Catatan (opsional)" error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} />
           </FormField>

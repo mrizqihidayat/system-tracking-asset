@@ -281,13 +281,13 @@ class ReportTest extends TestCase
 
         $data = $this->dataRows($sheet(''));
         $this->assertSame(['Tisu', 'Kabel'], array_column($data, 1));
-        $this->assertSame('Belum direspons', $data[0][7]);
-        $this->assertSame('Memo', $data[0][6]);
-        $this->assertSame('Dept A', $data[0][5]);
-        $this->assertSame('Pencatat', $data[0][11]);
+        $this->assertSame('Belum direspons', $data[0][8]);
+        $this->assertSame('Memo', $data[0][7]);
+        $this->assertSame('Dept A', $data[0][6]);
+        $this->assertSame('Pencatat', $data[0][12]);
         $this->assertSame(5, $data[0][2]);
-        $this->assertSame('Diterima', $data[1][7]);
-        $this->assertSame('2026-01-11 09:30', $data[1][9]->format('Y-m-d H:i'));
+        $this->assertSame('Diterima', $data[1][8]);
+        $this->assertSame('2026-01-11 09:30', $data[1][10]->format('Y-m-d H:i'));
 
         $this->assertSame(['Tisu'], array_column($this->dataRows($sheet('?unresponded=1')), 1));
         $this->assertSame(['Kabel'], array_column($this->dataRows($sheet('?from=2026-01-01&to=2026-01-31')), 1));
@@ -300,7 +300,7 @@ class ReportTest extends TestCase
         $atk = ConsumableCategory::factory()->create(['name' => 'ATK'])->id;
         $arsip = ConsumableCategory::factory()->create(['name' => 'Arsip'])->id;
 
-        Consumable::factory()->create(['name' => 'Spidol', 'consumable_category_id' => $atk, 'unit' => 'pcs', 'quantity' => 0, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id, 'storage_location' => 'Gudang IHS']);
+        Consumable::factory()->create(['name' => 'Spidol', 'consumable_category_id' => $atk, 'unit' => 'pcs', 'quantity' => 0, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id, 'room_id' => Room::factory()->for(Building::factory()->create(['name' => 'IHS']))->create(['name' => 'Gudang'])->id]);
         Consumable::factory()->create(['name' => 'Kertas', 'consumable_category_id' => $atk, 'unit' => 'rim', 'quantity' => 4, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
         Consumable::factory()->create(['name' => 'Map', 'consumable_category_id' => $arsip, 'unit' => 'pcs', 'quantity' => 50, 'min_quantity' => 10, 'provider_department_id' => $this->shd->id]);
 
@@ -310,7 +310,7 @@ class ReportTest extends TestCase
         $this->assertSame(['Kertas', 'Map', 'Spidol'], array_column($data, 0));
         $this->assertSame(['Menipis', 'Aman', 'Habis'], array_column($data, 5));
         $this->assertSame(['ATK', 'rim', 4, 10], [$data[0][1], $data[0][2], $data[0][3], $data[0][4]]);
-        $this->assertSame('Gudang IHS', $data[2][7]);
+        $this->assertSame('Gudang, IHS', $data[2][7]);
 
         $this->assertSame(['Spidol'], array_column($this->dataRows($sheet('?status=Habis')), 0));
         $this->assertSame(['Kertas', 'Spidol'], array_column($this->dataRows($sheet('?category=atk')), 0));
@@ -318,12 +318,30 @@ class ReportTest extends TestCase
         $this->assertSame('Status: Habis', $sheet('?status=Habis')[1][0]);
     }
 
+    public function test_consumables_report_has_transactions_sheet_following_filter(): void
+    {
+        $make = fn (string $name) => $this->postJson('/api/consumables', [
+            'name' => $name, 'unit' => 'pcs', 'quantity' => 5, 'min_quantity' => 1, 'provider_department_id' => $this->deptA->id,
+        ])->assertCreated()->json('data.id');
+        $pulpen = $make('Pulpen');
+        $make('Tinta');
+        $room = Room::factory()->create(['name' => 'Kelas 1']);
+        $this->postJson("/api/consumables/{$pulpen}/transactions", ['type' => 'Pemakaian', 'quantity' => 2, 'room_id' => $room->id, 'note' => 'Pelatihan'])->assertCreated();
+
+        $rows = $this->dataRows($this->sheets($this->report('consumables', '?search=pulpen'))['Transaksi']);
+
+        $this->assertCount(2, $rows);
+        $this->assertSame(['Pulpen', 'Barang Masuk', 5, 5], [$rows[0][1], $rows[0][2], $rows[0][3], $rows[0][4]]);
+        $this->assertSame(['Pulpen', 'Pemakaian', -2, 3, 'Pelatihan'], [$rows[1][1], $rows[1][2], $rows[1][3], $rows[1][4], $rows[1][6]]);
+        $this->assertStringEndsWith('/ Kelas 1', $rows[1][7]);
+    }
+
     public function test_empty_reports_still_return_a_valid_file(): void
     {
         foreach (['assets', 'loans', 'requests', 'consumables'] as $type) {
             $sheets = $this->sheets($this->report($type)->assertOk());
 
-            $this->assertCount(1, $sheets);
+            $this->assertCount($type === 'consumables' ? 2 : 1, $sheets);
             $this->assertSame([], $this->dataRows(array_values($sheets)[0]), $type);
         }
     }

@@ -336,7 +336,6 @@ class MasterDataTest extends TestCase
         return [
             'unit peminjam' => ['/api/lookups/borrower-units'],
             'cara permintaan' => ['/api/lookups/request-methods'],
-            'lokasi simpan' => ['/api/lookups/storage-locations'],
         ];
     }
 

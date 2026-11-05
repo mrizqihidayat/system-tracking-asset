@@ -5,6 +5,7 @@ namespace App\Enums;
 enum RequestStatus: string
 {
     case Diajukan = 'Diajukan';
+    case DiterimaSebagian = 'Diterima sebagian';
     case Diterima = 'Diterima';
     case Dikembalikan = 'Dikembalikan';
     case Dibatalkan = 'Dibatalkan';

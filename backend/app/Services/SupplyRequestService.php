@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ConsumableStatus;
 use App\Enums\RequestStatus;
+use App\Enums\StockTransactionType;
 use App\Models\Consumable;
 use App\Models\RequestCatalog;
 use App\Models\SupplyRequest;
@@ -52,19 +53,21 @@ class SupplyRequestService
     }
 
     /**
-     * Diajukan → Diterima | Dibatalkan; Diterima → Dikembalikan (hanya jika snapshot "perlu dikembalikan") | Dibatalkan.
+     * Diajukan → Diterima | Dibatalkan; Diterima sebagian → Diterima | Dibatalkan (sisa saja, stok yang masuk tetap);
+     * Diterima → Dikembalikan (hanya jika snapshot "perlu dikembalikan") | Dibatalkan.
+     * Barang stok: Diterima dengan jumlah yang datang (bawaan: semua sisa); kurang dari sisa → Diterima sebagian.
      */
-    public function changeStatus(SupplyRequest $request, RequestStatus $to, ?string $note = null): SupplyRequest
+    public function changeStatus(SupplyRequest $request, RequestStatus $to, ?string $note, User $user, ?int $received = null): SupplyRequest
     {
-        return DB::transaction(function () use ($request, $to, $note) {
+        return DB::transaction(function () use ($request, $to, $note, $user, $received) {
             $request = $this->lock($request);
             $this->ensureTransition($request, $to);
 
-            $effect = $this->stockEffect($request, $to, lock: true);
-            $this->applyEffect($request, $to, $effect);
+            $effect = $this->stockEffect($request, $to, $received, lock: true);
+            $this->applyEffect($request, $to, $effect, $user);
 
-            $request->status = $to;
-            $request->statusImpact = $this->impact($effect);
+            $request->status = $effect['status'] ?? $to;
+            $request->statusImpact = $this->impact($request, $effect);
 
             match ($to) {
                 RequestStatus::Diterima => $request->received_at = now(),
@@ -87,17 +90,17 @@ class SupplyRequestService
      *
      * @return array{message: string, clamped: bool}
      */
-    public function statusImpact(SupplyRequest $request, RequestStatus $to): array
+    public function statusImpact(SupplyRequest $request, RequestStatus $to, ?int $received = null): array
     {
         $this->ensureTransition($request, $to);
 
-        return $this->impact($this->stockEffect($request, $to));
+        return $this->impact($request, $this->stockEffect($request, $to, $received));
     }
 
     private function ensureTransition(SupplyRequest $request, RequestStatus $to): void
     {
         $allowed = match ($request->status) {
-            RequestStatus::Diajukan => [RequestStatus::Diterima, RequestStatus::Dibatalkan],
+            RequestStatus::Diajukan, RequestStatus::DiterimaSebagian => [RequestStatus::Diterima, RequestStatus::Dibatalkan],
             RequestStatus::Diterima => [RequestStatus::Dikembalikan, RequestStatus::Dibatalkan],
             default => [],
         };
@@ -112,17 +115,13 @@ class SupplyRequestService
     }
 
     /**
-     * Sasaran & jumlah perubahan. Diterima: barang stok bertambah.
-     * Dikembalikan/Dibatalkan setelah Diterima: kurangi lagi, tidak sampai di bawah 0.
+     * Sasaran & jumlah perubahan stok. null = tidak mengubah stok.
+     * Dikembalikan/Dibatalkan setelah Diterima: kurangi jumlah yang sudah masuk, tidak sampai di bawah 0.
      *
-     * @return array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool}|null
+     * @return array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool, status?: RequestStatus}|null
      */
-    private function stockEffect(SupplyRequest $request, RequestStatus $to, bool $lock = false): ?array
+    private function stockEffect(SupplyRequest $request, RequestStatus $to, ?int $received, bool $lock = false): ?array
     {
-        if ($to !== RequestStatus::Diterima && ($request->status !== RequestStatus::Diterima || $request->applied_to === null)) {
-            return null;
-        }
-
         $target = $this->consumable($request->consumable_id, $lock);
 
         if (! $target) {
@@ -130,10 +129,27 @@ class SupplyRequestService
         }
 
         if ($to === RequestStatus::Diterima) {
-            return ['target' => $target, 'adding' => true, 'amount' => $request->quantity, 'current' => $target->quantity, 'clamped' => false];
+            $remaining = $request->quantity - $request->received_quantity;
+            $amount = $received ?? $remaining;
+
+            if ($amount > $remaining) {
+                throw ValidationException::withMessages(['received_quantity' => "Jumlah diterima melebihi sisa permintaan ({$remaining})."]);
+            }
+
+            return [
+                'target' => $target, 'adding' => true, 'amount' => $amount, 'current' => $target->quantity, 'clamped' => false,
+                'status' => $amount < $remaining ? RequestStatus::DiterimaSebagian : RequestStatus::Diterima,
+            ];
         }
 
-        return ['target' => $target, 'adding' => false, 'amount' => min($request->quantity, $target->quantity), 'current' => $target->quantity, 'clamped' => $target->quantity < $request->quantity];
+        if ($request->status !== RequestStatus::Diterima || $request->received_quantity === 0) {
+            return null;
+        }
+
+        return [
+            'target' => $target, 'adding' => false, 'amount' => min($request->received_quantity, $target->quantity),
+            'current' => $target->quantity, 'clamped' => $target->quantity < $request->received_quantity,
+        ];
     }
 
     private function consumable(?int $id, bool $lock): ?Consumable
@@ -146,25 +162,48 @@ class SupplyRequestService
     }
 
     /**
-     * @param  array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool}|null  $effect
+     * Barang datang → Barang Masuk; dikembalikan/dibatalkan setelah Diterima → Koreksi dengan alasan otomatis.
+     *
+     * @param  array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool, status?: RequestStatus}|null  $effect
      */
-    private function applyEffect(SupplyRequest $request, RequestStatus $to, ?array $effect): void
+    private function applyEffect(SupplyRequest $request, RequestStatus $to, ?array $effect, User $user): void
     {
-        if ($effect !== null && $effect['amount'] > 0) {
-            $this->consumables->adjust($effect['target'], $effect['adding'] ? $effect['amount'] : -$effect['amount']);
+        if ($effect === null) {
+            return;
         }
 
-        $request->applied_to = $to === RequestStatus::Diterima && $effect !== null ? SupplyRequest::APPLIED_TO_STOCK : null;
+        if ($effect['adding']) {
+            $this->consumables->record($effect['target'], StockTransactionType::BarangMasuk, $effect['amount'], [
+                'note' => "Dari permintaan #{$request->id}",
+                'supply_request_id' => $request->id,
+            ], $user);
+            $request->received_quantity += $effect['amount'];
+
+            return;
+        }
+
+        if ($effect['amount'] > 0) {
+            $this->consumables->record($effect['target'], StockTransactionType::Koreksi, -$effect['amount'], [
+                'note' => "Permintaan #{$request->id} {$to->value}",
+                'supply_request_id' => $request->id,
+            ], $user);
+        }
+
+        if ($to === RequestStatus::Dibatalkan) {
+            $request->received_quantity = 0;
+        }
     }
 
     /**
-     * @param  array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool}|null  $effect
+     * @param  array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool, status?: RequestStatus}|null  $effect
      * @return array{message: string, clamped: bool}
      */
-    private function impact(?array $effect): array
+    private function impact(SupplyRequest $request, ?array $effect): array
     {
         if ($effect === null) {
-            return ['message' => 'Tidak mengubah stok.', 'clamped' => false];
+            return ['message' => $request->status === RequestStatus::DiterimaSebagian
+                ? "Sisa permintaan dibatalkan. Stok yang sudah masuk ({$request->received_quantity}) tetap."
+                : 'Tidak mengubah stok.', 'clamped' => false];
         }
 
         $subject = "Stok {$effect['target']->name}";
@@ -215,7 +254,7 @@ class SupplyRequestService
 
     /**
      * Saran permintaan per departemen penyedia: hanya dari stok Menipis/Habis.
-     * has_open_request = sudah ada permintaan Diajukan untuk barang itu.
+     * has_open_request = sudah ada permintaan Diajukan / Diterima sebagian untuk barang itu.
      *
      * @return list<array{provider_department: array{id: int, name: string}, items: list<array<string, mixed>>}>
      */
@@ -229,7 +268,7 @@ class SupplyRequestService
      */
     private function buildSuggestions(): array
     {
-        $open = SupplyRequest::query()->where('status', RequestStatus::Diajukan->value)->get();
+        $open = SupplyRequest::query()->whereIn('status', [RequestStatus::Diajukan->value, RequestStatus::DiterimaSebagian->value])->get();
 
         $items = $this->stockSuggestions()
             ->map(function (array $item) use ($open) {

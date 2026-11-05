@@ -5,19 +5,21 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\PaginatesList;
 use App\Http\Requests\IndexConsumableRequest;
 use App\Http\Requests\StoreConsumableRequest;
-use App\Http\Requests\UpdateConsumableQuantityRequest;
+use App\Http\Requests\StoreStockTransactionRequest;
 use App\Http\Requests\UpdateConsumableRequest;
 use App\Http\Resources\ConsumableResource;
+use App\Http\Resources\StockTransactionResource;
 use App\Models\Consumable;
 use App\Services\ConsumableService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ConsumableController extends Controller
 {
     use PaginatesList;
 
-    private const RELATIONS = ['providerDepartment', 'consumableCategory', 'openRequest'];
+    private const RELATIONS = ['providerDepartment', 'consumableCategory', 'room.building', 'openRequest'];
 
     public function __construct(private ConsumableService $consumables) {}
 
@@ -37,7 +39,7 @@ class ConsumableController extends Controller
 
     public function store(StoreConsumableRequest $request): JsonResponse
     {
-        $consumable = Consumable::create($request->validated())->load(self::RELATIONS);
+        $consumable = $this->consumables->create($request->validated(), $request->user())->load(self::RELATIONS);
 
         return ConsumableResource::make($consumable)->response()->setStatusCode(201);
     }
@@ -56,7 +58,10 @@ class ConsumableController extends Controller
      */
     public function usage(Consumable $consumable): JsonResponse
     {
-        return response()->json(['data' => ['rooms' => $this->consumables->usage($consumable)]]);
+        return response()->json(['data' => [
+            'rooms' => $this->consumables->usage($consumable),
+            'delete_block_reason' => $this->consumables->deleteBlockReason($consumable),
+        ]]);
     }
 
     public function update(UpdateConsumableRequest $request, Consumable $consumable): ConsumableResource
@@ -67,21 +72,32 @@ class ConsumableController extends Controller
     }
 
     /**
-     * Ubah jumlah: quantity (set) atau adjustment (tambah/kurang), dengan lock; tidak boleh negatif.
+     * Kartu stok: riwayat transaksi satu barang, terbaru lebih dulu.
      */
-    public function updateQuantity(UpdateConsumableQuantityRequest $request, Consumable $consumable): ConsumableResource
+    public function transactions(Request $request, Consumable $consumable): AnonymousResourceCollection
     {
-        $data = $request->validated();
+        $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
 
-        $consumable = isset($data['quantity'])
-            ? $this->consumables->setQuantity($consumable, (int) $data['quantity'])
-            : $this->consumables->adjust($consumable, (int) $data['adjustment']);
-
-        return ConsumableResource::make($consumable->load(self::RELATIONS));
+        return StockTransactionResource::collection(
+            $consumable->transactions()->with(['room.building', 'creator'])->orderByDesc('id')->paginate($request->integer('per_page', 20))->withQueryString(),
+        );
     }
 
     /**
-     * Hapus permanen; tautan di standar ruangan dilepas (daftar ruangan dikembalikan).
+     * Catat transaksi stok; respons berisi transaksi dan data barang terbaru.
+     */
+    public function storeTransaction(StoreStockTransactionRequest $request, Consumable $consumable): JsonResponse
+    {
+        $transaction = $this->consumables->transact($consumable, $request->validated(), $request->user());
+
+        return StockTransactionResource::make($transaction->load(['room.building', 'creator']))
+            ->additional(['meta' => ['consumable' => ConsumableResource::make($consumable->refresh()->load(self::RELATIONS))]])
+            ->response()
+            ->setStatusCode(201);
+    }
+
+    /**
+     * Hapus permanen (hanya jika transaksinya saldo awal saja); baris standar ikut terhapus, daftar ruangan dikembalikan.
      */
     public function destroy(Consumable $consumable): JsonResponse
     {

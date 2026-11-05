@@ -196,6 +196,26 @@ class RoomReadinessTest extends TestCase
         $this->assertSame(['total_items' => 3, 'shortage_items' => 1, 'unchecked_items' => 1, 'is_complete' => false], $response['meta']['summary']);
     }
 
+    public function test_stock_stored_in_room_is_listed_but_not_counted_as_present(): void
+    {
+        $here = Consumable::factory()->create(['name' => 'Tisu', 'room_id' => $this->room->id, 'quantity' => 8, 'min_quantity' => 2, 'unit' => 'dus']);
+        Consumable::factory()->create(['name' => 'Kertas', 'room_id' => $this->room->id, 'quantity' => 0]);
+        Consumable::factory()->create(['name' => 'Lain', 'room_id' => Room::factory()->create()->id]);
+        $standard = $this->standard(['consumable_id' => $here->id, 'standard_quantity' => 5, 'actual_quantity' => 1]);
+
+        $data = $this->checklist()['data'];
+
+        $this->assertSame([
+            ['id' => $data['stored_stock'][0]['id'], 'name' => 'Kertas', 'quantity' => 0, 'unit' => 'pcs', 'status' => 'Habis'],
+            ['id' => $here->id, 'name' => 'Tisu', 'quantity' => 8, 'unit' => 'dus', 'status' => 'Aman'],
+        ], $data['stored_stock']);
+
+        // Ada tetap dari hasil cek, bukan dari jumlah stok yang tersimpan di ruangan ini.
+        $this->assertSame($standard->id, $data['consumables'][0]['id']);
+        $this->assertSame(1, $data['consumables'][0]['present_quantity']);
+        $this->assertSame('Kurang', $data['consumables'][0]['result']);
+    }
+
     public function test_store_consumable_row_uses_stock_item_and_provider(): void
     {
         $consumable = Consumable::factory()->create(['name' => 'Tisu', 'provider_department_id' => $this->deptA->id]);

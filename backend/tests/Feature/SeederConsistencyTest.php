@@ -7,6 +7,7 @@ use App\Enums\AssetStatus;
 use App\Enums\CountMethod;
 use App\Enums\EventType;
 use App\Enums\LoanStatus;
+use App\Enums\RequestStatus;
 use App\Models\Asset;
 use App\Models\AssetCodeHistory;
 use App\Models\AssetType;
@@ -123,6 +124,17 @@ class SeederConsistencyTest extends TestCase
         $this->assertFalse(Schema::hasColumn('assets', 'deleted_at'));
     }
 
+    public function test_stock_quantity_equals_transactions_and_partial_request_is_seeded(): void
+    {
+        Consumable::with('transactions')->get()->each(function (Consumable $consumable) {
+            $this->assertSame($consumable->quantity, $consumable->transactions->sum('quantity'), $consumable->name);
+        });
+
+        $partial = SupplyRequest::query()->where('status', RequestStatus::DiterimaSebagian)->sole();
+        $this->assertSame([10, 4], [$partial->quantity, $partial->received_quantity]);
+        $this->assertTrue(Consumable::query()->whereKey($partial->consumable_id)->where('name', 'Pensil 2B')->exists());
+    }
+
     public function test_room_standards_are_per_asset_type_or_stock_item(): void
     {
         RoomStandard::all()->each(function (RoomStandard $standard) {
@@ -139,6 +151,7 @@ class SeederConsistencyTest extends TestCase
         $tisu = Consumable::query()->where('name', 'Tisu')->with('providerDepartment')->sole();
         $this->assertSame('SGA', $tisu->providerDepartment->name);
         $this->assertTrue(RoomStandard::query()->where('consumable_id', $tisu->id)->exists());
-        $this->assertSame(0, Consumable::query()->whereNull('storage_location')->count());
+        $this->assertSame(0, Consumable::query()->whereNull('room_id')->count());
+        $this->assertSame(['Gudang IHS', 'Gudang MH', 'Main Office SHD'], Consumable::with('room')->get()->pluck('room.name')->unique()->sort()->values()->all());
     }
 }

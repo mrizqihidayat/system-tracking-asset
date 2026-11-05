@@ -26,6 +26,7 @@ import StandardFormModal, { type StandardTarget } from './StandardFormModal'
 const BASE = '/kelengkapan-ruangan'
 
 const resultColor = { Sesuai: 'green', Kurang: 'red', 'Belum dicek': 'amber' } as const
+const stockColor = { Aman: 'green', Menipis: 'amber', Habis: 'red' } as const
 
 const chip = (active: boolean) =>
   `inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors ${
@@ -400,6 +401,24 @@ export default function RoomsPage() {
               emptyText="Belum ada barang habis pakai. Klik “Tambah barang” untuk menambah."
             />
           </section>
+
+          {!!checklist && checklistReady && checklist.data.stored_stock.length > 0 && (
+            <section className="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 className="font-semibold">Stok tersimpan di sini</h3>
+              <p className="text-sm text-slate-500">Hanya informasi; tidak dihitung sebagai Ada di ruangan ini.</p>
+              <ul className="mt-2 divide-y divide-slate-100">
+                {checklist.data.stored_stock.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="min-w-0 font-medium">{s.name}</span>
+                    <span className="flex shrink-0 items-center gap-3">
+                      <span className="tabular-nums">{s.quantity} {s.unit}</span>
+                      <Badge color={stockColor[s.status]}>{s.status}</Badge>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
       {canSave && (

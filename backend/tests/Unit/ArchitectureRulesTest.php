@@ -90,6 +90,20 @@ class ArchitectureRulesTest extends TestCase
         $this->assertSame([], $violations, 'Hapus aset hanya lewat AssetService::delete() (delete-impact + confirm_code).');
     }
 
+    public function test_stock_quantity_changes_only_through_consumable_service(): void
+    {
+        $violations = $this->filesMatching([
+            '/StockTransaction::(create|insert|forceCreate|firstOrCreate|updateOrCreate)\b/',
+            '/new\s+StockTransaction\b/',
+            '/->transactions\(\)\s*->\s*(create|insert|forceCreate|createMany|save|saveMany)\b/',
+            '/->(increment|decrement)\(\s*[\'"]quantity[\'"]/',
+            '/Consumable::create\(/',
+            '/->update\(\[[^\]]*[\'"]quantity[\'"]\s*=>/',
+        ], ['Services/ConsumableService.php']);
+
+        $this->assertSame([], $violations, 'Jumlah stok hanya boleh berubah lewat ConsumableService::record().');
+    }
+
     public function test_dangerous_database_commands_are_not_used_in_application_code(): void
     {
         $violations = $this->filesMatching([

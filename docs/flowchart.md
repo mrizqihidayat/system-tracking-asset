@@ -233,13 +233,13 @@ flowchart TD
     C -- Lepas barang --> S7[Konfirmasi] --> S8[(Hapus baris standar, stok tidak berubah)] --> B
 
     C -- Cek ruangan --> K3[(Ada aset dihitung otomatis: lokasi asal di ruangan ini, bukan Dipinjam, Perbaikan, Hilang, Tidak Layak Pakai)]
-    K3 --> K4[Staf mengisi Ada barang habis pakai; selisih & hasil langsung terhitung di layar]
+    K3 --> K4[Stok yang tersimpan di ruangan ini hanya informasi; staf mengisi Ada barang habis pakai; selisih & hasil langsung terhitung di layar]
     K4 --> K5[(Simpan hasil cek + waktu & staf; isian kosong = Belum dicek, bukan kurang)]
     K5 --> K6{Ada baris Kurang dengan standar lebih dari 0?}
     K6 -- Tidak --> B
     K6 -- Ya --> K7{Bagian}
     K7 -- Aset --> K8[Tanpa aksi kekurangan; kode aset menaut ke Detail Aset] --> B
-    K7 -- Barang, stok masih ada --> F1[Klik Ambil dari stok] --> F2[(Jumlah = min kekurangan, stok; stok berkurang, Ada bertambah)]
+    K7 -- Barang, stok masih ada --> F1[Klik Ambil dari stok] --> F2[(Jumlah = min kekurangan, stok; transaksi Pemakaian dengan ruangan tujuan, Ada bertambah)]
     F2 --> F3{Masih kurang?}
     F3 -- Tidak --> B
     F3 -- Ya --> F4[Sisa tetap tercatat kurang; stok 0 berganti ke Ajukan permintaan] --> B
@@ -269,14 +269,17 @@ flowchart TD
 
     C -- Aksi baris riwayat --> U0{Status permintaan}
     U0 -- Dikembalikan / Dibatalkan --> U3[Tanpa aksi] --> B
+    U0 -- Diterima sebagian --> U4{Aksi}
+    U4 -- Catat barang diterima --> M1
+    U4 -- Batalkan sisa --> M4[Popup dampak] --> I4[(Status Dibatalkan; stok yang sudah masuk tetap, tampil diterima N dari M)] --> B
     U0 -- Diajukan --> U1{Aksi}
     U1 -- Ubah --> P2
-    U1 -- Tandai Diterima --> M1[Popup dampak, catatan opsional] --> I1[(Status Diterima; barang stok: stok bertambah; tanpa tautan: tidak berubah)] --> B
+    U1 -- Catat barang diterima / Tandai Diterima --> M1[Barang stok: isi jumlah yang datang; catatan opsional] --> I1[(Barang stok: Barang Masuk sesuai jumlah; kurang dari sisa = Diterima sebagian, penuh = Diterima; tanpa tautan: Diterima, stok tidak berubah)] --> B
     U1 -- Tandai Dibatalkan --> M2[Popup dampak, catatan opsional] --> I2[(Status Dibatalkan; tidak mengubah apa pun)] --> B
     U0 -- Diterima --> U2{Aksi}
     U2 -- Tandai Dikembalikan, jika pengembalian dipilih Dikembalikan --> M3[Popup dampak, catatan opsional]
     U2 -- Tandai Dibatalkan --> M3
-    M3 --> I3[(Status baru; kurangi tujuan yang tercatat, minimal 0; jika berhenti di 0 tampil peringatan cek manual)] --> B
+    M3 --> I3[(Status baru; transaksi Koreksi mengurangi jumlah yang sudah masuk, minimal 0; jika berhenti di 0 tampil peringatan cek manual)] --> B
 
     C -- Ekspor Excel --> X1[(Laporan Permintaan .xlsx sesuai status & pencarian aktif)] --> B
     C -- Pindah menu --> Z([Selesai])
@@ -286,22 +289,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Daftar barang disimpan SHD: jumlah, minimum, status, lokasi simpan, departemen penyedia; filter status & cari]
+    A([Mulai]) --> B[Daftar barang: jumlah, minimum, status, lokasi simpan ruangan & gedung, departemen penyedia; filter status, gedung, ruangan & cari]
     B --> C{Pilih aksi}
 
-    C -- Tambah / Ubah data --> T1[Input nama unik, kategori pilih atau tambah baru, satuan, minimum, minta ke, lokasi simpan teks bebas dengan saran, catatan; jumlah awal hanya saat tambah] --> T2[(Simpan)] --> CEK
+    C -- Tambah / Ubah data --> T1[Input nama unik, kategori pilih atau tambah baru, satuan, minimum, minta ke, lokasi simpan gedung lalu ruangan bisa tambah baru, catatan; jumlah awal hanya saat tambah, dicatat sebagai saldo awal] --> T2[(Simpan)] --> CEK
 
-    C -- Ubah jumlah --> J0{Cara}
-    J0 -- Klik angka --> J1[Input jumlah baru >= 0]
-    J0 -- Tombol + / - --> J2[Penyesuaian 1, angka langsung berubah di layar]
-    J1 & J2 --> J3{Hasil >= 0?}
-    J3 -- Tidak --> J4[Tolak: stok tidak cukup, angka dikembalikan] --> B
-    J3 -- Ya --> J5[(Simpan dengan lock)] --> CEK
+    C -- Catat transaksi --> J0[Pilih jenis: Barang Masuk, Pemakaian ruangan opsional, Koreksi keterangan wajib, Penghapusan alasan wajib; jumlah, keterangan]
+    J0 --> J3{Hasil >= 0?}
+    J3 -- Tidak --> J4[Tolak: stok tidak cukup] --> B
+    J3 -- Ya --> J5[(Simpan transaksi & jumlah stok dengan lock)] --> CEK
 
-    R0[Ambil dari stok di Kelengkapan Ruangan] --> R1[(Stok berkurang otomatis, tidak pernah negatif)] --> CEK
-    R2[Status permintaan tertaut barang ini berubah] --> R3[(Diterima: stok bertambah; Dikembalikan / Dibatalkan setelah Diterima: stok berkurang, minimal 0)] --> CEK
+    C -- Kartu stok --> KS[Riwayat transaksi barang, terbaru lebih dulu] --> B
 
-    C -- Hapus --> H0[(Ambil usage: ruangan yang standarnya memakai barang ini)]
+    R0[Ambil dari stok di Kelengkapan Ruangan] --> R1[(Transaksi Pemakaian dengan ruangan tujuan, tidak pernah negatif)] --> CEK
+    R2[Status permintaan tertaut barang ini berubah] --> R3[(Barang datang: Barang Masuk sesuai jumlah diterima; Dikembalikan / Dibatalkan dari Diterima: Koreksi, minimal 0)] --> CEK
+
+    C -- Hapus --> H00{Ada transaksi selain saldo awal?}
+    H00 -- Ya --> H01[Tolak: catat Penghapusan agar stok menjadi 0; barang tetap tercatat] --> B
+    H00 -- Tidak --> H0[(Ambil usage: ruangan yang standarnya memakai barang ini)]
     H0 --> H1{Dipakai di standar?}
     H1 -- Ya --> H2[Peringatan: hapus permanen, barang ikut terlepas dari ruangan]
     H1 -- Tidak --> H3[Konfirmasi hapus permanen]

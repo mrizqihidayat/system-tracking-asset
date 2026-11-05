@@ -28,6 +28,7 @@ class SupplyRequestResource extends JsonResource
             'consumable_id' => $this->consumable_id,
             'item_name' => $this->item_name,
             'quantity' => $this->quantity,
+            'received_quantity' => $this->received_quantity,
             'purpose' => $this->purpose,
             'request_method' => $this->request_method,
             'lead_time_days' => $this->lead_time_days,

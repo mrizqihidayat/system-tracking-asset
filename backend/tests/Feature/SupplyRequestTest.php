@@ -377,7 +377,7 @@ class SupplyRequestTest extends TestCase
         $this->assertFalse($items['Spidol']['has_open_request']);
     }
 
-    // ---------- status mengubah stok ----------
+    // ---------- status mengubah stok (diterima sebagian & kartu stok: StockTransactionTest) ----------
 
     private function setStatus(SupplyRequest $request, string $status): TestResponse
     {
@@ -473,7 +473,7 @@ class SupplyRequestTest extends TestCase
         // Dikembalikan boleh dipilih di form; stok tidak turun di bawah 0.
         $returned = $request(['must_return' => true]);
         $this->setStatus($returned, 'Diterima')->assertOk();
-        $this->patchJson("/api/consumables/{$pensil->id}/quantity", ['quantity' => 3])->assertOk();
+        $this->postJson("/api/consumables/{$pensil->id}/transactions", ['type' => 'Koreksi', 'quantity' => -4, 'note' => 'Terpakai'])->assertCreated();
         $this->setStatus($returned, 'Dikembalikan')->assertOk();
         $this->assertSame(0, $pensil->fresh()->quantity);
     }
@@ -515,7 +515,7 @@ class SupplyRequestTest extends TestCase
         $pulpen = Consumable::factory()->create(['quantity' => 2147483647, 'provider_department_id' => $this->deptA->id]);
         $request = $this->supplyRequest(['consumable_id' => $pulpen->id, 'quantity' => 1]);
 
-        $this->setStatus($request, 'Diterima')->assertUnprocessable()->assertJsonPath('errors.adjustment.0', 'Jumlah stok melebihi batas.');
+        $this->setStatus($request, 'Diterima')->assertUnprocessable()->assertJsonPath('errors.quantity.0', 'Jumlah stok melebihi batas.');
 
         $this->assertSame(2147483647, $pulpen->fresh()->quantity);
         $this->assertSame('Diajukan', $request->fresh()->status->value);
@@ -574,17 +574,6 @@ class SupplyRequestTest extends TestCase
         $this->setStatus($unlinked, 'Dibatalkan')->assertOk();
 
         $this->assertSame(1, $tisu->fresh()->quantity);
-    }
-
-    public function test_reverse_is_skipped_when_target_was_deleted(): void
-    {
-        $tisu = Consumable::factory()->create(['provider_department_id' => $this->deptA->id]);
-        $request = $this->supplyRequest(['consumable_id' => $tisu->id, 'quantity' => 2]);
-        $this->setStatus($request, 'Diterima')->assertOk();
-
-        $this->deleteJson("/api/consumables/{$tisu->id}")->assertOk();
-
-        $this->setStatus($request, 'Dibatalkan')->assertOk()->assertJsonPath('meta.impact.message', 'Tidak mengubah stok.');
     }
 
     public function test_status_impact_rejects_invalid_transition(): void

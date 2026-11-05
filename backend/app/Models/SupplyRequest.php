@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['request_date', 'catalog_id', 'consumable_id', 'item_name', 'quantity', 'purpose', 'room_id', 'applied_to', 'provider_department_id', 'request_method', 'lead_time_days', 'must_return', 'status', 'received_at', 'returned_at', 'note', 'created_by'])]
+#[Fillable(['request_date', 'catalog_id', 'consumable_id', 'item_name', 'quantity', 'purpose', 'room_id', 'received_quantity', 'provider_department_id', 'request_method', 'lead_time_days', 'must_return', 'status', 'received_at', 'returned_at', 'note', 'created_by'])]
 class SupplyRequest extends Model
 {
     /** @use HasFactory<SupplyRequestFactory> */
@@ -24,11 +24,6 @@ class SupplyRequest extends Model
      * Saran awal cara permintaan; request_method teks bebas per permintaan (log jalur pengiriman).
      */
     public const DEFAULT_REQUEST_METHODS = ['Memo', 'Form', 'Email', 'WhatsApp', 'Lainnya'];
-
-    /**
-     * Tujuan penambahan saat Diterima (applied_to), dipakai untuk mengurangi kembali.
-     */
-    public const APPLIED_TO_STOCK = 'stok';
 
     /**
      * Dampak perubahan status terakhir, diisi SupplyRequestService::changeStatus() (bukan kolom tabel).
@@ -55,6 +50,7 @@ class SupplyRequest extends Model
             'lead_time_days' => 'integer',
             'must_return' => 'boolean',
             'status' => RequestStatus::class,
+            'received_quantity' => 'integer',
             'received_at' => 'datetime',
             'returned_at' => 'datetime',
         ];

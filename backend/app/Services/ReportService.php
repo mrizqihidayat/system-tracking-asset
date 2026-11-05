@@ -12,6 +12,7 @@ use App\Models\Department;
 use App\Models\Loan;
 use App\Models\Room;
 use App\Models\RoomStandard;
+use App\Models\StockTransaction;
 use App\Models\SupplyRequest;
 use App\Reports\Report;
 use App\Reports\ReportColumn;
@@ -247,6 +248,7 @@ class ReportService
                 $request->request_date,
                 $request->item_name,
                 $request->quantity,
+                $request->received_quantity,
                 $request->purpose,
                 $request->room ? "{$request->room->building->name} / {$request->room->name}" : null,
                 $request->providerDepartment->name,
@@ -260,7 +262,7 @@ class ReportService
             ]);
 
         $columns = [
-            ReportColumn::date('Tanggal'), ReportColumn::text('Item', 28), ReportColumn::int('Jumlah'),
+            ReportColumn::date('Tanggal'), ReportColumn::text('Item', 28), ReportColumn::int('Jumlah'), ReportColumn::int('Masuk stok'),
             ReportColumn::text('Untuk kegiatan', 28), ReportColumn::text('Ruangan', 26), ReportColumn::text('Departemen penyedia', 16),
             ReportColumn::text('Cara permintaan', 16), ReportColumn::text('Status', 16), ReportColumn::date('Batas respons'),
             ReportColumn::datetime('Diterima'), ReportColumn::datetime('Dikembalikan'), ReportColumn::text('Dicatat oleh', 18),
@@ -285,7 +287,7 @@ class ReportService
     private function consumables(array $filters): Report
     {
         $rows = Consumable::query()
-            ->with(['providerDepartment', 'consumableCategory'])
+            ->with(['providerDepartment', 'consumableCategory', 'room.building'])
             ->filter($filters)
             ->orderBy('name')
             ->lazy(self::CHUNK)
@@ -297,7 +299,7 @@ class ReportService
                 $consumable->min_quantity,
                 $consumable->status()->value,
                 $consumable->providerDepartment->name,
-                $consumable->storage_location,
+                $consumable->room ? "{$consumable->room->name}, {$consumable->room->building->name}" : null,
                 $consumable->note,
             ]);
 
@@ -311,10 +313,40 @@ class ReportService
             'Status' => $filters['status'] ?? null,
             'Kategori' => $filters['category'] ?? null,
             'Minta ke' => $this->nameOf(Department::class, $filters['provider_department_id'] ?? null),
+            'Gedung' => $this->nameOf(Building::class, $filters['building_id'] ?? null),
+            'Ruangan' => $this->nameOf(Room::class, $filters['room_id'] ?? null),
             'Pencarian' => $filters['search'] ?? null,
         ]);
 
-        return new Report(ReportType::Consumables, $summary, [new ReportSheet('Stok', $columns, $rows)]);
+        $transactions = StockTransaction::query()
+            ->with(['consumable', 'room.building', 'creator'])
+            ->whereHas('consumable', fn ($query) => $query->filter($filters))
+            ->orderBy('id')
+            ->lazy(self::CHUNK)
+            ->map(fn (StockTransaction $transaction) => [
+                $transaction->transaction_date,
+                $transaction->consumable->name,
+                $transaction->type->value,
+                $transaction->quantity,
+                $transaction->balance_after,
+                $transaction->reason,
+                $transaction->note,
+                $transaction->room ? "{$transaction->room->building->name} / {$transaction->room->name}" : null,
+                $transaction->supply_request_id,
+                $transaction->creator?->name,
+            ]);
+
+        $transactionColumns = [
+            ReportColumn::date('Tanggal'), ReportColumn::text('Barang', 28), ReportColumn::text('Jenis', 14),
+            ReportColumn::int('Jumlah'), ReportColumn::int('Saldo'), ReportColumn::text('Alasan', 14),
+            ReportColumn::text('Keterangan', 30), ReportColumn::text('Ruangan', 28), ReportColumn::int('No. permintaan'),
+            ReportColumn::text('Dicatat oleh', 18),
+        ];
+
+        return new Report(ReportType::Consumables, $summary, [
+            new ReportSheet('Stok', $columns, $rows),
+            new ReportSheet('Transaksi', $transactionColumns, $transactions),
+        ]);
     }
 
     /**

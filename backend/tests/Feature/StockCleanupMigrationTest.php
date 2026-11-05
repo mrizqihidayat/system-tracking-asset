@@ -43,6 +43,9 @@ class StockCleanupMigrationTest extends TestCase
     private function laterMigrations(): array
     {
         return array_map(fn (string $file) => $this->migration($file), [
+            '2026_11_05_000007_replace_storage_location_with_room',
+            '2026_11_05_000006_add_partial_receipt_to_supply_requests',
+            '2026_11_05_000005_create_stock_transactions_table',
             '2026_11_05_000004_simplify_room_standards',
             '2026_11_05_000002_create_consumable_categories_table',
             '2026_11_05_000001_drop_catalog_id_from_consumables',
@@ -138,7 +141,9 @@ class StockCleanupMigrationTest extends TestCase
         $this->assertFalse(DB::table('room_standards')->where('id', $orphan)->exists());
         $this->assertFalse(Schema::hasColumn('room_standards', 'item_name'));
         $this->assertFalse(Schema::hasColumn('supply_requests', 'room_standard_id'));
-        $this->assertSame('Gudang, Gedung IHS', Consumable::find($stored)->storage_location);
+        // Teks lokasi "{ruangan}, {gedung}" kembali menjadi tautan ruangan.
+        $this->assertSame($room->id, Consumable::find($stored)->room_id);
+        $this->assertFalse(Schema::hasColumn('consumables', 'storage_location'));
 
         // Index unik nama tetap berlaku setelah kolom dihapus.
         $this->expectException(QueryException::class);
@@ -147,9 +152,11 @@ class StockCleanupMigrationTest extends TestCase
 
     public function test_duplicate_standards_are_merged(): void
     {
+        $partial = $this->migration('2026_11_05_000006_add_partial_receipt_to_supply_requests');
         $migration = $this->migration('2026_11_05_000004_simplify_room_standards');
 
         Schema::disableForeignKeyConstraints();
+        $partial->down();
         $migration->down();
         Schema::enableForeignKeyConstraints();
 
@@ -161,6 +168,7 @@ class StockCleanupMigrationTest extends TestCase
 
         Schema::disableForeignKeyConstraints();
         $migration->up();
+        $partial->up();
         Schema::enableForeignKeyConstraints();
 
         $this->assertFalse(DB::table('room_standards')->where('id', $second)->exists());

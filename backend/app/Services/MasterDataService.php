@@ -97,6 +97,8 @@ class MasterDataService
                 'riwayat aset (tujuan)' => ['asset_events', 'to_room_id'],
                 'permintaan' => ['supply_requests', 'room_id'],
                 'standar ruangan' => ['room_standards', 'room_id'],
+                'barang stok (lokasi simpan)' => ['consumables', 'room_id'],
+                'riwayat stok' => ['stock_transactions', 'room_id'],
             ],
             $model instanceof ConsumableCategory => ['barang habis pakai' => ['consumables', 'consumable_category_id']],
             $model instanceof AssetType => [

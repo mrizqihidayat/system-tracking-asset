@@ -54,22 +54,22 @@ class SupplyRequestController extends Controller
     {
         $data = $request->validated();
 
-        $supplyRequest = $this->requests->changeStatus($supplyRequest, RequestStatus::from($data['status']), $data['note'] ?? null);
+        $supplyRequest = $this->requests->changeStatus($supplyRequest, RequestStatus::from($data['status']), $data['note'] ?? null, $request->user(), $data['received_quantity'] ?? null);
 
         return SupplyRequestResource::make($supplyRequest->load(SupplyRequestResource::RELATIONS))
             ->additional(['meta' => ['impact' => $supplyRequest->statusImpact]]);
     }
 
     /**
-     * Pratinjau dampak perubahan status ke stok / Ada ruangan (status tujuan lewat query).
+     * Pratinjau dampak perubahan status ke stok (status tujuan lewat query).
      */
     public function statusImpact(UpdateSupplyRequestStatusRequest $request, SupplyRequest $supplyRequest): JsonResponse
     {
-        return response()->json(['data' => $this->requests->statusImpact($supplyRequest, RequestStatus::from($request->validated('status')))]);
+        return response()->json(['data' => $this->requests->statusImpact($supplyRequest, RequestStatus::from($request->validated('status')), $request->validated('received_quantity'))]);
     }
 
     /**
-     * Saran permintaan per departemen penyedia (kekurangan ruangan + stok Menipis/Habis).
+     * Saran permintaan per departemen penyedia (stok Menipis/Habis).
      */
     public function suggestions(Request $request): JsonResponse
     {

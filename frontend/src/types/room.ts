@@ -62,10 +62,20 @@ export interface RoomConsumable {
   can_request: boolean
 }
 
+/** Bagian hanya-baca: barang yang lokasi simpannya ruangan ini; tidak dihitung sebagai Ada. */
+export interface RoomStoredStock {
+  id: number
+  name: string
+  quantity: number
+  unit: string
+  status: 'Aman' | 'Menipis' | 'Habis'
+}
+
 export interface Checklist {
   data: {
     assets: RoomAssetGroup[]
     consumables: RoomConsumable[]
+    stored_stock: RoomStoredStock[]
   }
   meta: {
     room: Room & { last_checked_at?: string | null }

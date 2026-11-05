@@ -9,9 +9,9 @@ export interface RequestCatalog {
   note: string | null
 }
 
-export type RequestStatus = 'Diajukan' | 'Diterima' | 'Dikembalikan' | 'Dibatalkan'
+export type RequestStatus = 'Diajukan' | 'Diterima sebagian' | 'Diterima' | 'Dikembalikan' | 'Dibatalkan'
 
-/** Dampak perubahan status ke stok / Ada ruangan. */
+/** Dampak perubahan status ke stok. */
 export interface StatusImpact {
   message: string
   clamped: boolean
@@ -24,6 +24,8 @@ export interface SupplyRequest {
   consumable_id: number | null
   item_name: string
   quantity: number
+  /** Jumlah yang sudah masuk stok (barang stok). */
+  received_quantity: number
   purpose: string | null
   status: RequestStatus
   is_unresponded: boolean
@@ -78,10 +80,28 @@ export interface ConsumableItem {
   min_quantity: number
   status: ConsumableStatus
   provider_department: Department | null
-  storage_location: string | null
+  /** Lokasi simpan (opsional). */
+  room: Room | null
   /** Permintaan Diajukan terbaru untuk barang ini. */
   open_request?: { id: number; created_at: string | null } | null
   note: string | null
+}
+
+export type StockTransactionType = 'Barang Masuk' | 'Pemakaian' | 'Koreksi' | 'Penghapusan'
+
+/** Satu baris kartu stok. quantity bertanda, balance_after = stok setelah transaksi. */
+export interface StockTransaction {
+  id: number
+  type: StockTransactionType
+  quantity: number
+  balance_after: number
+  transaction_date: string
+  reason: string | null
+  note: string | null
+  is_opening: boolean
+  room: { id: number; name: string; building: string } | null
+  supply_request_id: number | null
+  created_by: string | null
 }
 
 export interface ConsumableUsage {

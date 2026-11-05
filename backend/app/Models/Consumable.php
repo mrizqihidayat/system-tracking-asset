@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['name', 'consumable_category_id', 'unit', 'quantity', 'min_quantity', 'storage_location', 'provider_department_id', 'note'])]
+#[Fillable(['name', 'consumable_category_id', 'unit', 'quantity', 'min_quantity', 'room_id', 'provider_department_id', 'note'])]
 class Consumable extends Model
 {
     /** @use HasFactory<ConsumableFactory> */
@@ -49,6 +49,16 @@ class Consumable extends Model
     }
 
     /**
+     * Lokasi simpan (opsional). Stok di sini tidak dihitung sebagai Ada di Kelengkapan Ruangan.
+     *
+     * @return BelongsTo<Room, $this>
+     */
+    public function room(): BelongsTo
+    {
+        return $this->belongsTo(Room::class);
+    }
+
+    /**
      * @return BelongsTo<ConsumableCategory, $this>
      */
     public function consumableCategory(): BelongsTo
@@ -57,13 +67,21 @@ class Consumable extends Model
     }
 
     /**
-     * Permintaan Diajukan terbaru untuk barang ini (tautan "Diajukan · tanggal" di daftar stok).
+     * Permintaan yang masih terbuka (Diajukan / Diterima sebagian) terbaru untuk barang ini (tautan di daftar stok).
      *
      * @return HasOne<SupplyRequest, $this>
      */
     public function openRequest(): HasOne
     {
-        return $this->hasOne(SupplyRequest::class)->ofMany(['id' => 'max'], fn ($query) => $query->where('status', RequestStatus::Diajukan->value));
+        return $this->hasOne(SupplyRequest::class)->ofMany(['id' => 'max'], fn ($query) => $query->whereIn('status', [RequestStatus::Diajukan->value, RequestStatus::DiterimaSebagian->value]));
+    }
+
+    /**
+     * @return HasMany<StockTransaction, $this>
+     */
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(StockTransaction::class);
     }
 
     /**
@@ -86,7 +104,9 @@ class Consumable extends Model
         $query
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->withStatus(ConsumableStatus::from($status)))
             ->when($filters['category'] ?? null, fn ($query, $category) => $query->whereHas('consumableCategory', fn ($q) => $q->whereRaw('lower(name) = ?', [mb_strtolower($category)])))
-            ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id));
+            ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id))
+            ->when($filters['building_id'] ?? null, fn ($query, $id) => $query->whereHas('room', fn ($room) => $room->where('building_id', $id)))
+            ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id));
 
         Search::apply($query, $filters['search'] ?? null, 'consumables.name', fn ($query, $pattern) => $query->orWhereHas(
             'consumableCategory', fn ($q) => $q->whereRaw(Search::likeSql('consumable_categories.name'), [$pattern]),

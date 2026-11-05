@@ -24,7 +24,7 @@ export const listQueries = {
   consumables: (params: ListParams) => paginated<ConsumableItem>(queryKeys.consumables.list(params), '/consumables', params),
   supplyRequests: (params: ListParams) => paginated<SupplyRequest>(queryKeys.supplyRequests.list(params), '/supply-requests', params),
   suggestions: () => data<SuggestionGroup[]>(queryKeys.supplyRequests.suggestions(), '/supply-requests/suggestions'),
-  /** Dampak status ke stok / Ada ruangan: disimpan sampai data permintaan/stok berubah (lewat invalidasi). */
+  /** Dampak status ke stok: disimpan sampai data permintaan/stok berubah (lewat invalidasi). */
   statusImpact: (id: number, status: RequestStatus) =>
     queryOptions({
       ...data<StatusImpact>(queryKeys.supplyRequests.statusImpact(id, status), `/supply-requests/${id}/status-impact?status=${status}`),

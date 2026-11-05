@@ -22,12 +22,12 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Data master: gedung & ruangan | 11 | 10 | 1 |
 | Data master: jenis aset | 6 | 6 | 0 |
 | Data master: kategori stok | 5 | 5 | 0 |
-| Lookup | 3 | 2 | 1 |
+| Lookup | 2 | 1 | 1 |
 | Aset | 20 | 20 | 0 |
 | Peminjaman | 5 | 5 | 0 |
 | Kelengkapan ruangan | 7 | 7 | 0 |
 | Permintaan ke departemen lain | 11 | 11 | 0 |
-| Stok habis pakai | 7 | 7 | 0 |
+| Stok habis pakai | 8 | 8 | 0 |
 | **Total** | **88** | **86** | **2** |
 
 ## Endpoint API yang tidak dipakai frontend
@@ -64,7 +64,7 @@ Di balik reverse proxy, batas per IP hanya benar jika `TRUSTED_PROXIES` diisi. T
 | `{token}` halaman publik | Tepat 12 karakter huruf dan angka | 404, tanpa query ke database |
 | `search` pada `/api/lookups/*` | Teks, maks. 100 karakter | 422 |
 | `quantity`, `min_quantity`, `standard_quantity`, `actual_quantity` | Maks. 2147483647 | 422 |
-| `adjustment` pada `PATCH /api/consumables/{id}/quantity` | Antara -2147483647 dan 2147483647; hasil akhir tidak boleh melewati batas | 422 |
+| `quantity` pada `POST /api/consumables/{id}/transactions` | Bukan 0; antara 1 dan 2147483647 (Koreksi: boleh negatif); hasil akhir tidak boleh negatif atau melewati batas | 422 |
 | Nama file unggahan | UTF-8 sah, maks. 255 karakter | 422 |
 
 Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diunduh sebagai `evil.pdf`. Nama asli tetap ditampilkan di daftar file.
@@ -152,7 +152,6 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 |---|---|---|---|---|
 | GET | `/api/lookups/borrower-units` | Saran departemen peminjam | Token | **Tidak** |
 | GET | `/api/lookups/request-methods` | Pilihan cara permintaan, satu sumber untuk web dan versi HP | Token | Ya: Form permintaan (`lib/queries/master.ts`) |
-| GET | `/api/lookups/storage-locations` | Saran lokasi simpan stok | Token | Ya: Form barang stok (`lib/queries/master.ts`) |
 
 ### Aset
 
@@ -226,8 +225,9 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | GET | `/api/consumables/{id}` | Detail barang dan ruangan pemakainya | Token | Ya: Form stok (`pages/consumables/ConsumableFormModal.tsx`) |
 | GET | `/api/consumables/{id}/usage` | Pemakaian barang sebelum dihapus | Token | Ya: Stok (`pages/consumables/ConsumablesPage.tsx`) |
 | PUT | `/api/consumables/{id}` | Ubah data barang, tanpa jumlah | Token | Ya: Form stok (`pages/consumables/ConsumableFormModal.tsx`) |
-| PATCH | `/api/consumables/{id}/quantity` | Ubah jumlah stok | Token | Ya: Stok (`pages/consumables/ConsumablesPage.tsx`) |
-| DELETE | `/api/consumables/{id}` | Hapus barang permanen | Token | Ya: Stok (`pages/consumables/ConsumablesPage.tsx`) |
+| GET | `/api/consumables/{id}/transactions` | Kartu stok: riwayat transaksi barang | Token | Ya: Stok (`pages/consumables/StockCardModal.tsx`) |
+| POST | `/api/consumables/{id}/transactions` | Catat transaksi stok | Token | Ya: Stok (`pages/consumables/StockTransactionModal.tsx`) |
+| DELETE | `/api/consumables/{id}` | Hapus barang permanen jika hanya punya saldo awal | Token | Ya: Stok (`pages/consumables/ConsumablesPage.tsx`) |
 
 ## Route non-API
 

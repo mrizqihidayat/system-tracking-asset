@@ -25,6 +25,7 @@ export const queryKeys = {
   consumables: {
     all: ['consumables'] as const,
     list: (params: ListParams) => ['consumables', 'list', params] as const,
+    transactions: (id: number, page: number) => ['consumables', 'transactions', id, page] as const,
   },
   supplyRequests: {
     all: ['supply-requests'] as const,
@@ -45,7 +46,6 @@ export const queryKeys = {
     consumableCategories: () => ['master', 'consumable-categories'] as const,
     assetTypes: () => ['master', 'asset-types'] as const,
     requestCatalog: () => ['master', 'request-catalog'] as const,
-    storageLocations: () => ['master', 'storage-locations'] as const,
     requestMethods: () => ['master', 'request-methods'] as const,
   },
 }

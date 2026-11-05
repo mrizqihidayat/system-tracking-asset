@@ -14,7 +14,7 @@ import { useDashboardCards, useDashboardPanels, useDashboardReadiness } from '..
 import { useErrorToast } from '../lib/useErrorToast'
 import type { Loan } from '../types/loan'
 
-const requestColor = { Diajukan: 'blue', Diterima: 'green', 'Belum direspons': 'amber', Dikembalikan: 'slate', Dibatalkan: 'red' } as const
+const requestColor = { Diajukan: 'blue', 'Diterima sebagian': 'amber', Diterima: 'green', 'Belum direspons': 'amber', Dikembalikan: 'slate', Dibatalkan: 'red' } as const
 
 function StatCard({ label, value, to, alert, note }: { label: string; value: number; to: string; alert?: boolean; note?: ReactNode }) {
   return (

@@ -23,7 +23,7 @@ class MasterDataSeeder extends Seeder
         }
 
         $buildings = [
-            'Gedung IHS' => ['Ruang Kelas 1', 'Ruang Kelas 2', 'Ruang Rapat', 'Gudang IHS'],
+            'Gedung IHS' => ['Ruang Kelas 1', 'Ruang Kelas 2', 'Ruang Rapat', 'Gudang IHS', 'Main Office SHD'],
             'Millennials Hub' => ['Ruang Diskusi', 'Auditorium', 'Gudang MH'],
         ];
 

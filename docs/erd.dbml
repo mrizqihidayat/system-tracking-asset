@@ -239,7 +239,7 @@ Table supply_requests {
   lead_time_days int [note: 'snapshot dari katalog saat dibuat/diubah (Diajukan); null tanpa katalog']
   must_return boolean [not null, default: false, note: 'pilihan di form: Dikembalikan / Tidak dikembalikan; default dari katalog']
   status request_status [not null, default: 'Diajukan']
-  applied_to varchar(10) [note: 'stok: penambahan saat Diterima, untuk mengurangi kembali; kosong = tidak mengubah apa pun']
+  received_quantity int [not null, default: 0, note: 'jumlah yang sudah masuk stok; Diterima sebagian jika kurang dari quantity']
   received_at timestamp
   returned_at timestamp
   note text
@@ -248,6 +248,23 @@ Table supply_requests {
   updated_at timestamp
 
   Note: '"Belum direspons" = Diajukan yang melewati snapshot lead_time_days (dihitung)'
+}
+
+Table stock_transactions {
+  id bigint [pk, increment]
+  consumable_id bigint [not null, ref: > consumables.id, note: 'ON DELETE CASCADE (hanya saldo awal yang bisa ikut terhapus)']
+  type varchar [not null, note: 'Barang Masuk | Pemakaian | Koreksi | Penghapusan']
+  quantity int [not null, note: 'bertanda, tidak 0']
+  balance_after int [not null, note: 'stok setelah transaksi, >= 0']
+  transaction_date date [not null]
+  reason varchar(20) [note: 'Penghapusan: rusak | kedaluwarsa | lainnya']
+  note text [note: 'keterangan; wajib untuk Koreksi']
+  is_opening boolean [not null, default: false, note: 'saldo awal']
+  room_id bigint [ref: > rooms.id, note: 'tujuan Pemakaian']
+  supply_request_id bigint [ref: > supply_requests.id, note: 'Barang Masuk / Koreksi dari permintaan; ON DELETE SET NULL']
+  created_by bigint [ref: > users.id, note: 'staf pencatat; kosong untuk saldo awal hasil migrasi']
+  created_at timestamp
+  updated_at timestamp
 }
 
 Table room_standards {
@@ -272,10 +289,10 @@ Table consumables {
   quantity int [not null, default: 0]
   min_quantity int [not null, default: 0]
   provider_department_id bigint [not null, ref: > departments.id, note: 'minta ke (isi ulang); menjadi sumber baris standar yang memakainya']
-  storage_location varchar(150) [note: 'lokasi simpan, teks bebas (tidak tertaut ruangan)']
+  room_id bigint [ref: > rooms.id, note: 'lokasi simpan (opsional); hapus ruangan ditolak bila masih dipakai; tidak dihitung sebagai Ada di ruangan']
   note text
   created_at timestamp
   updated_at timestamp
 
-  Note: 'Hanya barang yang disimpan SHD, tidak tertaut katalog. Hapus = hard delete (tanpa soft delete)'
+  Note: 'Semua barang habis pakai, tidak tertaut katalog. quantity = hasil stock_transactions. Hapus permanen hanya jika transaksinya saldo awal saja'
 }

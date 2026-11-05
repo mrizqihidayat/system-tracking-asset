@@ -16,13 +16,13 @@ export const invalidate = {
   /** Aset & peminjaman: status/lokasi aset memengaruhi daftar, ruangan (QR), saran, dashboard. */
   assets: (qc: QueryClient) => run(qc, operational),
   loans: (qc: QueryClient) => run(qc, operational),
-  /** Stok: daftar stok, saran lokasi simpan, checklist (isi dari stok), saran permintaan, dashboard. */
-  consumables: (qc: QueryClient) => run(qc, [k.consumables.all, k.master.storageLocations(), k.rooms.all, k.supplyRequests.all, k.dashboard.all]),
+  /** Stok: daftar stok & kartu stok, checklist (ambil dari stok), saran permintaan, dashboard. */
+  consumables: (qc: QueryClient) => run(qc, [k.consumables.all, k.rooms.all, k.supplyRequests.all, k.dashboard.all]),
   /** Permintaan: riwayat, saran, panel dashboard. */
   supplyRequests: (qc: QueryClient) => run(qc, [k.supplyRequests.all, k.dashboard.all]),
   /** Katalog: daftar katalog (master), riwayat permintaan. */
   catalog: (qc: QueryClient) => run(qc, [k.master.requestCatalog(), k.supplyRequests.all]),
-  /** Standar & hasil cek ruangan (isi dari stok juga mengurangi stok). */
+  /** Standar & hasil cek ruangan (ambil dari stok juga mengurangi stok). */
   rooms: (qc: QueryClient) => run(qc, [k.rooms.all, k.consumables.all, k.supplyRequests.all, k.dashboard.all]),
   /** Data master: nama tampil di hampir semua daftar → semua query dianggap basi. */
   master: (qc: QueryClient) => qc.invalidateQueries(),

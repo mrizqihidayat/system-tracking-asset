@@ -60,7 +60,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('asset-types', AssetTypeController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('/lookups/borrower-units', [LookupController::class, 'borrowerUnits']);
     Route::get('/lookups/request-methods', [LookupController::class, 'requestMethods']);
-    Route::get('/lookups/storage-locations', [LookupController::class, 'storageLocations']);
 
     // Aset (SPEC §5, §14). Hapus = permanen lewat AssetService (cek delete-impact dulu).
     Route::get('/assets', [AssetController::class, 'index']);
@@ -123,6 +122,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/consumables/{consumable}', [ConsumableController::class, 'show'])->whereNumber('consumable');
     Route::get('/consumables/{consumable}/usage', [ConsumableController::class, 'usage'])->whereNumber('consumable');
     Route::put('/consumables/{consumable}', [ConsumableController::class, 'update'])->whereNumber('consumable');
-    Route::patch('/consumables/{consumable}/quantity', [ConsumableController::class, 'updateQuantity'])->whereNumber('consumable');
+    Route::get('/consumables/{consumable}/transactions', [ConsumableController::class, 'transactions'])->whereNumber('consumable');
+    Route::post('/consumables/{consumable}/transactions', [ConsumableController::class, 'storeTransaction'])->whereNumber('consumable');
     Route::delete('/consumables/{consumable}', [ConsumableController::class, 'destroy'])->whereNumber('consumable');
 });

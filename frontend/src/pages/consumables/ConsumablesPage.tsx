@@ -1,5 +1,5 @@
-import { EllipsisVertical, Minus, Plus } from 'lucide-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { EllipsisVertical, Plus } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
@@ -9,28 +9,28 @@ import { PageHeader } from '../../components/ui/Page'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu from '../../components/ui/DropdownMenu'
-import { FormField, Input, Select } from '../../components/ui/FormField'
+import { Input, Select } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import { invalidate } from '../../lib/queries/invalidate'
-import { queryKeys } from '../../lib/queries/keys'
 import { listConfigs } from '../../lib/queries/list-configs'
 import { useConsumables } from '../../lib/queries/lists'
+import { useBuildings, useRooms } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
-import type { Paginated } from '../../types/api'
-import type { ConsumableItem, ConsumableStatus, ConsumableUsage } from '../../types/supply'
-import ActionModal from '../assets/modals/ActionModal'
+import type { ConsumableItem, ConsumableUsage } from '../../types/supply'
 import ConsumableFormModal from './ConsumableFormModal'
+import StockCardModal from './StockCardModal'
+import StockTransactionModal from './StockTransactionModal'
 
 const statusColor = { Aman: 'green', Menipis: 'amber', Habis: 'red' } as const
 
-/** Rumus sama dengan backend (ConsumableStatus): Habis = 0, Menipis ≤ minimum, selain itu Aman. */
-const stockStatus = (quantity: number, min: number): ConsumableStatus =>
-  quantity <= 0 ? 'Habis' : quantity <= min ? 'Menipis' : 'Aman'
-
-type ModalState = { kind: 'form'; item: ConsumableItem | null } | { kind: 'quantity'; item: ConsumableItem } | null
+type ModalState =
+  | { kind: 'form'; item: ConsumableItem | null }
+  | { kind: 'transaction'; item: ConsumableItem }
+  | { kind: 'card'; item: ConsumableItem }
+  | null
 
 /** Form Buat permintaan terisi: item, departemen, jumlah = minimum − jumlah (minimal 1), tanpa katalog. */
 const requestUrl = (c: ConsumableItem) => {
@@ -45,25 +45,6 @@ const requestUrl = (c: ConsumableItem) => {
 
 const openRequestUrl = (id: number) => `/permintaan?id=${id}`
 
-function QuantityModal({ item, onClose, onDone }: { item: ConsumableItem; onClose: () => void; onDone: () => void }) {
-  const toast = useToast()
-  const [value, setValue] = useState(String(item.quantity))
-  const submit = async () => {
-    await api.patch(`/consumables/${item.id}/quantity`, { quantity: Number(value) })
-    toast.success(`Jumlah ${item.name} menjadi ${value} ${item.unit}.`)
-    onDone()
-  }
-  return (
-    <ActionModal title={`Ubah jumlah — ${item.name}`} submitLabel="Simpan" submitDisabled={value === ''} onClose={onClose} onSubmit={submit}>
-      {(errors) => (
-        <FormField label={`Jumlah sekarang (${item.unit})`} required error={errors.quantity}>
-          <Input type="number" min={0} value={value} onChange={(e) => setValue(e.target.value)} error={errors.quantity} autoFocus />
-        </FormField>
-      )}
-    </ActionModal>
-  )
-}
-
 export default function ConsumablesPage() {
   const toast = useToast()
   const navigate = useNavigate()
@@ -76,41 +57,18 @@ export default function ConsumablesPage() {
   const result = consumables.data
   const status = list.get('status')
   const search = list.searchText
-  const listKey = queryKeys.consumables.list(list.params)
+  const buildingId = list.get('building_id')
+  const roomId = list.get('room_id')
+  const { data: buildings } = useBuildings()
+  const { data: rooms } = useRooms(buildingId ? Number(buildingId) : null, true)
 
   const load = () => invalidate.consumables(queryClient)
 
-  // +/- jumlah: optimistic (angka & status langsung berubah), dikembalikan jika server menolak.
-  const adjustMutation = useMutation({
-    mutationFn: ({ item, adjustment }: { item: ConsumableItem; adjustment: number }) =>
-      api.patch<{ data: ConsumableItem }>(`/consumables/${item.id}/quantity`, { adjustment }),
-    onMutate: async ({ item, adjustment }) => {
-      await queryClient.cancelQueries({ queryKey: listKey })
-      const previous = queryClient.getQueryData<Paginated<ConsumableItem>>(listKey)
-      queryClient.setQueryData<Paginated<ConsumableItem>>(listKey, (cur) =>
-        cur && {
-          ...cur,
-          data: cur.data.map((c) => {
-            if (c.id !== item.id) return c
-            const quantity = Math.max(0, c.quantity + adjustment)
-            return { ...c, quantity, status: stockStatus(quantity, c.min_quantity) }
-          }),
-        },
-      )
-      return { previous }
-    },
-    onError: (e, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(listKey, context.previous)
-      toast.error(errorMessage(e))
-    },
-    onSettled: () => load(),
-  })
-  const adjust = (item: ConsumableItem, adjustment: number) => adjustMutation.mutate({ item, adjustment })
-
   const askDelete = async (item: ConsumableItem) => {
     try {
-      const r = await api.get<{ data: { rooms: ConsumableUsage[] } }>(`/consumables/${item.id}/usage`)
-      setDeleting({ item, usage: r.data.data.rooms })
+      const r = await api.get<{ data: { rooms: ConsumableUsage[]; delete_block_reason: string | null } }>(`/consumables/${item.id}/usage`)
+      if (r.data.data.delete_block_reason) toast.error(r.data.data.delete_block_reason)
+      else setDeleting({ item, usage: r.data.data.rooms })
     } catch (e) {
       toast.error(errorMessage(e))
     }
@@ -152,38 +110,19 @@ export default function ConsumablesPage() {
       className: 'text-center',
       sortKey: 'quantity',
       cell: (c) => (
-        <div className="flex items-center gap-1 md:justify-center">
-          <button
-            type="button"
-            aria-label={`Kurangi ${c.name}`}
-            disabled={c.quantity === 0}
-            onClick={() => adjust(c, -1)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
-          >
-            <Minus size={14} />
-          </button>
-          <button
-            type="button"
-            title="Klik untuk mengisi jumlah langsung"
-            onClick={() => setModal({ kind: 'quantity', item: c })}
-            className="min-h-9 min-w-16 whitespace-nowrap rounded-lg px-2 text-center font-semibold tabular-nums hover:bg-slate-100"
-          >
+        <>
+          <span className="whitespace-nowrap font-semibold tabular-nums">
             {c.quantity} <span className="text-xs font-normal text-slate-500">{c.unit}</span>
+          </span>
+          <button type="button" className="block whitespace-nowrap text-xs font-semibold text-brand-700 hover:underline md:mx-auto" onClick={() => setModal({ kind: 'transaction', item: c })}>
+            Catat transaksi
           </button>
-          <button
-            type="button"
-            aria-label={`Tambah ${c.name}`}
-            onClick={() => adjust(c, 1)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
+        </>
       ),
     },
     { header: 'Minimum', className: 'text-center', cell: (c) => <span className="tabular-nums">{c.min_quantity}</span> },
     { header: 'Status', className: 'text-center', mobile: 'badge', cell: (c) => <Badge color={statusColor[c.status]}>{c.status}</Badge> },
-    { header: 'Lokasi simpan', cell: (c) => c.storage_location ?? '-' },
+    { header: 'Lokasi simpan', cell: (c) => (c.room ? `${c.room.name}, ${c.room.building?.name ?? '-'}` : '-') },
     {
       header: 'Departemen penyedia',
       className: 'text-center',
@@ -212,6 +151,8 @@ export default function ConsumablesPage() {
           trigger={<EllipsisVertical size={16} />}
           triggerClassName="px-2.5!"
           items={[
+            { label: 'Catat transaksi', onClick: () => setModal({ kind: 'transaction', item: c }) },
+            { label: 'Kartu stok', onClick: () => setModal({ kind: 'card', item: c }) },
             { label: 'Ubah data', onClick: () => setModal({ kind: 'form', item: c }) },
             ...(c.provider_department && !c.provider_department.is_internal
               ? [c.open_request
@@ -229,10 +170,10 @@ export default function ConsumablesPage() {
     <div className="space-y-5">
       <PageHeader
         title="Stok Habis Pakai"
-        description={`Barang yang disimpan SHD${result ? ` · ${result.meta.total} barang` : ''}. Stok menipis/habis masuk saran permintaan.`}
+        description={`${result ? `${result.meta.total} barang. ` : ''}Setiap perubahan jumlah dicatat sebagai transaksi. Stok menipis/habis masuk saran permintaan.`}
         actions={
           <>
-            <ExportButton type="consumables" filters={() => ({ status, search: search.trim() })} />
+            <ExportButton type="consumables" filters={() => ({ status, building_id: buildingId, room_id: roomId, search: search.trim() })} />
             <Button onClick={() => setModal({ kind: 'form', item: null })}>
               <Plus size={16} /> Tambah barang
             </Button>
@@ -260,6 +201,27 @@ export default function ConsumablesPage() {
           <option>Menipis</option>
           <option>Habis</option>
         </Select>
+        <Select
+          clearable
+          className="sm:w-auto"
+          value={buildingId}
+          onChange={(e) => list.setFilter('building_id', e.target.value, { room_id: null })}
+          aria-label="Gedung lokasi simpan"
+        >
+          <option value="">Semua gedung</option>
+          {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </Select>
+        <Select
+          clearable
+          className="sm:w-auto"
+          value={roomId}
+          disabled={!buildingId}
+          onChange={(e) => list.setFilter('room_id', e.target.value)}
+          aria-label="Ruangan lokasi simpan"
+        >
+          <option value="">Semua ruangan</option>
+          {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </Select>
       </div>
 
       <DataTable
@@ -277,7 +239,8 @@ export default function ConsumablesPage() {
       />
 
       {modal?.kind === 'form' && <ConsumableFormModal item={modal.item} onClose={() => setModal(null)} onDone={done} />}
-      {modal?.kind === 'quantity' && <QuantityModal item={modal.item} onClose={() => setModal(null)} onDone={done} />}
+      {modal?.kind === 'transaction' && <StockTransactionModal item={modal.item} onClose={() => setModal(null)} onDone={done} />}
+      {modal?.kind === 'card' && <StockCardModal item={modal.item} onClose={() => setModal(null)} />}
 
       <ConfirmDialog
         open={deleting !== null}

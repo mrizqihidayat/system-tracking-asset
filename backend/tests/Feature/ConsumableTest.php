@@ -65,7 +65,8 @@ class ConsumableTest extends TestCase
             'show' => ['GET', '/api/consumables/1'],
             'usage' => ['GET', '/api/consumables/1/usage'],
             'update' => ['PUT', '/api/consumables/1'],
-            'quantity' => ['PATCH', '/api/consumables/1/quantity'],
+            'transactions' => ['GET', '/api/consumables/1/transactions'],
+            'store transaction' => ['POST', '/api/consumables/1/transactions'],
             'destroy' => ['DELETE', '/api/consumables/1'],
         ];
     }
@@ -112,36 +113,21 @@ class ConsumableTest extends TestCase
     {
         // Stok tidak tertaut katalog: catalog_id yang masih dikirim diabaikan.
         $category = ConsumableCategory::factory()->create(['name' => 'ATK']);
+        $gudang = Room::factory()->for(Building::factory()->create(['name' => 'Gedung IHS']))->create(['name' => 'Gudang']);
 
-        $id = $this->postJson('/api/consumables', $this->payload(['catalog_id' => 999, 'consumable_category_id' => $category->id, 'storage_location' => 'Gudang IHS']))
+        $id = $this->postJson('/api/consumables', $this->payload(['catalog_id' => 999, 'consumable_category_id' => $category->id, 'room_id' => $gudang->id]))
             ->assertCreated()
             ->assertJsonPath('data.status', 'Aman')
             ->assertJsonPath('data.provider_department.name', 'SGA')
             ->assertJsonMissingPath('data.catalog')
             ->assertJsonPath('data.consumable_category_id', $category->id)
             ->assertJsonPath('data.category', 'ATK')
-            ->assertJsonPath('data.storage_location', 'Gudang IHS')
+            ->assertJsonPath('data.room.name', 'Gudang')
+            ->assertJsonPath('data.room.building.name', 'Gedung IHS')
             ->assertJsonPath('data.open_request', null)
             ->json('data.id');
 
         $this->getJson("/api/consumables/{$id}")->assertOk()->assertJsonPath('meta.used_in_rooms', []);
-    }
-
-    public function test_quantity_and_adjustment_stop_at_integer_column_limit(): void
-    {
-        $item = $this->consumable(['quantity' => 10]);
-        $url = "/api/consumables/{$item->id}/quantity";
-
-        $this->patchJson($url, ['quantity' => 2147483648])->assertJsonValidationErrors('quantity');
-        $this->patchJson($url, ['adjustment' => 2147483648])->assertJsonValidationErrors('adjustment');
-        $this->patchJson($url, ['adjustment' => -2147483648])->assertJsonValidationErrors('adjustment');
-        $this->assertSame(10, $item->fresh()->quantity);
-
-        $this->patchJson($url, ['quantity' => 2147483647])->assertOk();
-        $this->patchJson($url, ['adjustment' => 1])
-            ->assertUnprocessable()
-            ->assertJsonPath('errors.adjustment.0', 'Jumlah stok melebihi batas.');
-        $this->assertSame(2147483647, $item->fresh()->quantity);
     }
 
     public function test_store_rejects_quantities_above_integer_column_limit(): void
@@ -210,40 +196,13 @@ class ConsumableTest extends TestCase
 
         $this->putJson("/api/consumables/{$item->id}", ['quantity' => 99])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['quantity' => 'Jumlah diubah lewat ubah jumlah.']);
+            ->assertJsonValidationErrors(['quantity' => 'Jumlah diubah lewat transaksi stok.']);
 
         $this->putJson("/api/consumables/{$item->id}", ['name' => 'pulpen', 'min_quantity' => 30])
             ->assertOk()
             ->assertJsonPath('data.name', 'pulpen')
             ->assertJsonPath('data.quantity', 20)
             ->assertJsonPath('data.status', 'Menipis');
-    }
-
-    public function test_update_quantity_set_or_adjust(): void
-    {
-        $item = $this->consumable(['quantity' => 10, 'min_quantity' => 5]);
-        $uri = "/api/consumables/{$item->id}/quantity";
-
-        $this->patchJson($uri, ['quantity' => 3])->assertOk()->assertJsonPath('data.quantity', 3)->assertJsonPath('data.status', 'Menipis');
-        $this->patchJson($uri, ['adjustment' => 7])->assertOk()->assertJsonPath('data.quantity', 10);
-        $this->patchJson($uri, ['adjustment' => -10])->assertOk()->assertJsonPath('data.quantity', 0)->assertJsonPath('data.status', 'Habis');
-
-        $this->patchJson($uri, ['adjustment' => -1])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['adjustment' => 'Stok tidak cukup (tersisa 0).']);
-
-        $this->patchJson($uri, [])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['quantity' => 'Isi jumlah atau penyesuaian.']);
-
-        $this->patchJson($uri, ['quantity' => 5, 'adjustment' => 1])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['quantity' => 'Isi salah satu saja: jumlah atau penyesuaian.']);
-
-        $this->patchJson($uri, ['quantity' => -1])->assertUnprocessable()->assertJsonValidationErrors('quantity');
-        $this->patchJson($uri, ['adjustment' => 0])->assertUnprocessable()->assertJsonValidationErrors(['adjustment' => 'Penyesuaian tidak boleh 0.']);
-
-        $this->assertSame(0, $item->fresh()->quantity);
     }
 
     public function test_list_shows_latest_open_request_with_one_extra_query(): void
@@ -272,21 +231,42 @@ class ConsumableTest extends TestCase
         $this->assertCount(1, $requestQueries);
     }
 
-    public function test_storage_location_lookup_suggests_used_values(): void
+    public function test_location_is_a_room_and_list_filters_by_building_and_room(): void
     {
-        $this->consumable(['name' => 'Pulpen', 'storage_location' => 'Main Office SHD']);
-        $this->consumable(['name' => 'Pensil', 'storage_location' => 'Main Office SHD']);
-        $this->consumable(['name' => 'Spidol', 'storage_location' => 'Gudang IHS']);
-        $this->consumable(['name' => 'Map']);
+        $ihs = Building::factory()->create(['name' => 'Gedung IHS']);
+        $gudang = Room::factory()->for($ihs)->create(['name' => 'Gudang']);
+        $mh = Room::factory()->create(['name' => 'Gudang MH']);
+        $this->consumable(['name' => 'Pulpen', 'room_id' => $gudang->id]);
+        $this->consumable(['name' => 'Pensil', 'room_id' => $mh->id]);
+        $this->consumable(['name' => 'Spidol']);
 
-        $this->getJson('/api/lookups/storage-locations')->assertOk()->assertExactJson(['data' => ['Gudang IHS', 'Main Office SHD']]);
-        $this->getJson('/api/lookups/storage-locations?search=shd')->assertOk()->assertExactJson(['data' => ['Main Office SHD']]);
+        $this->getJson("/api/consumables?building_id={$ihs->id}")->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Pulpen');
+        $this->getJson("/api/consumables?room_id={$mh->id}")->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Pensil');
 
-        $this->postJson('/api/consumables', $this->payload(['name' => 'Tinta', 'storage_location' => str_repeat('x', 151)]))
-            ->assertJsonValidationErrors('storage_location');
+        $this->postJson('/api/consumables', $this->payload(['name' => 'Tinta', 'room_id' => 999]))->assertJsonValidationErrors('room_id');
+        $this->postJson('/api/consumables', $this->payload(['name' => 'Tinta', 'storage_location' => 'Gudang']))->assertCreated()->assertJsonPath('data.room', null);
+        $this->getJson('/api/lookups/storage-locations')->assertNotFound();
     }
 
-    public function test_received_request_adds_stock_and_manual_quantity_still_works(): void
+    public function test_room_used_as_storage_location_cannot_be_deleted(): void
+    {
+        $gudang = Room::factory()->create(['name' => 'Gudang']);
+        $item = $this->consumable(['name' => 'Pulpen', 'room_id' => $gudang->id]);
+        $this->consumable(['name' => 'Pensil', 'room_id' => $gudang->id]);
+
+        $this->getJson("/api/rooms/{$gudang->id}/usage")
+            ->assertJsonPath('data.items', [['label' => 'barang stok (lokasi simpan)', 'count' => 2]])
+            ->assertJsonPath('data.can_delete', false);
+        $this->deleteJson("/api/rooms/{$gudang->id}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['id' => 'Ruangan masih dipakai: 2 barang stok (lokasi simpan).']);
+        $this->assertModelExists($gudang);
+
+        $item->update(['room_id' => null]);
+        $this->getJson("/api/rooms/{$gudang->id}/usage")->assertJsonPath('data.items.0.count', 1);
+    }
+
+    public function test_received_request_adds_stock_and_transactions_still_work(): void
     {
         $item = $this->consumable(['name' => 'Pulpen', 'quantity' => 2, 'min_quantity' => 10]);
         $request = SupplyRequest::factory()->create(['consumable_id' => $item->id, 'quantity' => 8, 'provider_department_id' => $this->sga->id]);
@@ -296,8 +276,8 @@ class ConsumableTest extends TestCase
             ->assertJsonPath('meta.impact.message', 'Stok Pulpen akan bertambah 8.');
         $this->assertSame(10, $item->fresh()->quantity);
 
-        $this->patchJson("/api/consumables/{$item->id}/quantity", ['adjustment' => -1])->assertOk()->assertJsonPath('data.quantity', 9);
-        $this->patchJson("/api/consumables/{$item->id}/quantity", ['quantity' => 3])->assertOk()->assertJsonPath('data.quantity', 3);
+        $this->postJson("/api/consumables/{$item->id}/transactions", ['type' => 'Pemakaian', 'quantity' => 1])->assertCreated()->assertJsonPath('meta.consumable.quantity', 9);
+        $this->postJson("/api/consumables/{$item->id}/transactions", ['type' => 'Koreksi', 'quantity' => -6, 'note' => 'Hitung ulang'])->assertCreated()->assertJsonPath('meta.consumable.quantity', 3);
 
         $this->patchJson("/api/supply-requests/{$request->id}/status", ['status' => 'Dibatalkan'])
             ->assertOk()
@@ -314,7 +294,7 @@ class ConsumableTest extends TestCase
         ]);
         $expected = [['room_id' => $class->id, 'room' => 'Ruang Kelas 1', 'building' => 'Gedung IHS', 'item_name' => 'Pulpen']];
 
-        $this->getJson("/api/consumables/{$item->id}/usage")->assertOk()->assertExactJson(['data' => ['rooms' => $expected]]);
+        $this->getJson("/api/consumables/{$item->id}/usage")->assertOk()->assertExactJson(['data' => ['rooms' => $expected, 'delete_block_reason' => null]]);
         $this->getJson("/api/consumables/{$item->id}")->assertJsonPath('meta.used_in_rooms', $expected);
 
         $this->deleteJson("/api/consumables/{$item->id}")

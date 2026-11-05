@@ -8,7 +8,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 class UpdateConsumableRequest extends StoreConsumableRequest
 {
     /**
-     * Kirim field yang berubah saja. Jumlah tidak diubah di sini (PATCH /consumables/{id}/quantity).
+     * Kirim field yang berubah saja. Jumlah tidak diubah di sini (POST /consumables/{id}/transactions).
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -29,7 +29,7 @@ class UpdateConsumableRequest extends StoreConsumableRequest
      */
     public function messages(): array
     {
-        return ['quantity.prohibited' => 'Jumlah diubah lewat ubah jumlah.'];
+        return ['quantity.prohibited' => 'Jumlah diubah lewat transaksi stok.'];
     }
 
     protected function ignoreId(): ?int

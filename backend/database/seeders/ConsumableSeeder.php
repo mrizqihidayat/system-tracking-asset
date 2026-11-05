@@ -2,20 +2,28 @@
 
 namespace Database\Seeders;
 
+use App\Enums\RequestStatus;
+use App\Enums\StockTransactionType;
 use App\Models\Consumable;
 use App\Models\ConsumableCategory;
 use App\Models\Department;
+use App\Models\Room;
+use App\Models\User;
+use App\Services\ConsumableService;
+use App\Services\SupplyRequestService;
 use Illuminate\Database\Seeder;
 
 /**
- * Stok habis pakai (barang yang disimpan SHD): campuran Aman, Menipis, Habis.
+ * Stok habis pakai: campuran Aman, Menipis, Habis. Semua jumlah lewat ConsumableService agar sama dengan hasil transaksi.
  */
 class ConsumableSeeder extends Seeder
 {
-    public function run(): void
+    public function run(ConsumableService $service, SupplyRequestService $requests): void
     {
+        $staff = User::where('username', 'staf1')->firstOrFail();
         $departments = Department::pluck('id', 'name');
         $categories = ConsumableCategory::pluck('id', 'name');
+        $rooms = Room::pluck('id', 'name');
 
         // [nama, kategori, satuan, jumlah, minimum, minta ke, lokasi simpan]
         $rows = [
@@ -37,15 +45,31 @@ class ConsumableSeeder extends Seeder
         ];
 
         foreach ($rows as [$name, $category, $unit, $quantity, $minimum, $provider, $location]) {
-            Consumable::create([
+            $service->create([
                 'name' => $name,
                 'consumable_category_id' => $categories[$category],
                 'unit' => $unit,
                 'quantity' => $quantity,
                 'min_quantity' => $minimum,
                 'provider_department_id' => $departments[$provider],
-                'storage_location' => $location,
-            ]);
+                'room_id' => $rooms[$location],
+            ], $staff);
         }
+
+        // Riwayat contoh untuk kartu stok: pemakaian, koreksi, dan penghapusan.
+        $pulpen = Consumable::where('name', 'Pulpen')->firstOrFail();
+        $service->record($pulpen, StockTransactionType::Pemakaian, -10, ['note' => 'Pelatihan operator smelter'], $staff);
+        $service->record($pulpen, StockTransactionType::Koreksi, 2, ['note' => 'Hasil hitung ulang gudang'], $staff);
+
+        // Permintaan dari stok yang baru datang sebagian.
+        $pensil = Consumable::where('name', 'Pensil 2B')->firstOrFail();
+        $request = $requests->create([
+            'consumable_id' => $pensil->id,
+            'item_name' => $pensil->name,
+            'provider_department_id' => $pensil->provider_department_id,
+            'quantity' => 10,
+            'request_method' => 'Memo',
+        ], $staff);
+        $requests->changeStatus($request, RequestStatus::Diterima, null, $staff, 4);
     }
 }

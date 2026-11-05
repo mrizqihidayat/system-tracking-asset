@@ -20,7 +20,7 @@ import { masterQueries, useRequestCatalog } from '../../lib/queries/master'
 import { prefetchRoomOptions, prefetchStatusImpacts } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
-import type { CatalogUsage, RequestCatalog, RequestPrefill, RequestStatus, StatusImpact, SupplyRequest } from '../../types/supply'
+import type { CatalogUsage, RequestCatalog, RequestPrefill, StatusImpact, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import CatalogFormModal from './CatalogFormModal'
 import RequestFormModal from './RequestFormModal'
@@ -30,16 +30,19 @@ const PREFILL_PARAMS = ['room_id', 'catalog_id', 'consumable_id']
 
 const statusColor = {
   Diajukan: 'blue',
+  'Diterima sebagian': 'amber',
   Diterima: 'green',
   'Belum direspons': 'amber',
   Dikembalikan: 'slate',
   Dibatalkan: 'red',
 } as const
 
+type TargetStatus = 'Diterima' | 'Dikembalikan' | 'Dibatalkan'
+
 type ModalState =
   | { kind: 'request'; request: SupplyRequest | null; prefill?: RequestPrefill }
   | { kind: 'catalog'; item: RequestCatalog | null }
-  | { kind: 'status'; request: SupplyRequest; status: Exclude<RequestStatus, 'Diajukan'> }
+  | { kind: 'status'; request: SupplyRequest; status: TargetStatus }
   | null
 
 function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
@@ -55,37 +58,67 @@ function Card({ title, action, children }: { title: string; action?: React.React
 }
 
 /** Status tujuan yang tersedia di menu aksi baris permintaan. */
-function nextStatuses(request: SupplyRequest): Exclude<RequestStatus, 'Diajukan'>[] {
-  if (request.status === 'Diajukan') return ['Diterima', 'Dibatalkan']
+function nextStatuses(request: SupplyRequest): TargetStatus[] {
+  if (request.status === 'Diajukan' || request.status === 'Diterima sebagian') return ['Diterima', 'Dibatalkan']
   if (request.status === 'Diterima') return request.must_return ? ['Dikembalikan', 'Dibatalkan'] : ['Dibatalkan']
   return []
 }
 
 function StatusModal({ request, status, onClose, onDone }: {
   request: SupplyRequest
-  status: Exclude<RequestStatus, 'Diajukan'>
+  status: TargetStatus
   onClose: () => void
   onDone: () => void
 }) {
   const toast = useToast()
   const [note, setNote] = useState('')
+  // Barang stok: staf mengisi jumlah yang benar-benar datang; kurang dari sisa = Diterima sebagian.
+  const receivesStock = status === 'Diterima' && request.consumable_id !== null
+  const remaining = request.quantity - request.received_quantity
+  const [received, setReceived] = useState(String(remaining))
+  const receivedValue = Number(received)
+  const receivedValid = Number.isInteger(receivedValue) && receivedValue >= 1 && receivedValue <= remaining
   // Dampak biasanya sudah termuat saat menu aksi dibuka; simpan aktif setelah dampaknya tersedia.
   const { data: impact, error: impactError } = useStatusImpact(request.id, status)
 
   const submit = async () => {
-    const res = await api.patch<{ meta: { impact: StatusImpact } }>(`/supply-requests/${request.id}/status`, { status, note: note.trim() || null })
-    toast.success(`Permintaan ditandai ${status}.`)
+    const res = await api.patch<{ meta: { impact: StatusImpact } }>(`/supply-requests/${request.id}/status`, {
+      status,
+      note: note.trim() || null,
+      ...(receivesStock ? { received_quantity: receivedValue } : {}),
+    })
+    toast.success(receivesStock && receivedValue < remaining ? `Diterima sebagian, sisa ${remaining - receivedValue}.` : `Permintaan ditandai ${status}.`)
     if (res.data.meta.impact.clamped) toast.error(res.data.meta.impact.message)
     onDone()
   }
   return (
-    <ActionModal title={`Tandai ${status}`} submitLabel={`Tandai ${status}`} danger={status === 'Dibatalkan'} submitDisabled={!impact} onClose={onClose} onSubmit={submit}>
+    <ActionModal
+      title={receivesStock ? 'Catat barang diterima' : `Tandai ${status}`}
+      submitLabel={receivesStock ? 'Simpan' : `Tandai ${status}`}
+      danger={status === 'Dibatalkan'}
+      submitDisabled={receivesStock ? !receivedValid : !impact}
+      onClose={onClose}
+      onSubmit={submit}
+    >
       {(errors) => (
         <>
           <p className="text-sm text-slate-600">
             {request.item_name} × {request.quantity} dari {request.provider_department?.name ?? '-'}.
+            {request.received_quantity > 0 && ` Sudah diterima ${request.received_quantity}, sisa ${remaining}.`}
           </p>
-          {impact ? (
+          {receivesStock ? (
+            <>
+              <FormField label="Jumlah yang diterima" required error={errors.received_quantity}>
+                <Input type="number" min={1} max={remaining} value={received} onChange={(e) => setReceived(e.target.value)} error={errors.received_quantity} autoFocus />
+              </FormField>
+              {receivedValid && (
+                <p className="rounded-lg bg-slate-100 px-3 py-2.5 text-sm text-slate-700">
+                  Stok {request.item_name} akan bertambah {receivedValue}.
+                  {receivedValue < remaining && ` Status menjadi Diterima sebagian, sisa ${remaining - receivedValue} bisa diterima kemudian.`}
+                </p>
+              )}
+            </>
+          ) : impact ? (
             <p className={`rounded-lg px-3 py-2.5 text-sm ${impact.clamped ? 'bg-warn-50 text-warn-700' : 'bg-slate-100 text-slate-700'}`}>{impact.message}</p>
           ) : impactError ? (
             <p role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">{errorMessage(impactError)}</p>
@@ -161,7 +194,7 @@ export default function RequestsPage() {
     closeModal()
     invalidate.supplyRequests(queryClient)
   }
-  // Status bisa mengubah stok & Ada ruangan.
+  // Status bisa mengubah stok.
   const statusDone = () => {
     closeModal()
     invalidate.rooms(queryClient)
@@ -229,7 +262,18 @@ export default function RequestsPage() {
         </>
       ),
     },
-    { header: 'Jumlah', sortKey: 'quantity', cell: (r) => <span className="tabular-nums">{r.quantity}</span> },
+    {
+      header: 'Jumlah',
+      sortKey: 'quantity',
+      cell: (r) => (
+        <>
+          <span className="tabular-nums">{r.quantity}</span>
+          {r.received_quantity > 0 && r.received_quantity < r.quantity && (
+            <span className="block whitespace-nowrap text-xs text-slate-500">diterima {r.received_quantity} dari {r.quantity}</span>
+          )}
+        </>
+      ),
+    },
     {
       header: 'Untuk kegiatan',
       cell: (r) => {
@@ -248,9 +292,15 @@ export default function RequestsPage() {
         const items: MenuItem[] = []
         if (r.status === 'Diajukan') {
           items.push(
-            { label: 'Tandai Diterima', onClick: () => setModal({ kind: 'status', request: r, status: 'Diterima' }) },
+            { label: r.consumable_id ? 'Catat barang diterima' : 'Tandai Diterima', onClick: () => setModal({ kind: 'status', request: r, status: 'Diterima' }) },
             { label: 'Ubah', onClick: () => setModal({ kind: 'request', request: r }) },
             { label: 'Tandai Dibatalkan', danger: true, onClick: () => setModal({ kind: 'status', request: r, status: 'Dibatalkan' }) },
+          )
+        }
+        if (r.status === 'Diterima sebagian') {
+          items.push(
+            { label: 'Catat barang diterima', onClick: () => setModal({ kind: 'status', request: r, status: 'Diterima' }) },
+            { label: 'Batalkan sisa', danger: true, onClick: () => setModal({ kind: 'status', request: r, status: 'Dibatalkan' }) },
           )
         }
         if (r.status === 'Diterima' && r.must_return) {
@@ -306,7 +356,7 @@ export default function RequestsPage() {
                         <p className="font-medium">{s.item_name} <span className="font-normal tabular-nums text-slate-500">× {s.quantity}</span></p>
                         <p className="text-xs text-slate-500">
                           Stok {s.stock_status.toLowerCase()}
-                          {s.has_open_request && ' · sudah ada permintaan Diajukan'}
+                          {s.has_open_request && ' · sudah ada permintaan terbuka'}
                         </p>
                       </div>
                       <Button

@@ -26,7 +26,7 @@ class StoreConsumableRequest extends FormRequest
             'quantity' => ['required', 'integer', 'min:0', 'max:'.DbInteger::MAX],
             'min_quantity' => ['required', 'integer', 'min:0', 'max:'.DbInteger::MAX],
             'provider_department_id' => ['required', 'integer', 'exists:departments,id'],
-            'storage_location' => ['nullable', 'string', 'max:150'],
+            'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
             'note' => ['nullable', 'string', 'max:1000'],
         ];
     }
