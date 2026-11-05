@@ -35,7 +35,7 @@ class StoreConsumableRequest extends FormRequest
     }
 
     /**
-     * Katalog harus dari unit yang sama dengan "minta ke".
+     * Katalog harus dari departemen yang sama dengan "minta ke".
      */
     protected function catalogMatchesProvider(): Closure
     {
@@ -44,7 +44,7 @@ class StoreConsumableRequest extends FormRequest
             $catalogProvider = RequestCatalog::query()->whereKey($value)->value('provider_department_id');
 
             if ($catalogProvider !== null && (int) $catalogProvider !== (int) $providerId) {
-                $fail("Katalog harus dari unit yang sama dengan 'minta ke'.");
+                $fail("Katalog harus dari departemen yang sama dengan 'minta ke'.");
             }
         };
     }

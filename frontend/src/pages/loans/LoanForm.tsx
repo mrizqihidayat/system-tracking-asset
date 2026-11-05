@@ -96,7 +96,7 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
           <FormField label="Nama peminjam" required error={errors.borrower_name}>
             <Input value={form.borrower_name} onChange={(e) => set('borrower_name', e.target.value)} error={errors.borrower_name} maxLength={150} />
           </FormField>
-          <FormField label="Unit kerja" required error={errors.borrower_unit}>
+          <FormField label="Departemen" required error={errors.borrower_unit}>
             <Input value={form.borrower_unit} onChange={(e) => set('borrower_unit', e.target.value)} error={errors.borrower_unit} maxLength={100} />
           </FormField>
         </div>

@@ -16,7 +16,7 @@ class StoreSupplyRequestRequest extends FormRequest
     }
 
     /**
-     * Dengan katalog: nama item & unit penyedia boleh dikosongkan (diisi dari katalog).
+     * Dengan katalog: nama item & departemen penyedia boleh dikosongkan (diisi dari katalog).
      * Cara permintaan wajib per permintaan (teks bebas dengan saran).
      *
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -40,7 +40,7 @@ class StoreSupplyRequestRequest extends FormRequest
     }
 
     /**
-     * Unit penyedia (bila dikirim) harus sama dengan unit katalog.
+     * Departemen penyedia (bila dikirim) harus sama dengan departemen katalog.
      */
     protected function catalogMatchesProvider(): Closure
     {
@@ -49,7 +49,7 @@ class StoreSupplyRequestRequest extends FormRequest
             $catalogProvider = RequestCatalog::query()->whereKey($value)->value('provider_department_id');
 
             if ($providerId !== null && $catalogProvider !== null && (int) $catalogProvider !== (int) $providerId) {
-                $fail('Katalog harus dari unit penyedia yang sama.');
+                $fail('Katalog harus dari departemen penyedia yang sama.');
             }
         };
     }

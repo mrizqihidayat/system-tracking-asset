@@ -196,7 +196,7 @@ export default function RequestsPage() {
 
   const catalogColumns: Column<RequestCatalog>[] = [
     { header: 'Item', mobile: 'title', cell: (c) => <span className="font-medium">{c.item_name}</span> },
-    { header: 'Unit penyedia', cell: (c) => c.provider_department?.name ?? '-' },
+    { header: 'Departemen penyedia', cell: (c) => c.provider_department?.name ?? '-' },
     { header: 'Perlu dikembalikan', cell: (c) => (c.must_return ? 'Ya' : 'Tidak') },
     { header: 'Lead time', cell: (c) => <span className="whitespace-nowrap">{c.lead_time_days} hari</span> },
     {
@@ -238,7 +238,7 @@ export default function RequestsPage() {
         return r.purpose && room ? `${r.purpose} di ${room}` : (r.purpose ?? room ?? '-')
       },
     },
-    { header: 'Unit penyedia', cell: (r) => r.provider_department?.name ?? '-' },
+    { header: 'Departemen penyedia', cell: (r) => r.provider_department?.name ?? '-' },
     { header: 'Cara permintaan', cell: (r) => r.request_method ?? '-' },
     { header: 'Status', mobile: 'badge', cell: (r) => <Badge color={statusColor[r.display_status]}>{r.display_status}</Badge> },
     {
@@ -276,8 +276,8 @@ export default function RequestsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Permintaan ke Unit Lain"
-        description="Perlengkapan yang tidak dimiliki SHD dan harus diminta ke unit penyedia."
+        title="Permintaan ke Departemen Lain"
+        description="Perlengkapan yang tidak dimiliki SHD dan harus diminta ke departemen penyedia."
         actions={
           <>
             <ExportButton
@@ -342,7 +342,7 @@ export default function RequestsPage() {
       )}
 
       <Card
-        title="Katalog perlengkapan dari unit lain"
+        title="Katalog perlengkapan dari departemen lain"
         action={<Button variant="secondary" onClick={() => setModal({ kind: 'catalog', item: null })}><Plus size={16} /> Tambah item</Button>}
       >
         <DataTable

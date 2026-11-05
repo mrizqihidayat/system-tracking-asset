@@ -89,7 +89,7 @@ class AssetResource extends JsonResource
     }
 
     /**
-     * "Hilang saat dipinjam oleh [nama], [unit], [tanggal]": hanya jika aset masih Hilang dan
+     * "Hilang saat dipinjam oleh [nama], [departemen], [tanggal]": hanya jika aset masih Hilang dan
      * transaksi terakhirnya berstatus Hilang. Hanya untuk staf (tidak ada di halaman publik).
      *
      * @return array{borrower_name: string, borrower_unit: string, date: ?string, loan_id: int}|null

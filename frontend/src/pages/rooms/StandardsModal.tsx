@@ -59,7 +59,7 @@ export default function StandardsModal({ roomId, roomName, standards, onClose, o
                 <div className="min-w-0">
                   <p className="font-medium">{s.item_name} <span className="text-slate-500">× {s.standard_quantity}</span></p>
                   <p className="text-xs text-slate-500">
-                    {s.source_department?.name} · {s.needs_completion ? 'Perlu dilengkapi' : s.count_method === 'QR' ? `Aset · ${s.asset_type?.name ?? '-'}` : s.fulfillment?.type === 'unit_lain' ? 'Barang unit lain' : 'Stok Habis Pakai'}
+                    {s.source_department?.name} · {s.needs_completion ? 'Perlu dilengkapi' : s.count_method === 'QR' ? `Aset · ${s.asset_type?.name ?? '-'}` : s.fulfillment?.type === 'unit_lain' ? 'Barang departemen lain' : 'Stok Habis Pakai'}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-3">

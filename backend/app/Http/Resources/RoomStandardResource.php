@@ -47,7 +47,7 @@ class RoomStandardResource extends JsonResource
     }
 
     /**
-     * Kolom "Pemenuhan": barang stok beserta penyedia & katalognya, atau barang unit lain beserta katalognya.
+     * Kolom "Pemenuhan": barang stok beserta penyedia & katalognya, atau barang departemen lain beserta katalognya.
      *
      * @return array<string, mixed>|null
      */

@@ -158,7 +158,7 @@ class LoanTest extends TestCase
             ->assertJsonValidationErrors([
                 'asset_id' => 'Aset wajib diisi.',
                 'borrower_name' => 'Nama peminjam wajib diisi.',
-                'borrower_unit' => 'Unit kerja wajib diisi.',
+                'borrower_unit' => 'Departemen wajib diisi.',
                 'purpose' => 'Keperluan wajib diisi.',
                 'due_date' => 'Rencana kembali wajib diisi.',
             ]);

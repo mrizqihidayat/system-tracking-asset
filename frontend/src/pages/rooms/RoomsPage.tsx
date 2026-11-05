@@ -195,11 +195,11 @@ export default function RoomsPage() {
     }
   }
 
-  // Kalimat banner: "Kekurangan dapat diisi dari stok atau diminta ke unit penyedia."
+  // Kalimat banner: "Kekurangan dapat diisi dari stok atau diminta ke departemen penyedia."
   const hasRequestable = shortages.some((s) => s.can_request)
   const ways = [
     ...(shortages.some((s) => s.can_fill_from_stock) ? ['diisi dari stok'] : []),
-    ...(hasRequestable ? ['diminta ke unit penyedia'] : []),
+    ...(hasRequestable ? ['diminta ke departemen penyedia'] : []),
   ]
   const waysText = ways.length ? ` Kekurangan dapat ${ways.join(' atau ')}.` : ''
 
@@ -215,7 +215,7 @@ export default function RoomsPage() {
           ) : s.count_method === 'QR' ? (
             <AssetCodes standard={s} />
           ) : (
-            <span className="block text-xs text-slate-500">{s.fulfillment?.type === 'unit_lain' ? 'Barang unit lain' : 'Stok Habis Pakai'}</span>
+            <span className="block text-xs text-slate-500">{s.fulfillment?.type === 'unit_lain' ? 'Barang departemen lain' : 'Stok Habis Pakai'}</span>
           )}
         </>
       ),
@@ -267,7 +267,7 @@ export default function RoomsPage() {
         const text = !f
           ? '-'
           : f.type === 'unit_lain'
-            ? `Minta ke ${f.provider_department?.name ?? 'unit penyedia'}`
+            ? `Minta ke ${f.provider_department?.name ?? 'departemen penyedia'}`
             : `Stok: ${f.consumable.name} (${f.consumable.quantity} ${f.consumable.unit})`
         return (
           <div className="space-y-1">

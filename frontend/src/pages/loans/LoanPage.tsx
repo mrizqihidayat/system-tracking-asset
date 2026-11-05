@@ -191,7 +191,7 @@ export default function LoanPage() {
               className="pl-9"
               value={search}
               onChange={(e) => historyList.setSearchText(e.target.value)}
-              placeholder="Cari peminjam, unit, kode, atau nama aset"
+              placeholder="Cari peminjam, departemen, kode, atau nama aset"
               aria-label="Cari peminjaman"
             />
           </div>

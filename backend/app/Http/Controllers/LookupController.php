@@ -13,7 +13,7 @@ class LookupController extends Controller
     private const LIMIT = 20;
 
     /**
-     * Saran unit peminjam: nama dari master departemen (maks. 20).
+     * Saran departemen peminjam: nama dari master departemen (maks. 20).
      */
     public function borrowerUnits(IndexLookupRequest $request): JsonResponse
     {

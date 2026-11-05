@@ -99,15 +99,15 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
           </div>
           {item && <p className="-mt-1 text-xs text-slate-500">Jumlah diubah lewat tombol − / + atau klik angka di tabel.</p>}
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Minta ke (unit penyedia)" required error={errors.provider_department_id}>
+            <FormField label="Minta ke (departemen penyedia)" required error={errors.provider_department_id}>
               <Select value={providerId ?? ''} onChange={(e) => setProviderId(Number(e.target.value) || null)} error={errors.provider_department_id}>
-                <option value="">Pilih unit</option>
+                <option value="">Pilih departemen</option>
                 {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </Select>
             </FormField>
             <FormField label="Katalog permintaan (opsional)" error={errors.catalog_id}>
               <Select clearable value={catalogId ?? ''} disabled={!providerId} onChange={(e) => setCatalogId(Number(e.target.value) || null)} error={errors.catalog_id}>
-                <option value="">{catalogOptions.length ? 'Tidak ada' : 'Tidak ada katalog dari unit ini'}</option>
+                <option value="">{catalogOptions.length ? 'Tidak ada' : 'Tidak ada katalog dari departemen ini'}</option>
                 {catalogOptions.map((c) => <option key={c.id} value={c.id}>{c.item_name}</option>)}
               </Select>
             </FormField>

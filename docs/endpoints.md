@@ -25,7 +25,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Aset | 20 | 20 | 0 |
 | Peminjaman | 5 | 5 | 0 |
 | Kelengkapan ruangan | 7 | 7 | 0 |
-| Permintaan ke unit lain | 11 | 11 | 0 |
+| Permintaan ke departemen lain | 11 | 11 | 0 |
 | Stok habis pakai | 7 | 7 | 0 |
 | **Total** | **87** | **85** | **2** |
 
@@ -36,7 +36,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Method | Endpoint | Fungsi | Keterangan |
 |---|---|---|---|
 | GET | `/api/buildings/{id}/rooms` | Daftar ruangan dalam satu gedung | Frontend memakai `GET /api/rooms?building_id={id}` |
-| GET | `/api/lookups/borrower-units` | Saran unit peminjam | Unit kerja di form pinjam kini teks bebas tanpa saran (SPEC §7) |
+| GET | `/api/lookups/borrower-units` | Saran departemen peminjam | Departemen di form pinjam kini teks bebas tanpa saran (SPEC §7) |
 
 `GET /api/lookups/request-methods` juga sempat tidak dipakai. Sejak T26p form permintaan mengambil pilihannya dari endpoint ini, sehingga web dan versi HP memakai sumber yang sama. Endpoint ini tidak boleh dihapus.
 
@@ -143,7 +143,7 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| GET | `/api/lookups/borrower-units` | Saran unit peminjam | Token | **Tidak** |
+| GET | `/api/lookups/borrower-units` | Saran departemen peminjam | Token | **Tidak** |
 | GET | `/api/lookups/request-methods` | Pilihan cara permintaan, satu sumber untuk web dan versi HP | Token | Ya: Form permintaan (`lib/queries/master.ts`) |
 | GET | `/api/lookups/storage-locations` | Saran lokasi simpan stok | Token | Ya: Form barang stok (`lib/queries/master.ts`) |
 
@@ -194,7 +194,7 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | DELETE | `/api/room-standards/{id}` | Hapus standar ruangan | Token | Ya: Popup standar (`pages/rooms/StandardsModal.tsx`) |
 | POST | `/api/room-standards/{id}/fill-from-stock` | Isi kekurangan dari stok | Token | Ya: Kelengkapan Ruangan (`pages/rooms/RoomsPage.tsx`) |
 
-### Permintaan ke unit lain
+### Permintaan ke departemen lain
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
@@ -205,7 +205,7 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | GET | `/api/request-catalog/{id}/usage` | Pemakaian item katalog sebelum dihapus | Token | Ya: Permintaan (`pages/requests/RequestsPage.tsx`) |
 | GET | `/api/supply-requests` | Riwayat permintaan, filter dan pencarian | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
 | POST | `/api/supply-requests` | Catat permintaan | Token | Ya: Form permintaan (`pages/requests/RequestFormModal.tsx`) |
-| GET | `/api/supply-requests/suggestions` | Saran permintaan per unit penyedia | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
+| GET | `/api/supply-requests/suggestions` | Saran permintaan per departemen penyedia | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
 | PUT | `/api/supply-requests/{id}` | Ubah permintaan yang masih Diajukan | Token | Ya: Form permintaan (`pages/requests/RequestFormModal.tsx`) |
 | GET | `/api/supply-requests/{id}/status-impact` | Dampak perubahan status ke stok dan ruangan | Token | Ya: Popup status (`lib/queries/lists.ts`) |
 | PATCH | `/api/supply-requests/{id}/status` | Ubah status permintaan | Token | Ya: Popup status (`pages/requests/RequestsPage.tsx`) |

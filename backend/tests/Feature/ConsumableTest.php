@@ -161,7 +161,7 @@ class ConsumableTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
                 'name' => 'Nama sudah digunakan.',
-                'catalog_id' => "Katalog harus dari unit yang sama dengan 'minta ke'.",
+                'catalog_id' => "Katalog harus dari departemen yang sama dengan 'minta ke'.",
                 'quantity' => 'Jumlah minimal 0.',
             ]);
 
@@ -212,7 +212,7 @@ class ConsumableTest extends TestCase
 
         $this->putJson("/api/consumables/{$item->id}", ['catalog_id' => $otherCatalog->id])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['catalog_id' => "Katalog harus dari unit yang sama dengan 'minta ke'."]);
+            ->assertJsonValidationErrors(['catalog_id' => "Katalog harus dari departemen yang sama dengan 'minta ke'."]);
 
         $this->putJson("/api/consumables/{$item->id}", ['name' => 'pulpen', 'catalog_id' => $sgaCatalog->id, 'min_quantity' => 30])
             ->assertOk()

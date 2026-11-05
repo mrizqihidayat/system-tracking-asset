@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Permintaan ke unit lain (SPEC §9): catat, ubah status (transisi terkunci, ikut mengubah stok / Ada ruangan),
+ * Permintaan ke departemen lain (SPEC §9): catat, ubah status (transisi terkunci, ikut mengubah stok / Ada ruangan),
  * saran permintaan, hapus katalog.
  */
 class SupplyRequestService
@@ -26,7 +26,7 @@ class SupplyRequestService
     public function __construct(private ConsumableService $consumables) {}
 
     /**
-     * Item & unit penyedia diisi dari katalog bila dikirim; tanggal default hari ini.
+     * Item & departemen penyedia diisi dari katalog bila dikirim; tanggal default hari ini.
      *
      * @param  array<string, mixed>  $data
      */
@@ -116,7 +116,7 @@ class SupplyRequestService
     }
 
     /**
-     * Sasaran & jumlah perubahan. Diterima: barang stok → stok, barang unit lain → Ada baris standar yang ditautkan.
+     * Sasaran & jumlah perubahan. Diterima: barang stok → stok, barang departemen lain → Ada baris standar yang ditautkan.
      * Dikembalikan/Dibatalkan setelah Diterima: kurangi tujuan yang tercatat, tidak sampai di bawah 0.
      *
      * @return array{target: Consumable|RoomStandard, adding: bool, amount: int, current: int, clamped: bool}|null
@@ -254,7 +254,7 @@ class SupplyRequestService
 
     /**
      * Hapus item katalog walau dipakai: tautan catalog_id di permintaan, standar ruangan, dan stok dilepas
-     * dalam satu transaksi. Riwayat permintaan tetap utuh (item, unit, cara, lead time, must_return tersimpan).
+     * dalam satu transaksi. Riwayat permintaan tetap utuh (item, departemen, cara, lead time, must_return tersimpan).
      */
     public function deleteCatalog(RequestCatalog $catalog): void
     {
@@ -271,7 +271,7 @@ class SupplyRequestService
     }
 
     /**
-     * Saran permintaan per unit penyedia: kekurangan ruangan (pemenuhan "minta ke", Belum dicek tidak
+     * Saran permintaan per departemen penyedia: kekurangan ruangan (pemenuhan "minta ke", Belum dicek tidak
      * termasuk) + stok Menipis/Habis. has_open_request = sudah ada permintaan Diajukan untuk item itu.
      *
      * @return list<array{provider_department: array{id: int, name: string}, items: list<array<string, mixed>>}>
@@ -417,7 +417,7 @@ class SupplyRequestService
             $data['item_name'] = Consumable::query()->whereKey($data['consumable_id'])->value('name');
             $data['room_standard_id'] = null;
         } elseif (! empty($data['room_standard_id'])) {
-            // Barang unit lain: nama & ruangan mengikuti baris standarnya.
+            // Barang departemen lain: nama & ruangan mengikuti baris standarnya.
             $standard = RoomStandard::query()->findOrFail($data['room_standard_id']);
             $data['item_name'] = $standard->item_name;
             $data['room_id'] = $standard->room_id;

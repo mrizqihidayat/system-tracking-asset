@@ -305,7 +305,7 @@ class RoomReadinessTest extends TestCase
 
         $this->postJson("/api/room-standards/{$id}/fill-from-stock")->assertJsonValidationErrors('standard');
 
-        // Katalog dihapus: tetap Barang unit lain, tanpa katalog.
+        // Katalog dihapus: tetap Barang departemen lain, tanpa katalog.
         $this->deleteJson("/api/request-catalog/{$catalog->id}")->assertOk();
         $this->getJson("/api/rooms/{$this->room->id}/checklist")->assertOk()->assertJsonPath('data.0.needs_completion', false)->assertJsonPath('data.0.fulfillment.catalog', null);
     }

@@ -16,7 +16,7 @@ enum ReportType: string
             self::Assets => 'Laporan Aset',
             self::Loans => 'Laporan Peminjaman',
             self::Rooms => 'Laporan Kelengkapan Ruangan',
-            self::Requests => 'Laporan Permintaan ke Unit Lain',
+            self::Requests => 'Laporan Permintaan ke Departemen Lain',
             self::Consumables => 'Laporan Stok Habis Pakai',
         };
     }

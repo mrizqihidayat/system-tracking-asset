@@ -105,7 +105,7 @@ export default function DashboardPage() {
           to="/daftar-aset"
           note={
             <>
-              {cards.total_assets.owned_by_shd} milik SHD · {cards.total_assets.from_other_units} unit lain
+              {cards.total_assets.owned_by_shd} milik SHD · {cards.total_assets.from_other_units} departemen lain
               {cards.total_assets.not_feasible > 0 && ` · ${cards.total_assets.not_feasible} tidak layak pakai`}
             </>
           }
@@ -211,7 +211,7 @@ export default function DashboardPage() {
           )}
         </Panel>
 
-        <Panel title="Permintaan ke unit lain" link={{ to: '/permintaan', label: 'Kelola' }} flush>
+        <Panel title="Permintaan ke departemen lain" link={{ to: '/permintaan', label: 'Kelola' }} flush>
           {!panels ? (
             <ListSkeleton />
           ) : panels.recent_requests.length === 0 ? (

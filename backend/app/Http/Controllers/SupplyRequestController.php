@@ -69,7 +69,7 @@ class SupplyRequestController extends Controller
     }
 
     /**
-     * Saran permintaan per unit penyedia (kekurangan ruangan + stok Menipis/Habis).
+     * Saran permintaan per departemen penyedia (kekurangan ruangan + stok Menipis/Habis).
      */
     public function suggestions(Request $request): JsonResponse
     {

@@ -11,7 +11,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * Katalog perlengkapan unit lain + riwayat permintaan.
+ * Katalog perlengkapan departemen lain + riwayat permintaan.
  */
 class RequestSeeder extends Seeder
 {
@@ -21,7 +21,7 @@ class RequestSeeder extends Seeder
         $departments = Department::pluck('id', 'name');
         $rooms = Room::pluck('id', 'name');
 
-        // item => [unit penyedia, cara, perlu kembali, lead time (hari), catatan]
+        // item => [departemen penyedia, cara, perlu kembali, lead time (hari), catatan]
         $catalog = [
             'Tisu' => ['SGA', 'Memo', false, 2, 'Per dus isi 24 pak'],
             'Air Mineral Botol' => ['SGA', 'WhatsApp', false, 1, 'Ajukan H-1 kegiatan'],

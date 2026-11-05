@@ -27,7 +27,7 @@ flowchart TD
     F --> M2[[Daftar Aset, juga lewat kolom cari Dashboard]]
     F --> M3[[Peminjaman]]
     F --> M4[[Kelengkapan Ruangan]]
-    F --> M5[[Permintaan ke Unit Lain]]
+    F --> M5[[Permintaan ke Departemen Lain]]
     F --> M6[[Stok Habis Pakai]]
     F --> M7[[Data Master]]
     F -- Ekspor laporan --> X1[Pilih Laporan Aset, Peminjaman, Kelengkapan Ruangan, Permintaan, atau Stok Habis Pakai] --> X2[(Buat file .xlsx tanpa filter, lalu unduh)] --> F
@@ -190,7 +190,7 @@ flowchart TD
     P2 -- Tidak --> P3[Pesan aset tidak dapat dipinjam] --> P1
     P2 -- Ya --> P3a{Kondisi fisik sama dengan catatan?}
     P3a -- Tidak --> P3b[[Catat kerusakan di Detail Aset dulu]] --> P1
-    P3a -- Ya --> P4[Input peminjam, unit kerja, keperluan, gedung & ruangan tujuan atau catatan lokasi, tgl pinjam default hari ini, rencana kembali, no. / tanggal approval; kondisi keluar otomatis]
+    P3a -- Ya --> P4[Input peminjam, departemen, keperluan, gedung & ruangan tujuan atau catatan lokasi, tgl pinjam default hari ini, rencana kembali, no. / tanggal approval; kondisi keluar otomatis]
     P4 --> P5{Tgl pinjam tidak di masa depan & tidak sebelum aset terdaftar; rencana kembali >= tgl pinjam?}
     P5 -- Tidak --> P4
     P5 -- Ya --> P6[(Transaksi Dipinjam, status aset Dipinjam, riwayat Dipinjam)] --> B
@@ -232,13 +232,13 @@ flowchart TD
     S2 -- Tambah / Ubah --> S5{Pilih tipe}
     S5 -- Aset --> S6[Pilih jenis aset & sumber default Milik SHD, nama, jumlah standar]
     S5 -- Stok Habis Pakai --> S8[Pilih barang dari Stok, nama, jumlah standar; sumber otomatis dari penyedia]
-    S5 -- Barang unit lain --> S9[Pilih departemen penyedia, katalog opsional, nama, jumlah standar]
+    S5 -- Barang departemen lain --> S9[Pilih departemen penyedia, katalog opsional, nama, jumlah standar]
     S6 & S8 & S9 --> S7[(Simpan standar)] --> S1
 
     C -- Baris Perlu dilengkapi --> K11[Baris SHD tanpa barang stok; klik Lengkapi: edit baris & pilih tipe] --> S1
 
     C -- Cek ruangan --> K3[(Ada baris Aset dihitung otomatis: lokasi asal di ruangan ini, bukan Dipinjam, Perbaikan, Hilang, Tidak Layak Pakai)]
-    K3 --> K4[Staf mengisi Ada baris Stok & Barang unit lain; selisih & hasil langsung terhitung di layar]
+    K3 --> K4[Staf mengisi Ada baris Stok & Barang departemen lain; selisih & hasil langsung terhitung di layar]
     K4 --> K5[(Simpan hasil cek + waktu & staf; isian kosong = Belum dicek, bukan kurang)]
     K5 --> K6{Ada baris Kurang?}
     K6 -- Tidak --> B
@@ -248,27 +248,27 @@ flowchart TD
     F2 --> F3{Masih kurang?}
     F3 -- Tidak --> B
     F3 -- Ya --> F4[Sisa tetap tercatat kurang; stok 0 berganti ke Buat permintaan] --> B
-    K7 -- Barang unit lain / stok 0 --> K9[Klik Buat permintaan: form terisi item, penyedia, jumlah, ruangan; tombol di banner hanya mengisi ruangan] --> K10[[Permintaan]]
+    K7 -- Barang departemen lain / stok 0 --> K9[Klik Buat permintaan: form terisi item, penyedia, jumlah, ruangan; tombol di banner hanya mengisi ruangan] --> K10[[Permintaan]]
 
     C -- Ekspor Excel --> X1[(Laporan Kelengkapan .xlsx gedung aktif: sheet Ringkasan & Detail)] --> B
     C -- Pindah menu --> Z([Selesai])
 ```
 
-## 7. Permintaan ke Unit Lain
+## 7. Permintaan ke Departemen Lain
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Saran permintaan per unit penyedia, katalog, riwayat + filter status & cari; Diajukan yang lewat lead time tampil Belum direspons]
+    A([Mulai]) --> B[Saran permintaan per departemen penyedia, katalog, riwayat + filter status & cari; Diajukan yang lewat lead time tampil Belum direspons]
     B --> C{Pilih aksi}
 
     C -- Kelola katalog --> K0{Aksi katalog}
-    K0 -- Tambah / Ubah --> K1[Input item, unit penyedia, perlu dikembalikan, lead time, catatan] --> K2[(Simpan katalog)] --> B
+    K0 -- Tambah / Ubah --> K1[Input item, departemen penyedia, perlu dikembalikan, lead time, catatan] --> K2[(Simpan katalog)] --> B
     K0 -- Hapus --> K3[(Ambil pemakaian katalog)] --> K4[Popup jumlah permintaan, standar ruangan, stok yang tautannya dilepas] --> K5[(Hapus katalog, tautan dikosongkan, riwayat tetap)] --> B
 
     C -- Buat permintaan --> P0{Dibuka dari}
     P0 -- Tombol Buat permintaan --> P1[Form kosong]
     P0 -- Saran / Kelengkapan Ruangan / Stok --> P1a[Form terisi item, penyedia atau katalog, jumlah, ruangan, tautan barang stok atau baris standar]
-    P1 & P1a --> P2[Pilih item katalog atau Item lain + unit penyedia; pengembalian barang default dari katalog; cara permintaan Memo, Form, Email, WhatsApp, Lainnya; jumlah, tanggal, kegiatan, ruangan, catatan]
+    P1 & P1a --> P2[Pilih item katalog atau Item lain + departemen penyedia; pengembalian barang default dari katalog; cara permintaan Memo, Form, Email, WhatsApp, Lainnya; jumlah, tanggal, kegiatan, ruangan, catatan]
     P2 --> P3[(Simpan status Diajukan; item diganti melepas tautan; snapshot lead time & pengembalian)]
     P3 --> P4[Staf mengirim permintaan di luar sistem] --> B
 
@@ -276,7 +276,7 @@ flowchart TD
     U0 -- Dikembalikan / Dibatalkan --> U3[Tanpa aksi] --> B
     U0 -- Diajukan --> U1{Aksi}
     U1 -- Ubah --> P2
-    U1 -- Tandai Diterima --> M1[Popup dampak, catatan opsional] --> I1[(Status Diterima; barang stok: stok bertambah; barang unit lain: Ada baris standar bertambah; tanpa tautan: tidak berubah)] --> B
+    U1 -- Tandai Diterima --> M1[Popup dampak, catatan opsional] --> I1[(Status Diterima; barang stok: stok bertambah; barang departemen lain: Ada baris standar bertambah; tanpa tautan: tidak berubah)] --> B
     U1 -- Tandai Dibatalkan --> M2[Popup dampak, catatan opsional] --> I2[(Status Dibatalkan; tidak mengubah apa pun)] --> B
     U0 -- Diterima --> U2{Aksi}
     U2 -- Tandai Dikembalikan, jika pengembalian dipilih Dikembalikan --> M3[Popup dampak, catatan opsional]
@@ -294,7 +294,7 @@ flowchart TD
     A([Mulai]) --> B[Daftar barang disimpan SHD: jumlah, minimum, status, lokasi simpan, departemen penyedia; filter status & cari]
     B --> C{Pilih aksi}
 
-    C -- Tambah / Ubah data --> T1[Input nama unik, kategori, satuan, minimum, minta ke, katalog dari unit yang sama, lokasi simpan teks bebas dengan saran, catatan; jumlah awal hanya saat tambah] --> T2[(Simpan)] --> CEK
+    C -- Tambah / Ubah data --> T1[Input nama unik, kategori, satuan, minimum, minta ke, katalog dari departemen yang sama, lokasi simpan teks bebas dengan saran, catatan; jumlah awal hanya saat tambah] --> T2[(Simpan)] --> CEK
 
     C -- Ubah jumlah --> J0{Cara}
     J0 -- Klik angka --> J1[Input jumlah baru >= 0]
@@ -312,14 +312,14 @@ flowchart TD
     H1 -- Tidak --> H3[Konfirmasi hapus permanen]
     H2 & H3 --> H4[(Hard delete; consumable_id di standar terkait dikosongkan, standar tetap utuh)] --> B
 
-    C -- Menu Ajukan / Lihat permintaan, penyedia unit lain --> S6a[[Permintaan]]
+    C -- Menu Ajukan / Lihat permintaan, penyedia departemen lain --> S6a[[Permintaan]]
 
     C -- Ekspor Excel --> X1[(Laporan Stok .xlsx sesuai status & pencarian aktif)] --> B
     C -- Pindah menu --> Z([Selesai])
 
     CEK{Jumlah <= minimum?}
     CEK -- Tidak --> S1[Status Aman] --> B
-    CEK -- Ya --> S2[Status Menipis, atau Habis jika 0] --> S3[Peringatan dashboard + masuk saran permintaan ke unit minta ke] --> S4{Penyedia unit lain?}
+    CEK -- Ya --> S2[Status Menipis, atau Habis jika 0] --> S3[Peringatan dashboard + masuk saran permintaan ke departemen minta ke] --> S4{Penyedia departemen lain?}
     S4 -- Tidak --> B
     S4 -- Ya, belum ada permintaan --> S5a[Tautan Ajukan permintaan: form terisi item, departemen, katalog, jumlah] --> S6a
     S4 -- Ya, sudah Diajukan --> S7a[Tautan Diajukan · tanggal ke permintaan itu] --> S6a

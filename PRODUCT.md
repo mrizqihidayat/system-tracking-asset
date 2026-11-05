@@ -12,7 +12,7 @@ Satu jenis pengguna: **Staf/Admin Aset Departemen SHD** di PT INALUM, tanpa role
 
 Staf bekerja di dua situasi: di meja kantor (PC/laptop) untuk mendata aset, mencatat peminjaman, dan mengekspor laporan; dan di lapangan (ruang kelas, gudang) untuk scan QR dan cek kelengkapan ruangan.
 
-Audiens kedua: siapa pun yang memindai label QR di aset membuka halaman publik read-only `/aset/{token}` tanpa login. Peminjam dan unit lain tidak memakai sistem; staf mencatat atas nama mereka.
+Audiens kedua: siapa pun yang memindai label QR di aset membuka halaman publik read-only `/aset/{token}` tanpa login. Peminjam dan departemen lain tidak memakai sistem; staf mencatat atas nama mereka.
 
 ## Product Purpose
 
@@ -20,20 +20,20 @@ Sistem pencatatan aset internal SHD yang menggantikan pencatatan tersebar:
 1. Mendata aset per unit secara terpusat dengan QR, lokasi, kondisi, dan dokumen.
 2. Memantau ketersediaan, peminjaman, perbaikan, dan jadwal servis.
 3. Mencatat riwayat lengkap tiap aset sebagai bukti akuntabilitas dan data pendukung pengadaan.
-4. Memantau kesiapan ruangan pelatihan terhadap standar perlengkapan dan mencatat permintaan ke unit lain.
+4. Memantau kesiapan ruangan pelatihan terhadap standar perlengkapan dan mencatat permintaan ke departemen lain.
 5. Memantau stok barang habis pakai.
 
 Berhasil bila staf bisa menjawab "aset ini di mana, kondisinya apa, siapa yang pinjam, ruangan mana yang belum siap" dengan cepat, dan riwayatnya bisa dipertanggungjawabkan.
 
 ## Positioning
 
-Bukan sistem aset generik: dibangun untuk kesiapan fasilitas pelatihan. Kelengkapan ruangan diukur terhadap standar per ruangan (dihitung otomatis dari aset ber-QR atau dicek manual), terhubung ke stok habis pakai SHD dan ke permintaan ke unit penyedia lain. Setiap perubahan aset tercatat di satu riwayat gabungan.
+Bukan sistem aset generik: dibangun untuk kesiapan fasilitas pelatihan. Kelengkapan ruangan diukur terhadap standar per ruangan (dihitung otomatis dari aset ber-QR atau dicek manual), terhubung ke stok habis pakai SHD dan ke permintaan ke departemen penyedia lain. Setiap perubahan aset tercatat di satu riwayat gabungan.
 
 ## Operating Context
 
-- Modul Fase 1: Dashboard, Daftar Aset, Scan QR, Label QR (PDF), Peminjaman, Kelengkapan Ruangan, Permintaan ke Unit Lain, Stok Habis Pakai, Ekspor laporan Excel, Data Master. Fase 2 (opsional): Lisensi Digital.
+- Modul Fase 1: Dashboard, Daftar Aset, Scan QR, Label QR (PDF), Peminjaman, Kelengkapan Ruangan, Permintaan ke Departemen Lain, Stok Habis Pakai, Ekspor laporan Excel, Data Master. Fase 2 (opsional): Lisensi Digital.
 - Label QR dicetak di A4 (12 label per lembar) dan ditempel di aset; scan memakai webcam laptop saat demo, HP saat deploy (butuh HTTPS).
-- Approval peminjaman, konfirmasi kerusakan, dan proses permintaan ke unit lain terjadi di luar sistem (memo, form, email, WhatsApp); sistem hanya mencatat nomor dan statusnya.
+- Approval peminjaman, konfirmasi kerusakan, dan proses permintaan ke departemen lain terjadi di luar sistem (memo, form, email, WhatsApp); sistem hanya mencatat nomor dan statusnya.
 - Laporan diekspor ke Excel untuk dibawa ke rapat/pengadaan.
 - Prototype magang; demo awal November 2026. Tim lain akan deploy dan membuat versi HP.
 

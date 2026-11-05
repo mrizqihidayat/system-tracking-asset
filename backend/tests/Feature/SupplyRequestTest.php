@@ -129,7 +129,7 @@ class SupplyRequestTest extends TestCase
         $this->assertNull($standard->fresh()->catalog_id);
         $this->assertNull($stock->fresh()->catalog_id);
 
-        // Riwayat tetap utuh dari snapshot: item, unit, cara, lead time, perlu dikembalikan.
+        // Riwayat tetap utuh dari snapshot: item, departemen, cara, lead time, perlu dikembalikan.
         $request->refresh();
         $this->assertNull($request->catalog_id);
         $this->assertSame([$catalog->item_name, $this->deptA->id, 'Memo', 2, true], [
@@ -330,7 +330,7 @@ class SupplyRequestTest extends TestCase
             'catalog_id' => $catalogId,
         ]);
 
-        // Barang unit lain kurang 3 → masuk saran.
+        // Barang departemen lain kurang 3 → masuk saran.
         $standard('Tisu', 2, $catalog->id);
         // Belum dicek → tidak masuk.
         $standard('Kursi', null);

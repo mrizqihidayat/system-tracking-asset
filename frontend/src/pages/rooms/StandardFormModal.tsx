@@ -18,7 +18,7 @@ type Kind = 'asset' | 'stock' | 'other'
 const KINDS: { value: Kind; label: string; hint: string }[] = [
   { value: 'asset', label: 'Aset', hint: 'Punya kode & QR, jumlah Ada dihitung otomatis' },
   { value: 'stock', label: 'Stok Habis Pakai', hint: 'Barang di Stok SHD, jumlah Ada diisi saat cek' },
-  { value: 'other', label: 'Barang unit lain', hint: 'Tidak disimpan SHD, kekurangan diminta ke unitnya' },
+  { value: 'other', label: 'Barang departemen lain', hint: 'Tidak disimpan SHD, kekurangan diminta ke departemennya' },
 ]
 
 const kindOf = (standard: RoomStandard | null): Kind | null => {
@@ -165,7 +165,7 @@ export default function StandardFormModal({ roomId, roomName, standard, onClose,
               </FormField>
               <FormField label="Katalog permintaan (opsional)" error={errors.catalog_id}>
                 <Select clearable value={catalogId ?? ''} disabled={!otherSourceId} onChange={(e) => pickCatalog(Number(e.target.value) || null)} error={errors.catalog_id}>
-                  <option value="">{catalogOptions.length ? 'Tidak ada' : 'Tidak ada katalog dari unit ini'}</option>
+                  <option value="">{catalogOptions.length ? 'Tidak ada' : 'Tidak ada katalog dari departemen ini'}</option>
                   {catalogOptions.map((c) => <option key={c.id} value={c.id}>{c.item_name}</option>)}
                 </Select>
               </FormField>

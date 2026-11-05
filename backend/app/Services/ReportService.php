@@ -124,7 +124,7 @@ class ReportService
 
         $columns = [
             ReportColumn::text('Kode aset', 16), ReportColumn::text('Nama aset', 28), ReportColumn::text('Peminjam', 22),
-            ReportColumn::text('Unit kerja', 14), ReportColumn::text('Keperluan', 28), ReportColumn::text('Tujuan', 28),
+            ReportColumn::text('Departemen', 14), ReportColumn::text('Keperluan', 28), ReportColumn::text('Tujuan', 28),
             ReportColumn::date('Tgl pinjam'), ReportColumn::date('Rencana kembali'), ReportColumn::datetime('Tgl kembali'),
             ReportColumn::text('Status', 14), ReportColumn::text('Terlambat', 11), ReportColumn::text('Kondisi keluar', 14),
             ReportColumn::text('Kondisi kembali', 14), ReportColumn::text('Catatan', 30),
@@ -264,7 +264,7 @@ class ReportService
 
         $columns = [
             ReportColumn::date('Tanggal'), ReportColumn::text('Item', 28), ReportColumn::int('Jumlah'),
-            ReportColumn::text('Untuk kegiatan', 28), ReportColumn::text('Ruangan', 26), ReportColumn::text('Unit penyedia', 16),
+            ReportColumn::text('Untuk kegiatan', 28), ReportColumn::text('Ruangan', 26), ReportColumn::text('Departemen penyedia', 16),
             ReportColumn::text('Cara permintaan', 16), ReportColumn::text('Status', 16), ReportColumn::date('Batas respons'),
             ReportColumn::datetime('Diterima'), ReportColumn::datetime('Dikembalikan'), ReportColumn::text('Dicatat oleh', 18),
             ReportColumn::text('Catatan', 30),
@@ -274,7 +274,7 @@ class ReportService
             'Periode' => $this->period($filters, 'tanggal permintaan'),
             'Status' => $filters['status'] ?? null,
             'Belum direspons' => $this->flag($filters, 'unresponded'),
-            'Unit penyedia' => $this->nameOf(Department::class, $filters['provider_department_id'] ?? null),
+            'Departemen penyedia' => $this->nameOf(Department::class, $filters['provider_department_id'] ?? null),
             'Ruangan' => $this->nameOf(Room::class, $filters['room_id'] ?? null),
             'Pencarian' => $filters['search'] ?? null,
         ]);

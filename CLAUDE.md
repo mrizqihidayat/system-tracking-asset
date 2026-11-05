@@ -1,6 +1,6 @@
 # Asset Tracking System — Departemen SHD (Prototype)
 
-Prototype web untuk mengelola aset Departemen SHD: aset per unit ber-QR (dengan riwayat, servis, foto & dokumen), peminjaman, kelengkapan ruangan per gedung/ruangan, permintaan ke unit lain, stok habis pakai, dan ekspor laporan. Pengguna hanya Staf/Admin Aset SHD (tanpa role).
+Prototype web untuk mengelola aset Departemen SHD: aset per unit ber-QR (dengan riwayat, servis, foto & dokumen), peminjaman, kelengkapan ruangan per gedung/ruangan, permintaan ke departemen lain, stok habis pakai, dan ekspor laporan. Pengguna hanya Staf/Admin Aset SHD (tanpa role).
 
 Target: **backend matang dan siap deploy** (tim lain yang akan deploy dan membuat versi HP), sehingga saat diterapkan cukup mengganti konfigurasi `.env`. Deadline demo: awal November 2026.
 

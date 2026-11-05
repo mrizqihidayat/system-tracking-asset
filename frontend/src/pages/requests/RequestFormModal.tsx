@@ -21,7 +21,7 @@ const today = () => new Date().toLocaleDateString('en-CA')
 const MANUAL = 'manual'
 const OTHER_METHOD = 'Lainnya'
 
-/** Catat permintaan ke unit lain (proses permintaan tetap di luar sistem). */
+/** Catat permintaan ke departemen lain (proses permintaan tetap di luar sistem). */
 export default function RequestFormModal({ catalog, request, prefill, onClose, onDone }: Props) {
   const toast = useToast()
   const departments = useDepartments().data.filter((d) => !d.is_internal)
@@ -137,9 +137,9 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
               <FormField label="Nama item" required error={errors.item_name}>
                 <Input value={itemName} onChange={(e) => setItemName(e.target.value)} error={errors.item_name} maxLength={150} />
               </FormField>
-              <FormField label="Unit penyedia" required error={errors.provider_department_id}>
+              <FormField label="Departemen penyedia" required error={errors.provider_department_id}>
                 <Select value={providerId ?? ''} onChange={(e) => setProviderId(Number(e.target.value) || null)} error={errors.provider_department_id}>
-                  <option value="">Pilih unit</option>
+                  <option value="">Pilih departemen</option>
                   {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </Select>
               </FormField>

@@ -59,7 +59,7 @@ class RoomStandard extends Model
     }
 
     /**
-     * Barang unit lain: Manual tanpa barang stok dengan sumber bukan SHD; kekurangannya diminta ke sumbernya.
+     * Barang departemen lain: Manual tanpa barang stok dengan sumber bukan SHD; kekurangannya diminta ke sumbernya.
      */
     public function isOtherUnit(): bool
     {
@@ -83,7 +83,7 @@ class RoomStandard extends Model
     }
 
     /**
-     * Kurang dan stok habis, atau barang unit lain → Buat permintaan ke penyedia.
+     * Kurang dan stok habis, atau barang departemen lain → Buat permintaan ke penyedia.
      */
     public function canRequest(): bool
     {

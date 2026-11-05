@@ -15,7 +15,7 @@ use Illuminate\Validation\Validator;
 /**
  * Baris standar ruangan (SPEC §8); dipakai juga untuk PUT (definisi lengkap).
  * Tipe Aset = QR (jenis aset + sumber). Tipe Stok Habis Pakai = Manual + barang stok (sumber dari penyedianya).
- * Tipe Barang unit lain = Manual tanpa barang stok (sumber bukan SHD, katalog opsional).
+ * Tipe Barang departemen lain = Manual tanpa barang stok (sumber bukan SHD, katalog opsional).
  * Jumlah Ada baris Manual hanya lewat POST /rooms/{id}/check.
  */
 class StoreRoomStandardRequest extends FormRequest
@@ -53,14 +53,14 @@ class StoreRoomStandardRequest extends FormRequest
             'asset_type_id.required_if' => 'Pilih jenis aset untuk tipe Aset.',
             'asset_type_id.prohibited_if' => 'Jenis aset hanya untuk tipe Aset.',
             'consumable_id.prohibited_if' => 'Barang stok hanya untuk tipe Stok Habis Pakai.',
-            'catalog_id.prohibited_if' => 'Katalog hanya untuk tipe Barang unit lain.',
+            'catalog_id.prohibited_if' => 'Katalog hanya untuk tipe Barang departemen lain.',
             'fulfillment_note.prohibited' => 'Pemenuhan mengikuti data stok, tidak diisi sendiri.',
             'actual_quantity.prohibited' => 'Jumlah Ada diisi lewat simpan hasil cek.',
         ];
     }
 
     /**
-     * Manual tanpa barang stok hanya untuk barang unit lain; katalognya harus dari unit yang sama.
+     * Manual tanpa barang stok hanya untuk barang departemen lain; katalognya harus dari departemen yang sama.
      *
      * @return list<callable>
      */
@@ -73,7 +73,7 @@ class StoreRoomStandardRequest extends FormRequest
 
             if ($this->filled('consumable_id')) {
                 if ($this->filled('catalog_id')) {
-                    $validator->errors()->add('catalog_id', 'Katalog hanya untuk tipe Barang unit lain.');
+                    $validator->errors()->add('catalog_id', 'Katalog hanya untuk tipe Barang departemen lain.');
                 }
 
                 return;

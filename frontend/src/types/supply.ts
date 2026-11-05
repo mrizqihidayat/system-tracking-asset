@@ -22,7 +22,7 @@ export interface SupplyRequest {
   request_date: string
   /** Barang stok yang diminta (null bila tanpa tautan atau barangnya sudah dihapus). */
   consumable_id: number | null
-  /** Baris standar Barang unit lain yang ditambah saat Diterima. */
+  /** Baris standar Barang departemen lain yang ditambah saat Diterima. */
   room_standard_id: number | null
   item_name: string
   quantity: number

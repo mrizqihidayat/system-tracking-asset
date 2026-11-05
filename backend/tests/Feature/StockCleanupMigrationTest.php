@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * Migrasi data T26m: lokasi simpan menjadi teks, barang "tidak disimpan" menjadi baris standar Barang unit lain.
+ * Migrasi data T26m: lokasi simpan menjadi teks, barang "tidak disimpan" menjadi baris standar Barang departemen lain.
  */
 class StockCleanupMigrationTest extends TestCase
 {

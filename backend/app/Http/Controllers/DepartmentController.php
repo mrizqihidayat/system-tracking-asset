@@ -29,7 +29,7 @@ class DepartmentController extends Controller
     }
 
     /**
-     * Unit baru dari ketikan nama; selalu bukan SHD.
+     * Departemen baru dari ketikan nama; selalu bukan SHD.
      */
     public function store(StoreDepartmentRequest $request): JsonResponse
     {
@@ -42,7 +42,7 @@ class DepartmentController extends Controller
     }
 
     /**
-     * Unit SHD (internal) tidak boleh diubah namanya.
+     * Departemen SHD (internal) tidak boleh diubah namanya.
      */
     public function update(UpdateDepartmentRequest $request, Department $department): DepartmentResource
     {

@@ -103,7 +103,7 @@ return [
         'vendor' => 'vendor',
         'asset_id' => 'aset',
         'borrower_name' => 'nama peminjam',
-        'borrower_unit' => 'unit kerja',
+        'borrower_unit' => 'departemen',
         'purpose' => 'keperluan',
         'destination_room_id' => 'ruangan tujuan',
         'destination_note' => 'catatan lokasi tujuan',

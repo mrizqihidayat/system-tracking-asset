@@ -15,7 +15,7 @@ use Illuminate\Database\Seeder;
  * Standar kelengkapan beberapa ruangan.
  *
  * Tipe Aset = QR (jenis aset). Tipe Stok Habis Pakai = Manual (barang stok, sumber = penyedianya, berisi jumlah Ada).
- * Tipe Barang unit lain = Manual tanpa barang stok (sumber & katalog dari unit penyedia, berisi jumlah Ada).
+ * Tipe Barang departemen lain = Manual tanpa barang stok (sumber & katalog dari departemen penyedia, berisi jumlah Ada).
  */
 class RoomStandardSeeder extends Seeder
 {

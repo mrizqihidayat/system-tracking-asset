@@ -27,7 +27,7 @@ export interface ReadinessBuilding {
   rooms: ReadinessRoom[]
 }
 
-/** Stok Habis Pakai: barang beserta penyedia & katalognya. Barang unit lain: penyedia & katalognya. */
+/** Stok Habis Pakai: barang beserta penyedia & katalognya. Barang departemen lain: penyedia & katalognya. */
 export type Fulfillment =
   | {
       type: 'stok'
