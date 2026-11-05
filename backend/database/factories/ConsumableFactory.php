@@ -20,7 +20,6 @@ class ConsumableFactory extends Factory
     {
         return [
             'name' => fake()->words(2, true),
-            'category' => 'ATK',
             'unit' => 'pcs',
             'quantity' => fake()->numberBetween(0, 100),
             'min_quantity' => 10,

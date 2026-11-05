@@ -108,6 +108,15 @@ Table categories {
   updated_at timestamp
 }
 
+Table consumable_categories {
+  id bigint [pk, increment]
+  name varchar(100) [not null, note: 'unik tanpa beda huruf besar/kecil: unique index lower(name)']
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'Kategori stok habis pakai, terpisah dari categories (kategori aset)'
+}
+
 Table asset_types {
   id bigint [pk, increment]
   category_id bigint [not null, ref: > categories.id]
@@ -271,7 +280,7 @@ Table room_standards {
 Table consumables {
   id bigint [pk, increment]
   name varchar(150) [not null, note: 'unik tanpa beda huruf besar/kecil: unique index lower(name)']
-  category varchar(100)
+  consumable_category_id bigint [ref: > consumable_categories.id, note: 'opsional; hapus kategori ditolak bila masih dipakai']
   unit varchar(20) [not null]
   quantity int [not null, default: 0]
   min_quantity int [not null, default: 0]

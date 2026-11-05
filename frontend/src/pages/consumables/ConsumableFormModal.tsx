@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import Combobox from '../../components/ui/Combobox'
+import EntityCombobox from '../../components/ui/EntityCombobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
-import { api } from '../../lib/api'
-import { useDepartments, useStorageLocations } from '../../lib/queries/master'
+import { api, errorMessage, fieldErrors } from '../../lib/api'
+import { createConsumableCategory } from '../../lib/lookups'
+import { useConsumableCategories, useDepartments, useStorageLocations } from '../../lib/queries/master'
 import type { ConsumableItem, ConsumableUsage } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 
@@ -17,10 +19,13 @@ interface Props {
 export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const toast = useToast()
   const { data: departments } = useDepartments()
+  const { data: categories } = useConsumableCategories()
   const { data: locations } = useStorageLocations()
   const [usedIn, setUsedIn] = useState<ConsumableUsage[]>([])
   const [name, setName] = useState(item?.name ?? '')
-  const [category, setCategory] = useState(item?.category ?? '')
+  const [categoryId, setCategoryId] = useState<number | null>(item?.consumable_category_id ?? null)
+  // Teks yang belum dipilih/ditambahkan tidak ikut tersimpan, jadi Simpan ditahan dulu.
+  const [categoryPending, setCategoryPending] = useState(false)
   const [unit, setUnit] = useState(item?.unit ?? 'pcs')
   const [quantity, setQuantity] = useState(String(item?.quantity ?? 0))
   const [minQuantity, setMinQuantity] = useState(String(item?.min_quantity ?? 0))
@@ -37,10 +42,20 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
     }
   }, [item])
 
+  const addCategory = async (categoryName: string) => {
+    try {
+      const c = await createConsumableCategory(categoryName)
+      return { id: c.id, label: c.name }
+    } catch (e) {
+      toast.error(fieldErrors(e).name ?? errorMessage(e))
+      throw e
+    }
+  }
+
   const submit = async () => {
     const payload: Record<string, unknown> = {
       name: name.trim(),
-      category: category.trim() || null,
+      consumable_category_id: categoryId,
       unit: unit.trim(),
       min_quantity: Number(minQuantity),
       provider_department_id: providerId,
@@ -60,7 +75,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
     <ActionModal
       title={item ? `Ubah ${item.name}` : 'Tambah barang habis pakai'}
       submitLabel="Simpan"
-      submitDisabled={!name.trim() || !unit.trim() || !providerId}
+      submitDisabled={!name.trim() || !unit.trim() || !providerId || categoryPending}
       onClose={onClose}
       onSubmit={submit}
     >
@@ -70,8 +85,17 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
             <FormField label="Nama barang" required error={errors.name}>
               <Input value={name} onChange={(e) => setName(e.target.value)} error={errors.name} maxLength={150} />
             </FormField>
-            <FormField label="Kategori" error={errors.category}>
-              <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Misal: ATK" error={errors.category} maxLength={100} />
+            <FormField label="Kategori" error={errors.consumable_category_id}>
+              <EntityCombobox
+                value={categoryId}
+                options={categories.map((c) => ({ id: c.id, label: c.name }))}
+                onChange={setCategoryId}
+                onCreate={addCategory}
+                onPendingChange={setCategoryPending}
+                placeholder="Misal: ATK"
+                error={errors.consumable_category_id}
+              />
+              {categoryPending && <p className="mt-1 text-xs text-slate-500">Pilih dari daftar atau klik Tambah, atau kosongkan.</p>}
             </FormField>
           </div>
           <div className="grid grid-cols-3 gap-3">

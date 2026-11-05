@@ -7,6 +7,7 @@ use App\Enums\CountMethod;
 use App\Enums\RequestStatus;
 use App\Models\Building;
 use App\Models\Consumable;
+use App\Models\ConsumableCategory;
 use App\Models\Department;
 use App\Models\Room;
 use App\Models\RoomStandard;
@@ -40,7 +41,6 @@ class ConsumableTest extends TestCase
     {
         return [
             'name' => 'Pulpen',
-            'category' => 'ATK',
             'unit' => 'pcs',
             'quantity' => 50,
             'min_quantity' => 10,
@@ -111,11 +111,15 @@ class ConsumableTest extends TestCase
     public function test_store_and_show(): void
     {
         // Stok tidak tertaut katalog: catalog_id yang masih dikirim diabaikan.
-        $id = $this->postJson('/api/consumables', $this->payload(['catalog_id' => 999, 'storage_location' => 'Gudang IHS']))
+        $category = ConsumableCategory::factory()->create(['name' => 'ATK']);
+
+        $id = $this->postJson('/api/consumables', $this->payload(['catalog_id' => 999, 'consumable_category_id' => $category->id, 'storage_location' => 'Gudang IHS']))
             ->assertCreated()
             ->assertJsonPath('data.status', 'Aman')
             ->assertJsonPath('data.provider_department.name', 'SGA')
             ->assertJsonMissingPath('data.catalog')
+            ->assertJsonPath('data.consumable_category_id', $category->id)
+            ->assertJsonPath('data.category', 'ATK')
             ->assertJsonPath('data.storage_location', 'Gudang IHS')
             ->assertJsonPath('data.open_request', null)
             ->json('data.id');
@@ -153,10 +157,11 @@ class ConsumableTest extends TestCase
     {
         $this->consumable(['name' => 'Pulpen']);
 
-        $this->postJson('/api/consumables', $this->payload(['name' => ' PULPEN ', 'quantity' => -1]))
+        $this->postJson('/api/consumables', $this->payload(['name' => ' PULPEN ', 'consumable_category_id' => 999, 'quantity' => -1]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
                 'name' => 'Nama sudah digunakan.',
+                'consumable_category_id',
                 'quantity' => 'Jumlah minimal 0.',
             ]);
 
@@ -180,9 +185,12 @@ class ConsumableTest extends TestCase
 
     public function test_index_filters(): void
     {
-        $this->consumable(['name' => 'Pulpen', 'category' => 'ATK', 'quantity' => 50, 'min_quantity' => 10]);
-        $this->consumable(['name' => 'Pensil', 'category' => 'ATK', 'quantity' => 5, 'min_quantity' => 10]);
-        $this->consumable(['name' => 'Baterai AA', 'category' => 'Elektronik', 'quantity' => 0, 'min_quantity' => 5,
+        $atk = ConsumableCategory::factory()->create(['name' => 'ATK'])->id;
+        $elektronik = ConsumableCategory::factory()->create(['name' => 'Elektronik'])->id;
+
+        $this->consumable(['name' => 'Pulpen', 'consumable_category_id' => $atk, 'quantity' => 50, 'min_quantity' => 10]);
+        $this->consumable(['name' => 'Pensil', 'consumable_category_id' => $atk, 'quantity' => 5, 'min_quantity' => 10]);
+        $this->consumable(['name' => 'Baterai AA', 'consumable_category_id' => $elektronik, 'quantity' => 0, 'min_quantity' => 5,
             'provider_department_id' => Department::factory()->create(['name' => 'SIT'])->id]);
 
         $this->getJson('/api/consumables')->assertOk()->assertJsonCount(3, 'data')->assertJsonPath('data.0.name', 'Baterai AA');
@@ -192,6 +200,7 @@ class ConsumableTest extends TestCase
         $this->getJson('/api/consumables?category=atk')->assertJsonCount(2, 'data');
         $this->getJson("/api/consumables?provider_department_id={$this->sga->id}")->assertJsonCount(2, 'data');
         $this->getJson('/api/consumables?search=elektro')->assertJsonCount(1, 'data');
+        $this->getJson('/api/consumables?sort=-category')->assertOk()->assertJsonPath('data.0.name', 'Baterai AA')->assertJsonPath('meta.total', 3);
         $this->getJson('/api/consumables?status=Kosong')->assertUnprocessable();
     }
 

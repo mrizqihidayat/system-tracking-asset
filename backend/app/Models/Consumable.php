@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['name', 'category', 'unit', 'quantity', 'min_quantity', 'storage_location', 'provider_department_id', 'note'])]
+#[Fillable(['name', 'consumable_category_id', 'unit', 'quantity', 'min_quantity', 'storage_location', 'provider_department_id', 'note'])]
 class Consumable extends Model
 {
     /** @use HasFactory<ConsumableFactory> */
@@ -49,6 +49,14 @@ class Consumable extends Model
     }
 
     /**
+     * @return BelongsTo<ConsumableCategory, $this>
+     */
+    public function consumableCategory(): BelongsTo
+    {
+        return $this->belongsTo(ConsumableCategory::class);
+    }
+
+    /**
      * Permintaan Diajukan terbaru untuk barang ini (tautan "Diajukan · tanggal" di daftar stok).
      *
      * @return HasOne<SupplyRequest, $this>
@@ -77,10 +85,12 @@ class Consumable extends Model
     {
         $query
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->withStatus(ConsumableStatus::from($status)))
-            ->when($filters['category'] ?? null, fn ($query, $category) => $query->whereRaw('lower(category) = ?', [mb_strtolower($category)]))
+            ->when($filters['category'] ?? null, fn ($query, $category) => $query->whereHas('consumableCategory', fn ($q) => $q->whereRaw('lower(name) = ?', [mb_strtolower($category)])))
             ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id));
 
-        Search::apply($query, $filters['search'] ?? null, ['consumables.name', 'consumables.category']);
+        Search::apply($query, $filters['search'] ?? null, 'consumables.name', fn ($query, $pattern) => $query->orWhereHas(
+            'consumableCategory', fn ($q) => $q->whereRaw(Search::likeSql('consumable_categories.name'), [$pattern]),
+        ));
     }
 
     public function status(): ConsumableStatus

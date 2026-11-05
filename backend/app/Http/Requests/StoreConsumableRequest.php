@@ -21,7 +21,7 @@ class StoreConsumableRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:150', new UniqueCaseInsensitive('consumables', ignoreId: $this->ignoreId())],
-            'category' => ['nullable', 'string', 'max:100'],
+            'consumable_category_id' => ['nullable', 'integer', 'exists:consumable_categories,id'],
             'unit' => ['required', 'string', 'max:20'],
             'quantity' => ['required', 'integer', 'min:0', 'max:'.DbInteger::MAX],
             'min_quantity' => ['required', 'integer', 'min:0', 'max:'.DbInteger::MAX],

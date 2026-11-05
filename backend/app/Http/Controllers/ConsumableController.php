@@ -17,7 +17,7 @@ class ConsumableController extends Controller
 {
     use PaginatesList;
 
-    private const RELATIONS = ['providerDepartment', 'openRequest'];
+    private const RELATIONS = ['providerDepartment', 'consumableCategory', 'openRequest'];
 
     public function __construct(private ConsumableService $consumables) {}
 
@@ -25,7 +25,8 @@ class ConsumableController extends Controller
     {
         $filters = $request->validated();
 
-        $query = Consumable::query()->with(self::RELATIONS)->filter($filters);
+        // category_name dipakai sort=category.
+        $query = Consumable::query()->with(self::RELATIONS)->withAggregate('consumableCategory as category_name', 'name')->filter($filters);
 
         $consumables = $this->paginateList(
             $query, $filters, IndexConsumableRequest::SORTABLE, fn ($query) => $query->orderBy('name'), IndexConsumableRequest::DEFAULT_PER_PAGE,

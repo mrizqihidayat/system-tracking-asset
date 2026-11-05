@@ -11,6 +11,7 @@ use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Category;
 use App\Models\Consumable;
+use App\Models\ConsumableCategory;
 use App\Models\Department;
 use App\Models\Loan;
 use App\Models\RequestCatalog;
@@ -310,16 +311,19 @@ class ReportTest extends TestCase
 
     public function test_consumables_report_status_and_filters(): void
     {
-        Consumable::factory()->create(['name' => 'Spidol', 'category' => 'ATK', 'unit' => 'pcs', 'quantity' => 0, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id, 'storage_location' => 'Gudang IHS']);
-        Consumable::factory()->create(['name' => 'Kertas', 'category' => 'ATK', 'unit' => 'rim', 'quantity' => 4, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
-        Consumable::factory()->create(['name' => 'Map', 'category' => 'Arsip', 'unit' => 'pcs', 'quantity' => 50, 'min_quantity' => 10, 'provider_department_id' => $this->shd->id]);
+        $atk = ConsumableCategory::factory()->create(['name' => 'ATK'])->id;
+        $arsip = ConsumableCategory::factory()->create(['name' => 'Arsip'])->id;
+
+        Consumable::factory()->create(['name' => 'Spidol', 'consumable_category_id' => $atk, 'unit' => 'pcs', 'quantity' => 0, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id, 'storage_location' => 'Gudang IHS']);
+        Consumable::factory()->create(['name' => 'Kertas', 'consumable_category_id' => $atk, 'unit' => 'rim', 'quantity' => 4, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
+        Consumable::factory()->create(['name' => 'Map', 'consumable_category_id' => $arsip, 'unit' => 'pcs', 'quantity' => 50, 'min_quantity' => 10, 'provider_department_id' => $this->shd->id]);
 
         $sheet = fn (string $query) => $this->sheets($this->report('consumables', $query))['Stok'];
 
         $data = $this->dataRows($sheet(''));
         $this->assertSame(['Kertas', 'Map', 'Spidol'], array_column($data, 0));
         $this->assertSame(['Menipis', 'Aman', 'Habis'], array_column($data, 5));
-        $this->assertSame(['rim', 4, 10], [$data[0][2], $data[0][3], $data[0][4]]);
+        $this->assertSame(['ATK', 'rim', 4, 10], [$data[0][1], $data[0][2], $data[0][3], $data[0][4]]);
         $this->assertSame('Gudang IHS', $data[2][7]);
 
         $this->assertSame(['Spidol'], array_column($this->dataRows($sheet('?status=Habis')), 0));

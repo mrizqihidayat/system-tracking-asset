@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Consumable;
+use App\Models\ConsumableCategory;
 use App\Models\Department;
 use Illuminate\Database\Seeder;
 
@@ -14,6 +15,7 @@ class ConsumableSeeder extends Seeder
     public function run(): void
     {
         $departments = Department::pluck('id', 'name');
+        $categories = ConsumableCategory::pluck('id', 'name');
 
         // [nama, kategori, satuan, jumlah, minimum, minta ke, lokasi simpan]
         $rows = [
@@ -32,7 +34,7 @@ class ConsumableSeeder extends Seeder
         foreach ($rows as [$name, $category, $unit, $quantity, $minimum, $provider, $location]) {
             Consumable::create([
                 'name' => $name,
-                'category' => $category,
+                'consumable_category_id' => $categories[$category],
                 'unit' => $unit,
                 'quantity' => $quantity,
                 'min_quantity' => $minimum,

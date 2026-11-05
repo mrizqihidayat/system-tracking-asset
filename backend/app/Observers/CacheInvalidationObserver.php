@@ -7,6 +7,7 @@ use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Category;
 use App\Models\Consumable;
+use App\Models\ConsumableCategory;
 use App\Models\Department;
 use App\Models\Loan;
 use App\Models\RequestCatalog;
@@ -39,6 +40,7 @@ class CacheInvalidationObserver implements ShouldHandleEventsAfterCommit
         Department::class => [AppCache::GROUP_MASTER, AppCache::GROUP_OPS],
         RequestCatalog::class => [AppCache::GROUP_MASTER, AppCache::GROUP_OPS],
         Category::class => [AppCache::GROUP_MASTER],
+        ConsumableCategory::class => [AppCache::GROUP_MASTER, AppCache::GROUP_OPS],
         AssetType::class => [AppCache::GROUP_MASTER],
     ];
 

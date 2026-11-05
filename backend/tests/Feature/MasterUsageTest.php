@@ -6,6 +6,8 @@ use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Category;
+use App\Models\Consumable;
+use App\Models\ConsumableCategory;
 use App\Models\Department;
 use App\Models\RequestCatalog;
 use App\Models\Room;
@@ -72,6 +74,16 @@ class MasterUsageTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.can_delete', false)
             ->assertJsonPath('data.reason', 'Departemen SHD tidak dapat dihapus.');
+    }
+
+    public function test_consumable_category_usage(): void
+    {
+        $category = ConsumableCategory::factory()->create();
+        Consumable::factory()->create(['consumable_category_id' => $category->id]);
+
+        $this->getJson("/api/consumable-categories/{$category->id}/usage")
+            ->assertJsonPath('data.items', [['label' => 'barang habis pakai', 'count' => 1]])
+            ->assertJsonPath('data.can_delete', false);
     }
 
     public function test_category_and_asset_type_usage(): void

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Category;
+use App\Models\ConsumableCategory;
 use App\Models\Department;
 use App\Services\CodeGenerator;
 use Illuminate\Database\Seeder;
@@ -33,6 +34,10 @@ class MasterDataSeeder extends Seeder
             foreach ($rooms as $roomName) {
                 $building->rooms()->create(['name' => $roomName]);
             }
+        }
+
+        foreach (['ATK', 'Printer', 'Elektronik', 'Pelatihan'] as $name) {
+            ConsumableCategory::create(['name' => $name]);
         }
 
         // Kode null = otomatis dari nama; Proyektor memakai kode yang diedit (contoh SPEC).

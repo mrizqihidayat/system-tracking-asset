@@ -43,6 +43,7 @@ export const queryKeys = {
     buildings: () => ['master', 'buildings'] as const,
     rooms: (buildingId?: number | null) => ['master', 'rooms', buildingId ?? 'all'] as const,
     categories: () => ['master', 'categories'] as const,
+    consumableCategories: () => ['master', 'consumable-categories'] as const,
     assetTypes: () => ['master', 'asset-types'] as const,
     requestCatalog: () => ['master', 'request-catalog'] as const,
     storageLocations: () => ['master', 'storage-locations'] as const,

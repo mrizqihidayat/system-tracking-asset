@@ -121,6 +121,7 @@ return [
         'from' => 'tanggal awal',
         'to' => 'tanggal akhir',
         'category' => 'kategori',
+        'consumable_category_id' => 'kategori',
         'unit' => 'satuan',
         'quantity' => 'jumlah',
         'min_quantity' => 'minimum',

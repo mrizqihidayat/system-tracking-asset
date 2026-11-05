@@ -15,7 +15,7 @@ class IndexConsumableRequest extends FormRequest
     public const DEFAULT_PER_PAGE = 15;
 
     /** Kunci sort => kolom (sort=kunci naik, sort=-kunci turun). */
-    public const SORTABLE = ['name' => 'consumables.name', 'category' => 'consumables.category', 'quantity' => 'consumables.quantity'];
+    public const SORTABLE = ['name' => 'consumables.name', 'category' => 'category_name', 'quantity' => 'consumables.quantity'];
 
     public function authorize(): bool
     {

@@ -6,6 +6,7 @@ use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Category;
+use App\Models\Consumable;
 use App\Models\Department;
 use App\Models\RequestCatalog;
 use App\Models\Room;
@@ -37,6 +38,7 @@ class MasterDataTest extends TestCase
             'building rooms' => ['GET', '/api/buildings/1/rooms'],
             'rooms' => ['GET', '/api/rooms'],
             'categories' => ['GET', '/api/categories'],
+            'consumable categories' => ['GET', '/api/consumable-categories'],
             'asset types' => ['GET', '/api/asset-types'],
             'store asset type' => ['POST', '/api/asset-types'],
             'borrower units' => ['GET', '/api/lookups/borrower-units'],
@@ -511,6 +513,36 @@ class MasterDataTest extends TestCase
         $type->delete();
         $this->deleteJson("/api/categories/{$category->id}")->assertOk();
         $this->assertModelMissing($category);
+    }
+
+    public function test_consumable_category_crud_and_delete_rules(): void
+    {
+        $id = $this->postJson('/api/consumable-categories', ['name' => ' ATK '])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'ATK')
+            ->assertJsonPath('data.consumables_count', 0)
+            ->json('data.id');
+
+        $this->postJson('/api/consumable-categories', ['name' => 'atk'])->assertJsonValidationErrors(['name' => 'Nama sudah digunakan.']);
+        $this->postJson('/api/consumable-categories', [])->assertJsonValidationErrors('name');
+
+        // Terpisah dari kategori aset.
+        $this->postJson('/api/categories', ['name' => 'ATK'])->assertCreated();
+        $this->getJson('/api/consumable-categories')->assertOk()->assertJsonCount(1, 'data');
+
+        $this->putJson("/api/consumable-categories/{$id}", ['name' => 'atk'])->assertOk()->assertJsonPath('data.name', 'atk');
+
+        $consumable = Consumable::factory()->create(['consumable_category_id' => $id]);
+        $this->getJson('/api/consumable-categories')->assertJsonPath('data.0.consumables_count', 1);
+
+        // Ganti nama langsung terlihat di data stok; yang masih dipakai tidak bisa dihapus.
+        $this->getJson("/api/consumables/{$consumable->id}")->assertJsonPath('data.category', 'atk');
+        $this->deleteJson("/api/consumable-categories/{$id}")->assertUnprocessable();
+        $this->assertDatabaseHas('consumable_categories', ['id' => $id]);
+
+        $consumable->update(['consumable_category_id' => null]);
+        $this->deleteJson("/api/consumable-categories/{$id}")->assertOk();
+        $this->assertDatabaseMissing('consumable_categories', ['id' => $id]);
     }
 
     public function test_asset_type_delete_rules(): void

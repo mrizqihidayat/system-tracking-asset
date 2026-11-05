@@ -70,9 +70,16 @@ export interface SuggestionGroup {
 
 export type ConsumableStatus = 'Aman' | 'Menipis' | 'Habis'
 
+export interface ConsumableCategory {
+  id: number
+  name: string
+  consumables_count?: number
+}
+
 export interface ConsumableItem {
   id: number
   name: string
+  consumable_category_id: number | null
   category: string | null
   unit: string
   quantity: number

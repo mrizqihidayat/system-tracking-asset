@@ -19,7 +19,8 @@ class ConsumableResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'category' => $this->category,
+            'consumable_category_id' => $this->consumable_category_id,
+            'category' => $this->consumableCategory?->name,
             'unit' => $this->unit,
             'quantity' => $this->quantity,
             'min_quantity' => $this->min_quantity,

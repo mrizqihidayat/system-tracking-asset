@@ -41,9 +41,11 @@ class StockCleanupMigrationTest extends TestCase
         $location = $this->migration('2026_11_03_065401_replace_consumable_room_with_storage_location');
         $unstored = $this->migration('2026_11_03_065402_move_unstored_consumables_to_room_standards');
         $dropCatalog = $this->migration('2026_11_05_000001_drop_catalog_id_from_consumables');
+        $categories = $this->migration('2026_11_05_000002_create_consumable_categories_table');
 
         // SQLite membangun ulang tabel saat kolom dihapus; foreign key aktif akan memicu ON DELETE SET NULL.
         Schema::disableForeignKeyConstraints();
+        $categories->down();
         $dropCatalog->down();
         $unstored->down();
         $location->down();
@@ -74,6 +76,7 @@ class StockCleanupMigrationTest extends TestCase
         $location->up();
         $unstored->up();
         $dropCatalog->up();
+        $categories->up();
         Schema::enableForeignKeyConstraints();
 
         $this->assertFalse(Schema::hasColumn('consumables', 'room_id'));

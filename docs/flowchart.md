@@ -294,7 +294,7 @@ flowchart TD
     A([Mulai]) --> B[Daftar barang disimpan SHD: jumlah, minimum, status, lokasi simpan, departemen penyedia; filter status & cari]
     B --> C{Pilih aksi}
 
-    C -- Tambah / Ubah data --> T1[Input nama unik, kategori, satuan, minimum, minta ke, lokasi simpan teks bebas dengan saran, catatan; jumlah awal hanya saat tambah] --> T2[(Simpan)] --> CEK
+    C -- Tambah / Ubah data --> T1[Input nama unik, kategori pilih atau tambah baru, satuan, minimum, minta ke, lokasi simpan teks bebas dengan saran, catatan; jumlah awal hanya saat tambah] --> T2[(Simpan)] --> CEK
 
     C -- Ubah jumlah --> J0{Cara}
     J0 -- Klik angka --> J1[Input jumlah baru >= 0]
@@ -329,7 +329,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Tab Gedung & Ruangan, Departemen, Kategori & Jenis aset]
+    A([Mulai]) --> B[Tab Gedung & Ruangan, Departemen, Kategori & Jenis aset, Kategori stok]
     B --> C{Pilih aksi}
 
     C -- Departemen SHD --> C1[Tanpa aksi: tidak dapat diubah atau dihapus] --> B

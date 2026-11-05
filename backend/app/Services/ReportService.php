@@ -288,13 +288,13 @@ class ReportService
     private function consumables(array $filters): Report
     {
         $rows = Consumable::query()
-            ->with(['providerDepartment'])
+            ->with(['providerDepartment', 'consumableCategory'])
             ->filter($filters)
             ->orderBy('name')
             ->lazy(self::CHUNK)
             ->map(fn (Consumable $consumable) => [
                 $consumable->name,
-                $consumable->category,
+                $consumable->consumableCategory?->name,
                 $consumable->unit,
                 $consumable->quantity,
                 $consumable->min_quantity,

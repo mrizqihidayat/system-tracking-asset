@@ -1,6 +1,6 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import type { AssetType, Building, Category, Department, Room } from '../../types/asset'
-import type { RequestCatalog } from '../../types/supply'
+import type { ConsumableCategory, RequestCatalog } from '../../types/supply'
 import { api } from '../api'
 import { MASTER_STALE_TIME } from '../query-client'
 import { queryKeys } from './keys'
@@ -18,6 +18,7 @@ export const masterQueries = {
   rooms: (buildingId?: number | null) =>
     master<Room>(queryKeys.master.rooms(buildingId), '/rooms', buildingId ? { building_id: buildingId } : undefined),
   categories: () => master<Category>(queryKeys.master.categories(), '/categories'),
+  consumableCategories: () => master<ConsumableCategory>(queryKeys.master.consumableCategories(), '/consumable-categories'),
   assetTypes: () => master<AssetType>(queryKeys.master.assetTypes(), '/asset-types'),
   requestCatalog: () => master<RequestCatalog>(queryKeys.master.requestCatalog(), '/request-catalog'),
   storageLocations: () => master<string>(queryKeys.master.storageLocations(), '/lookups/storage-locations'),
@@ -38,6 +39,7 @@ export const useBuildings = () => useMaster(masterQueries.buildings())
 export const useRooms = (buildingId?: number | null, requireBuilding = false) =>
   useMaster(masterQueries.rooms(buildingId), !requireBuilding || !!buildingId)
 export const useCategories = () => useMaster(masterQueries.categories())
+export const useConsumableCategories = () => useMaster(masterQueries.consumableCategories())
 export const useAssetTypes = () => useMaster(masterQueries.assetTypes())
 export const useRequestCatalog = () => useMaster(masterQueries.requestCatalog())
 export const useStorageLocations = () => useMaster(masterQueries.storageLocations())
