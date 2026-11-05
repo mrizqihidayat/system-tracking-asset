@@ -47,7 +47,7 @@ class RoomStandardResource extends JsonResource
     }
 
     /**
-     * Kolom "Pemenuhan": barang stok beserta penyedia & katalognya, atau barang departemen lain beserta katalognya.
+     * Kolom "Pemenuhan": barang stok beserta penyedianya, atau barang departemen lain beserta katalognya.
      *
      * @return array<string, mixed>|null
      */
@@ -72,7 +72,6 @@ class RoomStandardResource extends JsonResource
                 'name' => $this->consumable->name,
                 'unit' => $this->consumable->unit,
                 'quantity' => $this->consumable->quantity,
-                'catalog_id' => $this->consumable->catalog_id,
                 'provider_department' => DepartmentResource::make($this->consumable->providerDepartment),
             ],
         ];

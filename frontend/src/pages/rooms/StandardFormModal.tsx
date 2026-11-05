@@ -165,7 +165,7 @@ export default function StandardFormModal({ roomId, roomName, standard, onClose,
               </FormField>
               <FormField label="Katalog permintaan (opsional)" error={errors.catalog_id}>
                 <Select clearable value={catalogId ?? ''} disabled={!otherSourceId} onChange={(e) => pickCatalog(Number(e.target.value) || null)} error={errors.catalog_id}>
-                  <option value="">{catalogOptions.length ? 'Tidak ada' : 'Tidak ada katalog dari departemen ini'}</option>
+                  <option value="">{catalogOptions.length ? 'Tidak ada' : 'Belum ada katalog'}</option>
                   {catalogOptions.map((c) => <option key={c.id} value={c.id}>{c.item_name}</option>)}
                 </Select>
               </FormField>

@@ -416,8 +416,8 @@ export default function RequestsPage() {
       >
         {deleting && deleting.usage.total > 0 ? (
           <>
-            Item ini dipakai di {deleting.usage.supply_requests} permintaan, {deleting.usage.room_standards} standar ruangan,{' '}
-            {deleting.usage.consumables} stok. Tautannya akan dilepas, riwayat tetap tersimpan.
+            Item ini dipakai di {deleting.usage.supply_requests} permintaan dan {deleting.usage.room_standards} standar ruangan.
+            Tautannya akan dilepas, riwayat tetap tersimpan.
           </>
         ) : (
           <>Hapus "{deleting?.item.item_name}" dari katalog?</>

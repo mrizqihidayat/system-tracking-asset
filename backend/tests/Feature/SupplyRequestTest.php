@@ -106,11 +106,10 @@ class SupplyRequestTest extends TestCase
         $this->supplyRequest(['catalog_id' => $catalog->id]);
         $this->supplyRequest(['catalog_id' => $catalog->id]);
         RoomStandard::factory()->create(['source_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
-        Consumable::factory()->create(['provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
 
         $this->getJson("/api/request-catalog/{$catalog->id}/usage")
             ->assertOk()
-            ->assertExactJson(['data' => ['supply_requests' => 2, 'room_standards' => 1, 'consumables' => 1, 'total' => 4]]);
+            ->assertExactJson(['data' => ['supply_requests' => 2, 'room_standards' => 1, 'total' => 3]]);
         $this->getJson('/api/request-catalog/999/usage')->assertNotFound();
     }
 
@@ -121,13 +120,11 @@ class SupplyRequestTest extends TestCase
             $this->postJson('/api/supply-requests', ['catalog_id' => $catalog->id, 'quantity' => 3, 'request_method' => 'Memo'])->assertCreated()->json('data.id'),
         );
         $standard = RoomStandard::factory()->create(['source_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
-        $stock = Consumable::factory()->create(['provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
 
         $this->deleteJson("/api/request-catalog/{$catalog->id}")->assertOk();
 
         $this->assertModelMissing($catalog);
         $this->assertNull($standard->fresh()->catalog_id);
-        $this->assertNull($stock->fresh()->catalog_id);
 
         // Riwayat tetap utuh dari snapshot: item, departemen, cara, lead time, perlu dikembalikan.
         $request->refresh();
@@ -343,7 +340,7 @@ class SupplyRequestTest extends TestCase
         ]);
 
         Consumable::factory()->create(['name' => 'Spidol', 'quantity' => 0, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
-        Consumable::factory()->create(['name' => 'Kertas', 'quantity' => 4, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
+        Consumable::factory()->create(['name' => 'Kertas', 'quantity' => 4, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
         Consumable::factory()->create(['name' => 'Map', 'quantity' => 50, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
 
         $response = $this->getJson('/api/supply-requests/suggestions')->assertOk();
@@ -361,9 +358,10 @@ class SupplyRequestTest extends TestCase
         $this->assertSame('Habis', $items['stok:Spidol']['stock_status']);
         $this->assertSame('Tisu', $items['kekurangan_ruangan:Tisu']['catalog_name']);
         $this->assertNull($items['stok:Spidol']['catalog_name']);
-        // Nama barang sebenarnya, katalognya sebagai keterangan.
+        // Saran stok memakai nama barang, tanpa katalog.
         $this->assertSame(6, $items['stok:Kertas']['quantity']);
-        $this->assertSame('Tisu', $items['stok:Kertas']['catalog_name']);
+        $this->assertNull($items['stok:Kertas']['catalog_name']);
+        $this->assertNull($items['stok:Kertas']['catalog_id']);
         $this->assertSame('Menipis', $items['stok:Kertas']['stock_status']);
     }
 
@@ -416,11 +414,10 @@ class SupplyRequestTest extends TestCase
 
     public function test_open_request_flag_is_per_item_when_linked_to_stock(): void
     {
-        $catalog = $this->catalog(['item_name' => 'ATK Isi Ulang']);
-        $pensil = Consumable::factory()->create(['name' => 'Pensil', 'quantity' => 1, 'min_quantity' => 5, 'provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
-        Consumable::factory()->create(['name' => 'Spidol', 'quantity' => 1, 'min_quantity' => 5, 'provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
+        $pensil = Consumable::factory()->create(['name' => 'Pensil', 'quantity' => 1, 'min_quantity' => 5, 'provider_department_id' => $this->deptA->id]);
+        Consumable::factory()->create(['name' => 'Spidol', 'quantity' => 1, 'min_quantity' => 5, 'provider_department_id' => $this->deptA->id]);
 
-        $this->supplyRequest(['catalog_id' => $catalog->id, 'consumable_id' => $pensil->id, 'item_name' => 'Pensil']);
+        $this->supplyRequest(['consumable_id' => $pensil->id, 'item_name' => 'Pensil']);
 
         $items = collect($this->getJson('/api/supply-requests/suggestions')->assertOk()->json('data.0.items'))->keyBy('item_name');
 
@@ -473,16 +470,72 @@ class SupplyRequestTest extends TestCase
         $this->postJson('/api/supply-requests', [...$manual, 'must_return' => 'mungkin'])->assertJsonValidationErrors('must_return');
     }
 
-    public function test_store_with_stock_link_uses_item_name_of_consumable(): void
+    /**
+     * @return array<string, mixed>
+     */
+    private function stockRequestPayload(Consumable $consumable, array $overrides = []): array
     {
-        $catalog = $this->catalog(['item_name' => 'ATK Isi Ulang']);
-        $pensil = Consumable::factory()->create(['name' => 'Pensil 2B', 'provider_department_id' => $this->deptA->id, 'catalog_id' => $catalog->id]);
+        return [
+            'consumable_id' => $consumable->id,
+            'item_name' => $consumable->name,
+            'provider_department_id' => $this->deptA->id,
+            'quantity' => 5,
+            'request_method' => 'Memo',
+            ...$overrides,
+        ];
+    }
 
-        $this->postJson('/api/supply-requests', ['catalog_id' => $catalog->id, 'consumable_id' => $pensil->id, 'quantity' => 5, 'request_method' => 'Memo'])
+    public function test_stock_request_has_no_catalog_lead_time_or_unresponded_status(): void
+    {
+        $pensil = Consumable::factory()->create(['name' => 'Pensil 2B', 'provider_department_id' => $this->deptA->id]);
+
+        $id = $this->postJson('/api/supply-requests', $this->stockRequestPayload($pensil, [
+            'item_name' => 'Nama lain',
+            'request_date' => today()->subYear()->toDateString(),
+        ]))
             ->assertCreated()
             ->assertJsonPath('data.item_name', 'Pensil 2B')
             ->assertJsonPath('data.consumable_id', $pensil->id)
-            ->assertJsonPath('data.catalog.item_name', 'ATK Isi Ulang');
+            ->assertJsonPath('data.catalog', null)
+            ->assertJsonPath('data.lead_time_days', null)
+            ->assertJsonPath('data.must_return', false)
+            ->assertJsonPath('data.is_unresponded', false)
+            ->assertJsonPath('data.display_status', 'Diajukan')
+            ->json('data.id');
+
+        $this->getJson('/api/supply-requests?unresponded=1')->assertOk()->assertJsonMissing(['id' => $id]);
+    }
+
+    public function test_stock_request_rejects_catalog(): void
+    {
+        $pensil = Consumable::factory()->create(['name' => 'Pensil 2B', 'provider_department_id' => $this->deptA->id]);
+
+        $this->postJson('/api/supply-requests', $this->stockRequestPayload($pensil, ['catalog_id' => $this->catalog()->id]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['consumable_id' => 'Barang stok tidak memakai katalog.']);
+
+        $this->assertDatabaseCount('supply_requests', 0);
+    }
+
+    public function test_stock_request_updates_stock_when_status_changes_and_stops_at_zero(): void
+    {
+        $pensil = Consumable::factory()->create(['name' => 'Pensil 2B', 'quantity' => 2, 'provider_department_id' => $this->deptA->id]);
+        $request = fn (array $overrides = []) => SupplyRequest::query()->findOrFail(
+            $this->postJson('/api/supply-requests', $this->stockRequestPayload($pensil, $overrides))->assertCreated()->json('data.id'),
+        );
+
+        $canceled = $request();
+        $this->setStatus($canceled, 'Diterima')->assertOk();
+        $this->assertSame(7, $pensil->fresh()->quantity);
+        $this->setStatus($canceled, 'Dibatalkan')->assertOk();
+        $this->assertSame(2, $pensil->fresh()->quantity);
+
+        // Dikembalikan boleh dipilih di form; stok tidak turun di bawah 0.
+        $returned = $request(['must_return' => true]);
+        $this->setStatus($returned, 'Diterima')->assertOk();
+        $this->patchJson("/api/consumables/{$pensil->id}/quantity", ['quantity' => 3])->assertOk();
+        $this->setStatus($returned, 'Dikembalikan')->assertOk();
+        $this->assertSame(0, $pensil->fresh()->quantity);
     }
 
     public function test_received_other_unit_item_adds_room_quantity_and_clears_suggestion(): void

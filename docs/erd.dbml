@@ -276,11 +276,10 @@ Table consumables {
   quantity int [not null, default: 0]
   min_quantity int [not null, default: 0]
   provider_department_id bigint [not null, ref: > departments.id, note: 'minta ke (isi ulang); menjadi sumber baris standar yang memakainya']
-  catalog_id bigint [ref: > request_catalog.id, note: 'ON DELETE SET NULL']
   storage_location varchar(150) [note: 'lokasi simpan, teks bebas (tidak tertaut ruangan)']
   note text
   created_at timestamp
   updated_at timestamp
 
-  Note: 'Hanya barang yang disimpan SHD. Hapus = hard delete (tanpa soft delete)'
+  Note: 'Hanya barang yang disimpan SHD, tidak tertaut katalog. Hapus = hard delete (tanpa soft delete)'
 }

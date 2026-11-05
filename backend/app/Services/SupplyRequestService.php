@@ -239,21 +239,20 @@ class SupplyRequestService
     /**
      * Pemakaian item katalog (popup sebelum hapus).
      *
-     * @return array{supply_requests: int, room_standards: int, consumables: int, total: int}
+     * @return array{supply_requests: int, room_standards: int, total: int}
      */
     public function catalogUsage(RequestCatalog $catalog): array
     {
         $usage = [
             'supply_requests' => $catalog->supplyRequests()->count(),
             'room_standards' => $catalog->roomStandards()->count(),
-            'consumables' => $catalog->consumables()->count(),
         ];
 
         return $usage + ['total' => array_sum($usage)];
     }
 
     /**
-     * Hapus item katalog walau dipakai: tautan catalog_id di permintaan, standar ruangan, dan stok dilepas
+     * Hapus item katalog walau dipakai: tautan catalog_id di permintaan dan standar ruangan dilepas
      * dalam satu transaksi. Riwayat permintaan tetap utuh (item, departemen, cara, lead time, must_return tersimpan).
      */
     public function deleteCatalog(RequestCatalog $catalog): void
@@ -263,7 +262,6 @@ class SupplyRequestService
 
             $catalog->supplyRequests()->update(['catalog_id' => null]);
             $catalog->roomStandards()->update(['catalog_id' => null]);
-            $catalog->consumables()->update(['catalog_id' => null]);
 
             // Observer katalog (deleted) mengosongkan cache master & ops yang memuat tautan tadi.
             $catalog->delete();
@@ -318,7 +316,7 @@ class SupplyRequestService
     {
         return RoomStandard::query()
             ->where('count_method', CountMethod::Manual->value)
-            ->with(['consumable.catalog', 'consumable.providerDepartment', 'catalog', 'sourceDepartment', 'room.building'])
+            ->with(['consumable.providerDepartment', 'catalog', 'sourceDepartment', 'room.building'])
             ->orderBy('room_id')
             ->orderBy('id')
             ->get()
@@ -326,9 +324,9 @@ class SupplyRequestService
             ->map(fn (RoomStandard $standard) => [
                 'source' => 'kekurangan_ruangan',
                 'item_name' => $standard->consumable?->name ?? $standard->item_name,
-                'catalog_name' => ($standard->consumable ? $standard->consumable->catalog : $standard->catalog)?->item_name,
+                'catalog_name' => $standard->catalog?->item_name,
                 'quantity' => $standard->shortage(),
-                'catalog_id' => $standard->consumable ? $standard->consumable->catalog_id : $standard->catalog_id,
+                'catalog_id' => $standard->catalog_id,
                 'room' => ['id' => $standard->room_id, 'name' => $standard->room->name, 'building' => $standard->room->building->name],
                 'room_standard_id' => $standard->id,
                 'consumable_id' => $standard->consumable_id,
@@ -344,15 +342,15 @@ class SupplyRequestService
     {
         return Consumable::query()
             ->where(fn ($query) => $query->withStatus(ConsumableStatus::Habis)->orWhere(fn ($q) => $q->withStatus(ConsumableStatus::Menipis)))
-            ->with(['catalog', 'providerDepartment'])
+            ->with('providerDepartment')
             ->orderBy('name')
             ->get()
             ->map(fn (Consumable $consumable) => [
                 'source' => 'stok',
                 'item_name' => $consumable->name,
-                'catalog_name' => $consumable->catalog?->item_name,
+                'catalog_name' => null,
                 'quantity' => max($consumable->min_quantity - $consumable->quantity, 1),
-                'catalog_id' => $consumable->catalog_id,
+                'catalog_id' => null,
                 'room' => null,
                 'room_standard_id' => null,
                 'consumable_id' => $consumable->id,
@@ -374,7 +372,7 @@ class SupplyRequestService
             return false;
         }
 
-        // Permintaan tertaut stok dicocokkan per barang (satu katalog bisa dipakai banyak barang).
+        // Permintaan tertaut stok dicocokkan per barang.
         if ($request->consumable_id !== null) {
             return (int) $request->consumable_id === (int) $item['consumable_id'];
         }
@@ -412,7 +410,7 @@ class SupplyRequestService
             $data['provider_department_id'] = $catalog->provider_department_id;
         }
 
-        // Permintaan tertaut stok memakai nama barang, bukan nama katalog.
+        // Permintaan tertaut stok memakai nama barang.
         if (! empty($data['consumable_id'])) {
             $data['item_name'] = Consumable::query()->whereKey($data['consumable_id'])->value('name');
             $data['room_standard_id'] = null;

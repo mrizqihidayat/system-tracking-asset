@@ -17,6 +17,7 @@ class StoreSupplyRequestRequest extends FormRequest
 
     /**
      * Dengan katalog: nama item & departemen penyedia boleh dikosongkan (diisi dari katalog).
+     * Barang stok tidak memakai katalog: nama item & departemen penyedia dikirim langsung, tanpa lead time.
      * Cara permintaan wajib per permintaan (teks bebas dengan saran).
      *
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -26,7 +27,7 @@ class StoreSupplyRequestRequest extends FormRequest
         return [
             'request_date' => ['nullable', 'date'],
             'catalog_id' => ['nullable', 'integer', 'exists:request_catalog,id', $this->catalogMatchesProvider()],
-            'consumable_id' => ['nullable', 'integer', 'exists:consumables,id'],
+            'consumable_id' => ['nullable', 'integer', 'exists:consumables,id', 'prohibits:catalog_id'],
             'room_standard_id' => ['nullable', 'integer', 'exists:room_standards,id'],
             'item_name' => ['required_without:catalog_id', 'nullable', 'string', 'max:150'],
             'must_return' => ['nullable', 'boolean'],
@@ -37,6 +38,14 @@ class StoreSupplyRequestRequest extends FormRequest
             'request_method' => ['required', 'string', 'max:50'],
             'note' => ['nullable', 'string', 'max:1000'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['consumable_id.prohibits' => 'Barang stok tidak memakai katalog.'];
     }
 
     /**

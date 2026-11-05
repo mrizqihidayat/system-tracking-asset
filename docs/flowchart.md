@@ -263,11 +263,11 @@ flowchart TD
 
     C -- Kelola katalog --> K0{Aksi katalog}
     K0 -- Tambah / Ubah --> K1[Input item, departemen penyedia, perlu dikembalikan, lead time, catatan] --> K2[(Simpan katalog)] --> B
-    K0 -- Hapus --> K3[(Ambil pemakaian katalog)] --> K4[Popup jumlah permintaan, standar ruangan, stok yang tautannya dilepas] --> K5[(Hapus katalog, tautan dikosongkan, riwayat tetap)] --> B
+    K0 -- Hapus --> K3[(Ambil pemakaian katalog)] --> K4[Popup jumlah permintaan & standar ruangan yang tautannya dilepas] --> K5[(Hapus katalog, tautan dikosongkan, riwayat tetap)] --> B
 
     C -- Buat permintaan --> P0{Dibuka dari}
     P0 -- Tombol Buat permintaan --> P1[Form kosong]
-    P0 -- Saran / Kelengkapan Ruangan / Stok --> P1a[Form terisi item, penyedia atau katalog, jumlah, ruangan, tautan barang stok atau baris standar]
+    P0 -- Saran / Kelengkapan Ruangan / Stok --> P1a[Form terisi item, penyedia, jumlah, ruangan; barang stok: tertaut barang, tanpa katalog; Barang departemen lain: tertaut baris standar, katalog bila ada]
     P1 & P1a --> P2[Pilih item katalog atau Item lain + departemen penyedia; pengembalian barang default dari katalog; cara permintaan Memo, Form, Email, WhatsApp, Lainnya; jumlah, tanggal, kegiatan, ruangan, catatan]
     P2 --> P3[(Simpan status Diajukan; item diganti melepas tautan; snapshot lead time & pengembalian)]
     P3 --> P4[Staf mengirim permintaan di luar sistem] --> B
@@ -294,7 +294,7 @@ flowchart TD
     A([Mulai]) --> B[Daftar barang disimpan SHD: jumlah, minimum, status, lokasi simpan, departemen penyedia; filter status & cari]
     B --> C{Pilih aksi}
 
-    C -- Tambah / Ubah data --> T1[Input nama unik, kategori, satuan, minimum, minta ke, katalog dari departemen yang sama, lokasi simpan teks bebas dengan saran, catatan; jumlah awal hanya saat tambah] --> T2[(Simpan)] --> CEK
+    C -- Tambah / Ubah data --> T1[Input nama unik, kategori, satuan, minimum, minta ke, lokasi simpan teks bebas dengan saran, catatan; jumlah awal hanya saat tambah] --> T2[(Simpan)] --> CEK
 
     C -- Ubah jumlah --> J0{Cara}
     J0 -- Klik angka --> J1[Input jumlah baru >= 0]
@@ -321,7 +321,7 @@ flowchart TD
     CEK -- Tidak --> S1[Status Aman] --> B
     CEK -- Ya --> S2[Status Menipis, atau Habis jika 0] --> S3[Peringatan dashboard + masuk saran permintaan ke departemen minta ke] --> S4{Penyedia departemen lain?}
     S4 -- Tidak --> B
-    S4 -- Ya, belum ada permintaan --> S5a[Tautan Ajukan permintaan: form terisi item, departemen, katalog, jumlah] --> S6a
+    S4 -- Ya, belum ada permintaan --> S5a[Tautan Ajukan permintaan: form terisi item, departemen, jumlah, tanpa katalog] --> S6a
     S4 -- Ya, sudah Diajukan --> S7a[Tautan Diajukan · tanggal ke permintaan itu] --> S6a
 ```
 

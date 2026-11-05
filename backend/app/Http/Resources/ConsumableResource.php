@@ -25,10 +25,6 @@ class ConsumableResource extends JsonResource
             'min_quantity' => $this->min_quantity,
             'status' => $this->status(),
             'provider_department' => DepartmentResource::make($this->whenLoaded('providerDepartment')),
-            'catalog' => $this->whenLoaded('catalog', fn () => $this->catalog ? [
-                'id' => $this->catalog->id,
-                'item_name' => $this->catalog->item_name,
-            ] : null),
             'storage_location' => $this->storage_location,
             'open_request' => $this->whenLoaded('openRequest', fn () => $this->openRequest ? [
                 'id' => $this->openRequest->id,

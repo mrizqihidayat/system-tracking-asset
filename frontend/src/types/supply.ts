@@ -47,7 +47,6 @@ export interface SupplyRequest {
 export interface CatalogUsage {
   supply_requests: number
   room_standards: number
-  consumables: number
   total: number
 }
 
@@ -80,7 +79,6 @@ export interface ConsumableItem {
   min_quantity: number
   status: ConsumableStatus
   provider_department: Department | null
-  catalog: { id: number; item_name: string } | null
   storage_location: string | null
   /** Permintaan Diajukan terbaru untuk barang ini. */
   open_request?: { id: number; created_at: string | null } | null

@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['name', 'category', 'unit', 'quantity', 'min_quantity', 'storage_location', 'provider_department_id', 'catalog_id', 'note'])]
+#[Fillable(['name', 'category', 'unit', 'quantity', 'min_quantity', 'storage_location', 'provider_department_id', 'note'])]
 class Consumable extends Model
 {
     /** @use HasFactory<ConsumableFactory> */
@@ -46,14 +46,6 @@ class Consumable extends Model
     public function providerDepartment(): BelongsTo
     {
         return $this->belongsTo(Department::class, 'provider_department_id');
-    }
-
-    /**
-     * @return BelongsTo<RequestCatalog, $this>
-     */
-    public function catalog(): BelongsTo
-    {
-        return $this->belongsTo(RequestCatalog::class, 'catalog_id');
     }
 
     /**

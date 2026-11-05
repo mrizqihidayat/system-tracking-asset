@@ -3,7 +3,7 @@ import Combobox from '../../components/ui/Combobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
-import { useDepartments, useRequestCatalog, useStorageLocations } from '../../lib/queries/master'
+import { useDepartments, useStorageLocations } from '../../lib/queries/master'
 import type { ConsumableItem, ConsumableUsage } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 
@@ -17,7 +17,6 @@ interface Props {
 export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const toast = useToast()
   const { data: departments } = useDepartments()
-  const { data: catalog } = useRequestCatalog()
   const { data: locations } = useStorageLocations()
   const [usedIn, setUsedIn] = useState<ConsumableUsage[]>([])
   const [name, setName] = useState(item?.name ?? '')
@@ -26,7 +25,6 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
   const [quantity, setQuantity] = useState(String(item?.quantity ?? 0))
   const [minQuantity, setMinQuantity] = useState(String(item?.min_quantity ?? 0))
   const [providerId, setProviderId] = useState<number | null>(item?.provider_department?.id ?? null)
-  const [catalogId, setCatalogId] = useState<number | null>(item?.catalog?.id ?? null)
   const [location, setLocation] = useState(item?.storage_location ?? '')
   const [note, setNote] = useState(item?.note ?? '')
 
@@ -39,8 +37,6 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
     }
   }, [item])
 
-  const catalogOptions = catalog.filter((c) => c.provider_department?.id === providerId)
-
   const submit = async () => {
     const payload: Record<string, unknown> = {
       name: name.trim(),
@@ -48,7 +44,6 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
       unit: unit.trim(),
       min_quantity: Number(minQuantity),
       provider_department_id: providerId,
-      catalog_id: catalogOptions.some((c) => c.id === catalogId) ? catalogId : null,
       storage_location: location.trim() || null,
       note: note.trim() || null,
     }
@@ -105,22 +100,16 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
                 {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </Select>
             </FormField>
-            <FormField label="Katalog permintaan (opsional)" error={errors.catalog_id}>
-              <Select clearable value={catalogId ?? ''} disabled={!providerId} onChange={(e) => setCatalogId(Number(e.target.value) || null)} error={errors.catalog_id}>
-                <option value="">{catalogOptions.length ? 'Tidak ada' : 'Tidak ada katalog dari departemen ini'}</option>
-                {catalogOptions.map((c) => <option key={c.id} value={c.id}>{c.item_name}</option>)}
-              </Select>
+            <FormField label="Lokasi simpan (opsional)" error={errors.storage_location}>
+              <Combobox
+                value={location}
+                onChange={setLocation}
+                options={locations.map((l) => ({ id: l, label: l }))}
+                placeholder="Misal: Main Office SHD"
+                error={errors.storage_location}
+              />
             </FormField>
           </div>
-          <FormField label="Lokasi simpan (opsional)" error={errors.storage_location}>
-            <Combobox
-              value={location}
-              onChange={setLocation}
-              options={locations.map((l) => ({ id: l, label: l }))}
-              placeholder="Misal: Main Office SHD"
-              error={errors.storage_location}
-            />
-          </FormField>
           <FormField label="Catatan (opsional)" error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} />
           </FormField>

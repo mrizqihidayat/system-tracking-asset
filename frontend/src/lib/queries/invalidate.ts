@@ -20,8 +20,8 @@ export const invalidate = {
   consumables: (qc: QueryClient) => run(qc, [k.consumables.all, k.master.storageLocations(), k.rooms.all, k.supplyRequests.all, k.dashboard.all]),
   /** Permintaan: riwayat, saran, panel dashboard. */
   supplyRequests: (qc: QueryClient) => run(qc, [k.supplyRequests.all, k.dashboard.all]),
-  /** Katalog: daftar katalog (master), saran, stok (kolom "minta ke"). */
-  catalog: (qc: QueryClient) => run(qc, [k.master.requestCatalog(), k.supplyRequests.all, k.consumables.all, k.rooms.all]),
+  /** Katalog: daftar katalog (master), saran, standar ruangan. */
+  catalog: (qc: QueryClient) => run(qc, [k.master.requestCatalog(), k.supplyRequests.all, k.rooms.all]),
   /** Standar & hasil cek ruangan (isi dari stok juga mengurangi stok). */
   rooms: (qc: QueryClient) => run(qc, [k.rooms.all, k.consumables.all, k.supplyRequests.all, k.dashboard.all]),
   /** Data master: nama tampil di hampir semua daftar → semua query dianggap basi. */

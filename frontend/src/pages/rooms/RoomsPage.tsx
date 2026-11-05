@@ -41,8 +41,7 @@ const requestUrl = (roomId: number, s?: RoomStandard) => {
   if (f?.type === 'stok') {
     p.set('consumable_id', String(f.consumable.id))
     p.set('item_name', f.consumable.name)
-    if (f.consumable.catalog_id) p.set('catalog_id', String(f.consumable.catalog_id))
-    else if (f.consumable.provider_department) p.set('provider_department_id', String(f.consumable.provider_department.id))
+    if (f.consumable.provider_department) p.set('provider_department_id', String(f.consumable.provider_department.id))
   } else if (f?.type === 'unit_lain' && s) {
     p.set('room_standard_id', String(s.id))
     p.set('item_name', s.item_name)

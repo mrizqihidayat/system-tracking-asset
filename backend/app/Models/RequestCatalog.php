@@ -45,14 +45,6 @@ class RequestCatalog extends Model
     }
 
     /**
-     * @return HasMany<Consumable, $this>
-     */
-    public function consumables(): HasMany
-    {
-        return $this->hasMany(Consumable::class, 'catalog_id');
-    }
-
-    /**
      * @return HasMany<RoomStandard, $this>
      */
     public function roomStandards(): HasMany

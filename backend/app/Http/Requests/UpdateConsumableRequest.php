@@ -37,11 +37,6 @@ class UpdateConsumableRequest extends StoreConsumableRequest
         return $this->consumable()->id;
     }
 
-    protected function currentProviderId(): ?int
-    {
-        return $this->consumable()->provider_department_id;
-    }
-
     private function consumable(): Consumable
     {
         /** @var Consumable */

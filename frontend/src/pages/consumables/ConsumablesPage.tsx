@@ -32,15 +32,14 @@ const stockStatus = (quantity: number, min: number): ConsumableStatus =>
 
 type ModalState = { kind: 'form'; item: ConsumableItem | null } | { kind: 'quantity'; item: ConsumableItem } | null
 
-/** Form Buat permintaan terisi: item, departemen/katalog, jumlah = minimum − jumlah (minimal 1). */
+/** Form Buat permintaan terisi: item, departemen, jumlah = minimum − jumlah (minimal 1), tanpa katalog. */
 const requestUrl = (c: ConsumableItem) => {
   const p = new URLSearchParams({
     consumable_id: String(c.id),
     item_name: c.name,
     quantity: String(Math.max(c.min_quantity - c.quantity, 1)),
   })
-  if (c.catalog) p.set('catalog_id', String(c.catalog.id))
-  else if (c.provider_department) p.set('provider_department_id', String(c.provider_department.id))
+  if (c.provider_department) p.set('provider_department_id', String(c.provider_department.id))
   return `/permintaan?${p}`
 }
 

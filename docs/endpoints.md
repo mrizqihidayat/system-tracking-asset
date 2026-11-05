@@ -198,7 +198,7 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| GET | `/api/request-catalog` | Daftar katalog | Token | Ya: Permintaan, form standar, form stok (`lib/queries/master.ts`) |
+| GET | `/api/request-catalog` | Daftar katalog | Token | Ya: Permintaan, form standar (`lib/queries/master.ts`) |
 | POST | `/api/request-catalog` | Tambah item katalog | Token | Ya: Form katalog (`pages/requests/CatalogFormModal.tsx`) |
 | PUT/PATCH | `/api/request-catalog/{id}` | Ubah item katalog | Token | Ya: Form katalog (`pages/requests/CatalogFormModal.tsx`), memakai PUT |
 | DELETE | `/api/request-catalog/{id}` | Hapus item katalog dan melepas tautannya | Token | Ya: Permintaan (`pages/requests/RequestsPage.tsx`) |

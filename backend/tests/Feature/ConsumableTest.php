@@ -8,7 +8,6 @@ use App\Enums\RequestStatus;
 use App\Models\Building;
 use App\Models\Consumable;
 use App\Models\Department;
-use App\Models\RequestCatalog;
 use App\Models\Room;
 use App\Models\RoomStandard;
 use App\Models\SupplyRequest;
@@ -111,13 +110,12 @@ class ConsumableTest extends TestCase
 
     public function test_store_and_show(): void
     {
-        $catalog = RequestCatalog::factory()->create(['provider_department_id' => $this->sga->id, 'item_name' => 'ATK Isi Ulang']);
-
-        $id = $this->postJson('/api/consumables', $this->payload(['catalog_id' => $catalog->id, 'storage_location' => 'Gudang IHS']))
+        // Stok tidak tertaut katalog: catalog_id yang masih dikirim diabaikan.
+        $id = $this->postJson('/api/consumables', $this->payload(['catalog_id' => 999, 'storage_location' => 'Gudang IHS']))
             ->assertCreated()
             ->assertJsonPath('data.status', 'Aman')
             ->assertJsonPath('data.provider_department.name', 'SGA')
-            ->assertJsonPath('data.catalog.item_name', 'ATK Isi Ulang')
+            ->assertJsonMissingPath('data.catalog')
             ->assertJsonPath('data.storage_location', 'Gudang IHS')
             ->assertJsonPath('data.open_request', null)
             ->json('data.id');
@@ -154,14 +152,11 @@ class ConsumableTest extends TestCase
     public function test_store_validation(): void
     {
         $this->consumable(['name' => 'Pulpen']);
-        $otherUnit = Department::factory()->create();
-        $catalog = RequestCatalog::factory()->create(['provider_department_id' => $otherUnit->id]);
 
-        $this->postJson('/api/consumables', $this->payload(['name' => ' PULPEN ', 'catalog_id' => $catalog->id, 'quantity' => -1]))
+        $this->postJson('/api/consumables', $this->payload(['name' => ' PULPEN ', 'quantity' => -1]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
                 'name' => 'Nama sudah digunakan.',
-                'catalog_id' => "Katalog harus dari departemen yang sama dengan 'minta ke'.",
                 'quantity' => 'Jumlah minimal 0.',
             ]);
 
@@ -200,21 +195,15 @@ class ConsumableTest extends TestCase
         $this->getJson('/api/consumables?status=Kosong')->assertUnprocessable();
     }
 
-    public function test_update_rejects_quantity_and_checks_catalog_against_current_provider(): void
+    public function test_update_rejects_quantity(): void
     {
         $item = $this->consumable(['name' => 'Pulpen', 'quantity' => 20]);
-        $otherCatalog = RequestCatalog::factory()->create();
-        $sgaCatalog = RequestCatalog::factory()->create(['provider_department_id' => $this->sga->id]);
 
         $this->putJson("/api/consumables/{$item->id}", ['quantity' => 99])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['quantity' => 'Jumlah diubah lewat ubah jumlah.']);
 
-        $this->putJson("/api/consumables/{$item->id}", ['catalog_id' => $otherCatalog->id])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['catalog_id' => "Katalog harus dari departemen yang sama dengan 'minta ke'."]);
-
-        $this->putJson("/api/consumables/{$item->id}", ['name' => 'pulpen', 'catalog_id' => $sgaCatalog->id, 'min_quantity' => 30])
+        $this->putJson("/api/consumables/{$item->id}", ['name' => 'pulpen', 'min_quantity' => 30])
             ->assertOk()
             ->assertJsonPath('data.name', 'pulpen')
             ->assertJsonPath('data.quantity', 20)

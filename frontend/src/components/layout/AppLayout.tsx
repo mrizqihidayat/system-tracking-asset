@@ -15,7 +15,7 @@ const menu = [
   { to: '/daftar-aset', label: 'Daftar Aset', icon: Boxes },
   { to: '/peminjaman', label: 'Peminjaman', icon: HandHelping },
   { to: '/kelengkapan-ruangan', label: 'Kelengkapan Ruangan', icon: ClipboardCheck },
-  { to: '/permintaan', label: 'Permintaan ke Departemen Lain', icon: Send },
+  { to: '/permintaan', label: 'Permintaan ke Unit Lain', icon: Send },
   { to: '/stok', label: 'Stok Habis Pakai', icon: PackageOpen },
 ]
 

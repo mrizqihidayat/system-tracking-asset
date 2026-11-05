@@ -26,7 +26,9 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
   const toast = useToast()
   const departments = useDepartments().data.filter((d) => !d.is_internal)
   const { data: allRooms } = useRooms()
-  const initialCatalog = request ? request.catalog?.id : prefill?.catalog_id
+  // Barang stok tidak memakai katalog (permintaan lama yang masih punya katalog ikut menjadi Item lain).
+  const linkedConsumable = request ? request.consumable_id : prefill?.consumable_id
+  const initialCatalog = linkedConsumable ? null : request ? request.catalog?.id : prefill?.catalog_id
   const [catalogId, setCatalogId] = useState<string>(
     initialCatalog ? String(initialCatalog) : request || prefill?.item_name ? MANUAL : '',
   )
@@ -66,7 +68,6 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
   const mustReturn = returnChoice ?? selected?.must_return ?? false
 
   // Tautan barang stok hanya berlaku selama itemnya tidak diganti di form.
-  const linkedConsumable = request ? request.consumable_id : prefill?.consumable_id
   const linkedStandard = request ? request.room_standard_id : prefill?.room_standard_id
   const initialName = request?.item_name ?? prefill?.item_name ?? ''
   const itemUnchanged = (selected?.id ?? null) === (initialCatalog ?? null) && (!manual || itemName.trim() === initialName.trim())
