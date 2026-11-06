@@ -239,7 +239,7 @@ flowchart TD
     K6 -- Tidak --> B
     K6 -- Ya --> K7{Bagian}
     K7 -- Aset --> K8[Tanpa aksi kekurangan; kode aset menaut ke Detail Aset] --> B
-    K7 -- Barang, stok masih ada --> F1[Klik Ambil dari stok] --> F2[(Jumlah = min kekurangan, stok; transaksi Pemakaian dengan ruangan tujuan, Ada bertambah)]
+    K7 -- Barang, stok masih ada --> F1[Klik Isi dari stok: popup jumlah default kekurangan, maks. sisa stok, peringatan jika melebihi standar, keterangan opsional; stok kurang → tautan Ajukan permintaan] --> F2[(Transaksi Pemakaian dengan ruangan tujuan dan keterangan, Ada bertambah)]
     F2 --> F3{Masih kurang?}
     F3 -- Tidak --> B
     F3 -- Ya --> F4[Sisa tetap tercatat kurang; stok 0 berganti ke Ajukan permintaan] --> B
@@ -301,7 +301,7 @@ flowchart TD
 
     C -- Kartu stok --> KS[Riwayat transaksi barang, terbaru lebih dulu] --> B
 
-    R0[Ambil dari stok di Kelengkapan Ruangan] --> R1[(Transaksi Pemakaian dengan ruangan tujuan, tidak pernah negatif)] --> CEK
+    R0[Isi dari stok di Kelengkapan Ruangan] --> R1[(Transaksi Pemakaian dengan ruangan tujuan, tidak pernah negatif)] --> CEK
     R2[Status permintaan tertaut barang ini berubah] --> R3[(Barang datang: Barang Masuk sesuai jumlah diterima; Dikembalikan / Dibatalkan dari Diterima: Koreksi, minimal 0)] --> CEK
 
     C -- Hapus --> H00{Ada transaksi selain saldo awal?}

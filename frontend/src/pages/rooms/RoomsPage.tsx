@@ -20,6 +20,7 @@ import { useChecklist, useReadiness } from '../../lib/queries/lists'
 import { prefetchRoomOptions } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { Checklist, ChecklistResult, RoomAssetGroup, RoomConsumable } from '../../types/room'
+import FillFromStockModal from './FillFromStockModal'
 import NameModal from './NameModal'
 import StandardFormModal, { type StandardTarget } from './StandardFormModal'
 
@@ -43,10 +44,11 @@ const chipRow = '-mx-4 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 pb-1 sm:
 const selectorRow = 'flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3'
 const selectorLabel = 'shrink-0 text-xs font-medium text-slate-500 sm:w-16 sm:pt-2'
 
-const requestUrl = (roomId: number, s: RoomConsumable) => {
+/** Form permintaan terisi barang, penyedia, ruangan, dan jumlah (bawaan = kekurangan). */
+const requestUrl = (roomId: number, s: RoomConsumable, quantity = s.shortage) => {
   const p = new URLSearchParams({ room_id: String(roomId), consumable_id: String(s.consumable.id), item_name: s.consumable.name })
   if (s.consumable.provider_department) p.set('provider_department_id', String(s.consumable.provider_department.id))
-  if (s.shortage) p.set('quantity', String(s.shortage))
+  if (quantity) p.set('quantity', String(quantity))
   return `/permintaan?${p}`
 }
 
@@ -100,7 +102,7 @@ export default function RoomsPage() {
   const [actual, setActual] = useState<Record<number, string>>({})
   const [actualFrom, setActualFrom] = useState<Checklist | null>(null)
   const [saving, setSaving] = useState(false)
-  const [filling, setFilling] = useState<number | null>(null)
+  const [filling, setFilling] = useState<RoomConsumable | null>(null)
   const [modal, setModal] = useState<'building' | 'room' | null>(null)
   const [standardTarget, setStandardTarget] = useState<StandardTarget | null>(null)
   const [removing, setRemoving] = useState<RoomConsumable | null>(null)
@@ -195,19 +197,6 @@ export default function RoomsPage() {
     }
   }
 
-  const fillFromStock = async (s: RoomConsumable) => {
-    setFilling(s.id)
-    try {
-      const res = await api.post<{ message: string }>(`/room-standards/${s.id}/fill-from-stock`)
-      toast.success(res.data.message)
-      await reloadAll()
-    } catch (e) {
-      toast.error(errorMessage(e))
-    } finally {
-      setFilling(null)
-    }
-  }
-
   const removeConsumable = async () => {
     if (!removing) return
     setBusy(true)
@@ -296,8 +285,8 @@ export default function RoomsPage() {
       cell: (s) => (
         <div className="space-y-1">
           {s.can_fill_from_stock && (
-            <Button variant="secondary" className="min-h-8! px-3! text-xs!" loading={filling === s.id} onClick={() => fillFromStock(s)}>
-              Ambil dari stok
+            <Button variant="secondary" className="min-h-8! px-3! text-xs!" onClick={() => setFilling(s)}>
+              Isi dari stok
             </Button>
           )}
           {s.can_request && roomId && (
@@ -485,6 +474,18 @@ export default function RoomsPage() {
           onClose={() => setStandardTarget(null)}
           onDone={() => {
             setStandardTarget(null)
+            reloadAll()
+          }}
+        />
+      )}
+      {filling && room && roomId && (
+        <FillFromStockModal
+          row={filling}
+          roomName={roomLabel}
+          requestHref={(quantity) => requestUrl(roomId, filling, quantity)}
+          onClose={() => setFilling(null)}
+          onDone={() => {
+            setFilling(null)
             reloadAll()
           }}
         />

@@ -252,14 +252,14 @@ class RoomReadinessService
     }
 
     /**
-     * Ambil dari stok: jumlah = min(kekurangan, stok). Pemakaian tercatat di kartu stok & Ada bertambah dalam satu transaksi;
-     * sisa kekurangan tetap tercatat.
+     * Isi dari stok: jumlah = `$quantity` (boleh melebihi kekurangan, maks. sisa stok) atau, jika kosong, min(kekurangan, stok).
+     * Pemakaian tercatat di kartu stok (dengan keterangan) & Ada bertambah dalam satu transaksi; sisa kekurangan tetap tercatat.
      *
      * @return array{standard: RoomStandard, filled: int, remaining_shortage: int, stock_remaining: int}
      */
-    public function fillFromStock(RoomStandard $standard, User $user): array
+    public function fillFromStock(RoomStandard $standard, User $user, ?int $quantity = null, ?string $note = null): array
     {
-        return DB::transaction(function () use ($standard, $user) {
+        return DB::transaction(function () use ($standard, $user, $quantity, $note) {
             $standard = RoomStandard::query()->whereKey($standard->getKey())->lockForUpdate()->firstOrFail();
 
             if ($standard->count_method !== CountMethod::Manual) {
@@ -277,14 +277,17 @@ class RoomReadinessService
             }
 
             $consumable = $standard->consumable()->lockForUpdate()->firstOrFail();
-            $filled = min($shortage, $consumable->quantity);
 
-            if ($filled <= 0) {
+            if ($consumable->quantity <= 0) {
                 throw ValidationException::withMessages(['standard' => "Stok {$consumable->name} habis."]);
             }
 
+            // Melebihi sisa stok ditolak oleh record(): "Stok tidak cukup (tersisa N)." di field quantity.
+            $filled = $quantity ?? min($shortage, $consumable->quantity);
+            $note = trim((string) $note);
+
             $transaction = $this->consumables->record($consumable, StockTransactionType::Pemakaian, -$filled, [
-                'note' => 'Ambil dari stok',
+                'note' => $note === '' ? 'Isi dari stok' : "Isi dari stok · {$note}",
                 'room_id' => $standard->room_id,
             ], $user);
             $standard->update(['actual_quantity' => $standard->actual_quantity + $filled]);
@@ -292,7 +295,7 @@ class RoomReadinessService
             return [
                 'standard' => $standard,
                 'filled' => $filled,
-                'remaining_shortage' => $shortage - $filled,
+                'remaining_shortage' => max(0, $shortage - $filled),
                 'stock_remaining' => $transaction->balance_after,
             ];
         });

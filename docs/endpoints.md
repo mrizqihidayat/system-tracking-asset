@@ -209,7 +209,7 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | POST | `/api/rooms/{id}/check` | Simpan hasil cek ruangan | Token | Ya: Kelengkapan Ruangan (`pages/rooms/RoomsPage.tsx`) |
 | PUT | `/api/room-standards/{id}` | Ubah standar ruangan | Token | Ya: Form standar (`pages/rooms/StandardFormModal.tsx`) |
 | DELETE | `/api/room-standards/{id}` | Hapus standar ruangan | Token | Ya: Form standar, Kelengkapan Ruangan (`pages/rooms/StandardFormModal.tsx`, `pages/rooms/RoomsPage.tsx`) |
-| POST | `/api/room-standards/{id}/fill-from-stock` | Ambil kekurangan dari stok | Token | Ya: Kelengkapan Ruangan (`pages/rooms/RoomsPage.tsx`) |
+| POST | `/api/room-standards/{id}/fill-from-stock` | Isi kekurangan dari stok (`quantity`, `note` opsional) | Token | Ya: Kelengkapan Ruangan (`pages/rooms/FillFromStockModal.tsx`) |
 
 ### Permintaan ke departemen lain
 

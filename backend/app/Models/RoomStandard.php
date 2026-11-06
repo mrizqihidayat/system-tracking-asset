@@ -49,7 +49,7 @@ class RoomStandard extends Model
     }
 
     /**
-     * Kurang dan stok masih ada → Ambil dari stok.
+     * Kurang dan stok masih ada → Isi dari stok.
      */
     public function canFillFromStock(): bool
     {

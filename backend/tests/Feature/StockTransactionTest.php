@@ -203,6 +203,49 @@ class StockTransactionTest extends TestCase
         $this->assertBalanced($item);
     }
 
+    public function test_fill_from_stock_accepts_custom_quantity_up_to_stock_with_note(): void
+    {
+        $item = $this->createItem(10);
+        $room = Room::factory()->create();
+        $standard = RoomStandard::factory()->create([
+            'room_id' => $room->id, 'consumable_id' => $item->id, 'standard_quantity' => 5, 'actual_quantity' => 2, 'count_method' => CountMethod::Manual,
+        ]);
+        $url = "/api/room-standards/{$standard->id}/fill-from-stock";
+
+        // Melebihi sisa stok ditolak, stok & Ada tidak berubah.
+        $this->postJson($url, ['quantity' => 11])->assertJsonValidationErrors(['quantity' => 'Stok tidak cukup (tersisa 10).']);
+        $this->postJson($url, ['quantity' => 0])->assertJsonValidationErrors('quantity');
+        $this->assertSame(10, $item->fresh()->quantity);
+        $this->assertSame(2, $standard->fresh()->actual_quantity);
+
+        // Lebih kecil dari kekurangan: sisa kekurangan tetap tercatat.
+        $this->postJson($url, ['quantity' => 1, 'note' => 'pelatihan K3'])
+            ->assertOk()
+            ->assertJsonPath('filled', 1)
+            ->assertJsonPath('remaining_shortage', 2)
+            ->assertJsonPath('stock_remaining', 9);
+
+        // Melebihi kekurangan (masih ≤ stok) diterima; Ada boleh di atas standar.
+        $this->postJson($url, ['quantity' => 6])
+            ->assertOk()
+            ->assertJsonPath('filled', 6)
+            ->assertJsonPath('remaining_shortage', 0)
+            ->assertJsonPath('data.result', 'Sesuai');
+        $this->assertSame(9, $standard->fresh()->actual_quantity);
+        $this->assertSame(3, $item->fresh()->quantity);
+
+        $this->getJson("/api/consumables/{$item->id}/transactions")
+            ->assertJsonPath('data.0.quantity', -6)
+            ->assertJsonPath('data.0.note', 'Isi dari stok')
+            ->assertJsonPath('data.1.quantity', -1)
+            ->assertJsonPath('data.1.note', 'Isi dari stok · pelatihan K3')
+            ->assertJsonPath('data.1.room.id', $room->id);
+        $this->assertBalanced($item);
+
+        // Sudah sesuai standar: tidak bisa diisi lagi dari sini.
+        $this->postJson($url, ['quantity' => 1])->assertJsonValidationErrors(['standard' => 'Jumlah sudah sesuai standar.']);
+    }
+
     private function stockRequest(Consumable $item, int $quantity = 10, array $overrides = []): SupplyRequest
     {
         return SupplyRequest::query()->findOrFail($this->postJson('/api/supply-requests', [

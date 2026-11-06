@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\CountMethod;
+use App\Http\Requests\FillFromStockRequest;
 use App\Http\Requests\SaveRoomCheckRequest;
 use App\Http\Requests\StoreRoomStandardRequest;
 use App\Http\Resources\RoomResource;
@@ -12,7 +13,6 @@ use App\Models\RoomStandard;
 use App\Services\RoomReadinessService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 /**
  * Kelengkapan ruangan (SPEC §8): aset di ruangan, standar per jenis/barang, simpan hasil cek, ambil dari stok.
@@ -64,14 +64,19 @@ class RoomStandardController extends Controller
         return $this->checklistResponse($room);
     }
 
-    public function fillFromStock(Request $request, RoomStandard $roomStandard): JsonResponse
+    public function fillFromStock(FillFromStockRequest $request, RoomStandard $roomStandard): JsonResponse
     {
-        $result = $this->readiness->fillFromStock($roomStandard, $request->user());
+        $result = $this->readiness->fillFromStock(
+            $roomStandard,
+            $request->user(),
+            $request->validated('quantity'),
+            $request->validated('note'),
+        );
 
         return response()->json([
             'message' => $result['remaining_shortage'] > 0
-                ? "Diambil {$result['filled']}, masih kurang {$result['remaining_shortage']}."
-                : "Diambil {$result['filled']}, sudah sesuai standar.",
+                ? "Diisi {$result['filled']}, masih kurang {$result['remaining_shortage']}."
+                : "Diisi {$result['filled']}, sudah sesuai standar.",
             'filled' => $result['filled'],
             'remaining_shortage' => $result['remaining_shortage'],
             'stock_remaining' => $result['stock_remaining'],
