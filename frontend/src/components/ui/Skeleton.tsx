@@ -74,9 +74,9 @@ export function TableSkeleton({ columns = 5, rows = 5 }: { columns?: number; row
 export function CardSkeleton() {
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3.5" aria-hidden>
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="mt-2.5 h-7 w-12" />
-      <Skeleton className="mt-2 h-3 w-32" />
+      <Skeleton className="h-3 w-24" />
+      <Skeleton className="mt-2 h-9 w-14" />
+      <Skeleton className="mt-2 h-3 w-36" />
     </div>
   )
 }

@@ -66,7 +66,7 @@ Satu jenis pengguna: **Staf/Admin Aset SHD**, tanpa role. Akun dibuat lewat seed
 ## 7. Peminjaman
 - Dicatat staf atas nama peminjam. Approval atasan di luar sistem, nomornya dicatat.
 - Satu transaksi = satu unit aset. Satu aset maksimal satu transaksi `Dipinjam` (lock + partial unique index).
-- **Field pinjam**: aset (scan/ketik kode), nama peminjam, departemen (teks bebas, tanpa saran), keperluan/kegiatan, gedung & ruangan tujuan (opsional, bisa catatan lokasi bebas), tanggal pinjam, rencana kembali (wajib, ≥ tanggal pinjam), no. / tanggal approval (opsional, satu kolom teks bebas, disimpan di `approval_number`).
+- **Field pinjam**: aset (scan/ketik kode), nama peminjam, departemen (teks bebas, tanpa saran), keperluan/kegiatan, lokasi tujuan (opsional, satu kolom teks bebas di form web, disimpan di `destination_note`; API tetap menerima `destination_room_id` opsional), tanggal pinjam, rencana kembali (wajib, ≥ tanggal pinjam), no. / tanggal approval (opsional, satu kolom teks bebas, disimpan di `approval_number`).
 - **Kondisi saat keluar** diisi otomatis dari kondisi aset saat dipinjam (tidak diinput staf). Jika kondisi fisik berbeda, staf memakai "Catat kerusakan" dulu.
 - **Tanggal pinjam** default hari ini; boleh tanggal lampau (pencatatan terlambat), tidak boleh di masa depan, dan tidak boleh sebelum aset terdaftar. Jika rencana kembali sudah lewat, transaksi otomatis tampil terlambat. `created_at` transaksi tetap mencatat waktu pencatatan sebenarnya.
 - Syarat: aset ada dan status `Tersedia` (bukan Perbaikan/Hilang/Tidak Layak Pakai). Efek: status → `Dipinjam`, riwayat "Dipinjam" (pihak = peminjam, bertanggal pinjam).
@@ -130,7 +130,7 @@ Satu jenis pengguna: **Staf/Admin Aset SHD**, tanpa role. Akun dibuat lewat seed
 
 ## 11. Dashboard
 Kartu:
-- Total aset tercatat (rincian milik SHD · dari departemen lain), **tidak menghitung** aset `Tidak Layak Pakai`; jumlah Tidak Layak Pakai ditampilkan terpisah bila perlu
+- Total aset tercatat (rincian "{n} milik SHD · {n} dari departemen lain"), **tidak menghitung** aset `Tidak Layak Pakai`; jumlah Tidak Layak Pakai tidak ditampilkan di kartu (`not_feasible` tetap ada di API)
 - Sedang dipinjam (jatuh tempo hari ini, terlambat)
 - Perlu perbaikan (jumlah aset berstatus `Perbaikan`)
 - Ruangan belum lengkap (dari N ruangan di M gedung, tanpa ruangan gudang; hanya baris Kurang, Belum dicek tidak dihitung)
@@ -196,7 +196,7 @@ Lihat `docs/erd.dbml` (sumber kebenaran skema). Ringkasan tabel:
 
 **Stok habis pakai**: `GET /consumables` (`status`, `category` = nama kategori stok, `provider_department_id`, `building_id`, `room_id`, `search` nama barang/kategori; baris memuat `consumable_category_id`, `category` = nama, `room` (+ `building`) & `open_request`), `POST /consumables` (`consumable_category_id` opsional, `room_id` wajib dan harus ruangan gudang; `quantity` menjadi saldo awal), `GET /consumables/{id}` (+ `meta.used_in_rooms`), `GET /consumables/{id}/usage` (`rooms`, `delete_block_reason`), `PUT /consumables/{id}` (tanpa `quantity`), `GET /consumables/{id}/transactions` (kartu stok, paginasi `per_page` ≤ 100), `POST /consumables/{id}/transactions` (`type`, `quantity`, `reason`, `note`, `room_id`; respons + `meta.consumable`), `DELETE /consumables/{id}` (permanen jika hanya saldo awal, selain itu 422; `detached_rooms`). `GET /rooms/{id}/usage` menyebut jumlah barang yang memakai ruangan sebagai lokasi simpan; hapus ruangan ditolak selama masih dipakai.
 
-**Dashboard**: `GET /dashboard/cards` (semua kartu), `GET /dashboard/room-readiness` (panel kesiapan per gedung), `GET /dashboard/panels` (jatuh tempo, permintaan terbaru, perlu servis, stok menipis) (§11; kartu "Ruangan belum lengkap" memakai semua ruangan/gedung sebagai penyebut, hanya baris Kurang dengan standar > 0 yang dihitung, ruangan tanpa standar dihitung terpisah `rooms_without_standards`, ruangan gudang tidak masuk semua hitungan ini; "Perlu perbaikan" = aset Perbaikan; "Stok menipis" = Menipis + Habis)
+**Dashboard**: `GET /dashboard/cards` (semua kartu), `GET /dashboard/room-readiness` (panel kesiapan per gedung), `GET /dashboard/panels` (jatuh tempo, permintaan terbaru, perlu servis, stok menipis) (§11; kartu "Ruangan belum lengkap" memakai semua ruangan/gedung sebagai penyebut, hanya baris Kurang dengan standar > 0 yang dihitung, ruangan tanpa standar dihitung terpisah `rooms_without_standards`, ruangan gudang tidak masuk semua hitungan ini; "Perlu perbaikan" = aset Perbaikan (`needs_repair`: `assets_in_repair`, rincian kondisi `light_damage` = Rusak Ringan, `heavy_damage` = Rusak Berat; kartu menampilkan "{n} rusak ringan · {n} rusak berat"); "Stok menipis" = Menipis + Habis)
 
 **Ekspor**: `GET /reports/{type}?...filter` (type: assets, loans, rooms, requests, consumables) → unduhan `laporan-{jenis}-{yyyymmdd}.xlsx`. Tidak ada parameter `format`; jika dikirim hanya `xlsx` yang diterima (selain itu 422). Type tidak dikenal → 404; filter tidak valid → 422.
 

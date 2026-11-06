@@ -6,7 +6,6 @@ import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
 import type { Asset } from '../../types/asset'
 import AssetPicker, { type PickedAsset } from './AssetPicker'
-import RoomSelect from './RoomSelect'
 
 const today = () => new Date().toLocaleDateString('en-CA')
 
@@ -14,8 +13,6 @@ const emptyForm = () => ({
   borrower_name: '',
   borrower_unit: '',
   purpose: '',
-  buildingId: null as number | null,
-  roomId: null as number | null,
   destination_note: '',
   borrow_date: today(),
   due_date: '',
@@ -68,7 +65,6 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
         borrower_name: form.borrower_name.trim(),
         borrower_unit: form.borrower_unit.trim(),
         purpose: form.purpose.trim(),
-        destination_room_id: form.roomId,
         destination_note: form.destination_note.trim() || null,
         borrow_date: form.borrow_date || null,
         due_date: form.due_date,
@@ -105,16 +101,14 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
           <Input value={form.purpose} onChange={(e) => set('purpose', e.target.value)} error={errors.purpose} maxLength={255} />
         </FormField>
 
-        <RoomSelect
-          buildingLabel="Gedung tujuan"
-          roomLabel="Ruangan tujuan"
-          buildingId={form.buildingId}
-          roomId={form.roomId}
-          onChange={(b, r) => setForm((f) => ({ ...f, buildingId: b, roomId: r }))}
-          error={errors.destination_room_id}
-        />
-        <FormField label="Catatan lokasi (opsional, jika di luar ruangan terdaftar)" error={errors.destination_note}>
-          <Input value={form.destination_note} onChange={(e) => set('destination_note', e.target.value)} error={errors.destination_note} maxLength={255} />
+        <FormField label="Lokasi tujuan" error={errors.destination_note}>
+          <Input
+            value={form.destination_note}
+            onChange={(e) => set('destination_note', e.target.value)}
+            placeholder="Misal: Gedung IHS, Ruang Kelas 1"
+            error={errors.destination_note}
+            maxLength={255}
+          />
         </FormField>
 
         <div className="grid gap-3 sm:grid-cols-2">

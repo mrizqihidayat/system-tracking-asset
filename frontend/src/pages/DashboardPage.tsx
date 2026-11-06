@@ -1,5 +1,5 @@
 import { QrCode, Search } from 'lucide-react'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AssetCode, Badge } from '../components/ui/Badge'
 import { buttonClass } from '../components/ui/button-class'
@@ -16,15 +16,28 @@ import type { Loan } from '../types/loan'
 
 const requestColor = { Diajukan: 'blue', 'Diterima sebagian': 'amber', Diterima: 'green', 'Belum direspons': 'amber', Dikembalikan: 'slate', Dibatalkan: 'red' } as const
 
-function StatCard({ label, value, to, alert, note }: { label: string; value: number; to: string; alert?: boolean; note?: ReactNode }) {
+/** Satu baris keterangan kartu; `bad` = merah tebal (perlu tindakan). */
+type NoteLine = { text: string; bad?: boolean }
+
+/** Kartu ringkasan: label, angka besar, lalu keterangan kecil; label & keterangan turun ke baris berikut jika tidak cukup. */
+function StatCard({ label, value, to, alert, notes }: { label: string; value: number; to: string; alert?: boolean; notes: NoteLine[] }) {
   return (
     <Link
       to={to}
       className="group rounded-xl border border-slate-200 bg-white px-4 py-3.5 transition-colors hover:border-brand-200"
     >
-      <p className="text-sm font-medium text-slate-500 group-hover:text-brand-700">{label}</p>
-      <p className={`mt-0.5 text-3xl font-bold tabular-nums ${alert ? 'text-bad-700' : ''}`}>{value}</p>
-      {note && <p className="mt-0.5 text-xs text-slate-500">{note}</p>}
+      <p className="text-xs font-semibold uppercase leading-snug tracking-wide text-slate-500 group-hover:text-brand-700">
+        {label}
+      </p>
+      <p className={`mt-1 text-4xl font-bold leading-none tabular-nums ${alert ? 'text-bad-700' : ''}`}>{value}</p>
+      <p className="mt-2 text-[11px] leading-snug text-slate-500">
+        {notes.map((n, i) => (
+          <span key={n.text}>
+            {i > 0 && ' · '}
+            <span className={n.bad ? 'font-semibold text-bad-700' : ''}>{n.text}</span>
+          </span>
+        ))}
+      </p>
     </Link>
   )
 }
@@ -103,56 +116,57 @@ export default function DashboardPage() {
           label="Total aset"
           value={cards.total_assets.total}
           to="/daftar-aset"
-          note={
-            <>
-              {cards.total_assets.owned_by_shd} milik SHD · {cards.total_assets.from_other_units} departemen lain
-              {cards.total_assets.not_feasible > 0 && ` · ${cards.total_assets.not_feasible} tidak layak pakai`}
-            </>
-          }
+          notes={[
+            { text: `${cards.total_assets.owned_by_shd} milik SHD` },
+            { text: `${cards.total_assets.from_other_units} dari departemen lain` },
+          ]}
         />
         <StatCard
           label="Sedang dipinjam"
           value={cards.active_loans.total}
           to="/peminjaman"
-          note={
-            <>
-              {cards.active_loans.due_today} jatuh tempo hari ini
-              {cards.active_loans.overdue > 0 && (
-                <span className="font-semibold text-bad-700"> · {cards.active_loans.overdue} terlambat</span>
-              )}
-            </>
-          }
+          notes={[
+            { text: `${cards.active_loans.due_today} jatuh tempo hari ini` },
+            { text: `${cards.active_loans.overdue} terlambat`, bad: cards.active_loans.overdue > 0 },
+          ]}
         />
         <StatCard
           label="Perlu perbaikan"
           value={cards.needs_repair.assets_in_repair}
           to="/daftar-aset?status=Perbaikan"
+          notes={[
+            { text: `${cards.needs_repair.light_damage} rusak ringan` },
+            { text: `${cards.needs_repair.heavy_damage} rusak berat` },
+          ]}
         />
         <StatCard
           label="Ruangan belum lengkap"
           value={cards.incomplete_rooms.incomplete}
           to="/kelengkapan-ruangan"
           alert={cards.incomplete_rooms.incomplete > 0}
-          note={`dari ${cards.incomplete_rooms.total_rooms} ruangan · ${cards.incomplete_rooms.total_buildings} gedung`}
+          notes={[
+            { text: `dari ${cards.incomplete_rooms.total_rooms} ruangan` },
+            { text: `di ${cards.incomplete_rooms.total_buildings} gedung` },
+          ]}
         />
         <StatCard
           label="Perlu servis"
           value={cards.needs_service.total}
           to="/daftar-aset"
-          note={
-            cards.needs_service.overdue > 0 ? (
-              <span className="font-semibold text-bad-700">{cards.needs_service.overdue} lewat tanggal</span>
-            ) : (
-              `${cards.needs_service.upcoming} dalam 14 hari`
-            )
-          }
+          notes={[
+            { text: `${cards.needs_service.overdue} lewat tanggal`, bad: cards.needs_service.overdue > 0 },
+            { text: `${cards.needs_service.upcoming} dalam 14 hari` },
+          ]}
         />
         <StatCard
           label="Stok menipis"
           value={cards.low_stock.total}
           to="/stok"
           alert={cards.low_stock.habis > 0}
-          note={`${cards.low_stock.menipis} menipis · ${cards.low_stock.habis} habis`}
+          notes={[
+            { text: `${cards.low_stock.menipis} menipis` },
+            { text: `${cards.low_stock.habis} habis`, bad: cards.low_stock.habis > 0 },
+          ]}
         />
         </>}
       </div>
@@ -254,7 +268,7 @@ export default function DashboardPage() {
                     </div>
                     <ReadinessBar complete={complete} incomplete={incomplete} />
                     <p className="text-sm text-slate-500">
-                      {complete} lengkap · {incomplete} kurang · {b.rooms_without_standards} belum ada standar · {b.rooms_count} ruangan
+                      {complete} lengkap · {incomplete} kurang · {b.rooms_count} ruangan
                     </p>
                     {incomplete > 0 && (
                       <ul className="space-y-1 pt-1 text-sm">

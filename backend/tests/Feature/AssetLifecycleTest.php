@@ -121,7 +121,7 @@ class AssetLifecycleTest extends TestCase
         $this->assertSame('Rusak Berat', $asset->condition->value);
         $this->assertSame(['Registrasi', 'Dipinjam', 'Dikembalikan'], $this->eventTypes($asset));
         $this->assertSame('Kurang', $this->checklistRow()['result']);
-        $this->assertSame(['assets_in_repair' => 1], $this->dashboard()['needs_repair']);
+        $this->assertSame(['assets_in_repair' => 1, 'light_damage' => 0, 'heavy_damage' => 1], $this->dashboard()['needs_repair']);
         $this->assertSame(0, $this->dashboard()['active_loans']['total']);
 
         // 4. Servis → Tersedia lagi, jadwal servis berikutnya dekat → muncul "perlu servis"

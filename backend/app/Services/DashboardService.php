@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Enums\ConsumableStatus;
 use App\Http\Resources\ConsumableResource;
@@ -38,9 +39,7 @@ class DashboardService
         return $this->remember('cards', fn () => [
             'total_assets' => $this->totalAssets(),
             'active_loans' => $this->activeLoans(),
-            'needs_repair' => [
-                'assets_in_repair' => Asset::query()->where('status', AssetStatus::Perbaikan->value)->count(),
-            ],
+            'needs_repair' => $this->needsRepair(),
             'incomplete_rooms' => $this->incompleteRooms($this->readiness->summary()),
             'needs_service' => $this->needsService(),
             'low_stock' => $this->lowStockCounts(),
@@ -172,6 +171,26 @@ class DashboardService
     /**
      * @return array{total: int, menipis: int, habis: int}
      */
+    /**
+     * Aset Perbaikan + rincian kondisinya (satu query group by).
+     *
+     * @return array{assets_in_repair: int, light_damage: int, heavy_damage: int}
+     */
+    private function needsRepair(): array
+    {
+        $byCondition = Asset::query()
+            ->where('status', AssetStatus::Perbaikan->value)
+            ->groupBy('condition')
+            ->selectRaw('condition, count(*) as total')
+            ->pluck('total', 'condition');
+
+        return [
+            'assets_in_repair' => (int) $byCondition->sum(),
+            'light_damage' => (int) ($byCondition[AssetCondition::RusakRingan->value] ?? 0),
+            'heavy_damage' => (int) ($byCondition[AssetCondition::RusakBerat->value] ?? 0),
+        ];
+    }
+
     private function lowStockCounts(): array
     {
         $menipis = Consumable::query()->withStatus(ConsumableStatus::Menipis)->count();
