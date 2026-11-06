@@ -1,11 +1,13 @@
 import { Camera } from 'lucide-react'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { AssetCode, StatusBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { dropdownOptionClass, dropdownPanelClass } from '../../components/ui/dropdown-class'
 import { FormField, Input } from '../../components/ui/FormField'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toast-context'
+import { useAnchoredPanel } from '../../components/ui/useAnchoredPanel'
 import { api, errorMessage } from '../../lib/api'
 import { Scanner } from '../../lib/qr-scanner'
 import type { Paginated } from '../../types/api'
@@ -24,6 +26,8 @@ interface Props {
 const MIN_CHARS = 2
 const SEARCH_DELAY_MS = 100
 const PAGE_SIZE = 100
+/** Tinggi satu saran (kode + nama + lokasi), untuk menilai apakah daftar muat di bawah kolom. */
+const OPTION_HEIGHT = 60
 
 /** "Aset dipinjam": ketik kode (saran aset Tersedia muncul di bawahnya) atau scan QR; hanya aset yang boleh dipinjam yang diterima. */
 export default function AssetPicker({ asset, onPick, error }: Props) {
@@ -35,6 +39,7 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
   const box = useRef<HTMLDivElement>(null)
+  const list = useRef<HTMLUListElement>(null)
 
   const query = text.trim()
 
@@ -65,16 +70,15 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
     }
   }, [query])
 
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
-
   const items = query.length >= MIN_CHARS && suggestions?.query === query ? suggestions.items : []
   const showList = open && query.length >= MIN_CHARS && suggestions?.query === query
+
+  // Daftar dirender ke body (fixed) agar tidak terpotong area scroll popup; posisinya mengikuti kolom.
+  const close = useCallback(() => setOpen(false), [])
+  const { style, place } = useAnchoredPanel(box, list, showList, Math.max(items.length, 1), close, { optionHeight: OPTION_HEIGHT })
+  useLayoutEffect(() => {
+    if (showList) place()
+  }, [showList, items.length, place])
 
   const pick = (a: PickedAsset) => {
     setText('')
@@ -106,7 +110,11 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
       e.preventDefault()
       setActive((i) => (i <= 0 ? items.length - 1 : i - 1))
     } else if (e.key === 'Escape') {
-      setOpen(false)
+      if (showList) {
+        // Hanya menutup daftar, bukan popup di belakangnya.
+        e.stopPropagation()
+        setOpen(false)
+      }
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (showList && active >= 0 && items[active]) pick(items[active])
@@ -148,11 +156,14 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
               aria-activedescendant={active >= 0 ? `asset-suggestion-${active}` : undefined}
               error={error}
             />
-            {showList && (
+            {showList && createPortal(
               <ul
+                ref={list}
                 id="asset-suggestions"
                 role="listbox"
-                className={`absolute z-10 mt-1.5 max-h-72 w-full ${dropdownPanelClass}`}
+                style={style}
+                onMouseDown={(e) => e.preventDefault()}
+                className={`fixed z-50 ${dropdownPanelClass}`}
               >
                 {items.length === 0 ? (
                   <li className="px-3 py-2.5 text-slate-500">Tidak ada aset tersedia yang cocok.</li>
@@ -175,7 +186,8 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
                     </li>
                   ))
                 )}
-              </ul>
+              </ul>,
+              document.body,
             )}
           </div>
           <Button variant="secondary" loading={loading} onClick={() => find(text)}>Cari</Button>

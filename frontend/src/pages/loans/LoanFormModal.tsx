@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import { FormField, Input } from '../../components/ui/FormField'
+import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
 import type { Asset } from '../../types/asset'
@@ -19,40 +19,46 @@ const emptyForm = () => ({
   approval_number: '',
 })
 
-/** Kartu "Catat peminjaman baru" (mockup halaman Peminjaman & Pengembalian). */
-export default function LoanForm({ onSaved }: { onSaved: () => void }) {
+interface Props {
+  /** Dari `?asset_id=` (detail aset / hasil scan): aset diisi otomatis jika boleh dipinjam. */
+  initialAssetId?: string | null
+  onClose: () => void
+  onSaved: () => void
+}
+
+/** Popup "Catat peminjaman baru": isi bisa di-scroll, tombol Simpan selalu terlihat di bawah. */
+export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Props) {
   const toast = useToast()
-  const [params, setParams] = useSearchParams()
-  const presetId = params.get('asset_id')
   const [asset, setAsset] = useState<PickedAsset | null>(null)
+  const [loadingAsset, setLoadingAsset] = useState(!!initialAssetId)
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
 
   const set = <K extends keyof ReturnType<typeof emptyForm>>(key: K, value: ReturnType<typeof emptyForm>[K]) =>
     setForm((f) => ({ ...f, [key]: value }))
 
-  // ?asset_id=<id> (dari detail aset / hasil scan): isi aset otomatis jika boleh dipinjam.
   useEffect(() => {
-    if (!presetId) return
+    if (!initialAssetId) return
+    let cancelled = false
     api
-      .get<{ data: Asset; meta: { actions: string[] } }>(`/assets/${presetId}`)
+      .get<{ data: Asset; meta: { actions: string[] } }>(`/assets/${encodeURIComponent(initialAssetId)}`)
       .then((res) => {
+        if (cancelled) return
         if (res.data.meta.actions.includes('pinjam')) setAsset(res.data.data)
         else toast.error(`${res.data.data.code} berstatus ${res.data.data.status}, tidak dapat dipinjam.`)
       })
-      .catch((e) => toast.error(errorMessage(e)))
-      .finally(() => setParams((p) => (p.delete('asset_id'), p), { replace: true }))
-  }, [presetId, setParams, toast])
-
-  const reset = () => {
-    setAsset(null)
-    setForm(emptyForm())
-    setErrors({})
-  }
+      .catch((e) => !cancelled && toast.error(errorMessage(e)))
+      .finally(() => !cancelled && setLoadingAsset(false))
+    return () => {
+      cancelled = true
+    }
+  }, [initialAssetId, toast])
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    setMessage('')
     if (!asset) {
       setErrors({ asset_id: 'Pilih aset yang dipinjam.' })
       return
@@ -71,22 +77,41 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
         approval_number: form.approval_number.trim() || null,
       })
       toast.success(`Peminjaman ${asset.code} tersimpan.`)
-      reset()
       onSaved()
     } catch (error) {
       const fields = fieldErrors(error)
       setErrors(fields)
-      if (Object.keys(fields).length === 0) toast.error(errorMessage(error))
+      if (Object.keys(fields).length === 0) setMessage(errorMessage(error))
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
-      <h2 className="mb-4 font-semibold">Catat peminjaman baru</h2>
-      <form onSubmit={submit} className="space-y-4">
-        <AssetPicker asset={asset} onPick={setAsset} error={errors.asset_id} />
+    <Modal
+      open
+      size="lg"
+      title="Catat peminjaman baru"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Batal</Button>
+          <Button type="submit" form="loan-form" loading={saving}>Simpan peminjaman</Button>
+        </>
+      }
+    >
+      <form id="loan-form" onSubmit={submit} className="space-y-4">
+        {message && (
+          <div role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
+            {message}
+          </div>
+        )}
+
+        {loadingAsset ? (
+          <p role="status" className="text-sm text-slate-500">Memuat aset…</p>
+        ) : (
+          <AssetPicker asset={asset} onPick={setAsset} error={errors.asset_id} />
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Nama peminjam" required error={errors.borrower_name}>
@@ -125,12 +150,7 @@ export default function LoanForm({ onSaved }: { onSaved: () => void }) {
             <Input value={form.approval_number} placeholder="Opsional" onChange={(e) => set('approval_number', e.target.value)} error={errors.approval_number} maxLength={100} />
           </FormField>
         </div>
-
-        <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row">
-          <Button variant="secondary" onClick={reset}>Kosongkan</Button>
-          <Button type="submit" loading={saving}>Simpan peminjaman</Button>
-        </div>
       </form>
-    </section>
+    </Modal>
   )
 }

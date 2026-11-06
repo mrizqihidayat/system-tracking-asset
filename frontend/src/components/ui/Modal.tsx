@@ -7,14 +7,21 @@ interface Props {
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
+  /** `lg`: dialog lebih lebar di layar sm ke atas (form dua kolom). */
+  size?: 'md' | 'lg'
 }
 
-export default function Modal({ open, title, onClose, children, footer }: Props) {
+export default function Modal({ open, title, onClose, children, footer, size = 'md' }: Props) {
   const panel = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      // Popup bertumpuk (mis. scan QR di dalam form): hanya yang paling atas yang ditutup.
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      if (dialogs[dialogs.length - 1] === panel.current) onClose()
+    }
     document.addEventListener('keydown', onKey)
     panel.current?.focus()
     return () => document.removeEventListener('keydown', onKey)
@@ -31,7 +38,7 @@ export default function Modal({ open, title, onClose, children, footer }: Props)
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-white shadow-[0_-8px_32px_rgb(20_33_46/0.18)] outline-none sm:max-h-full sm:max-w-lg sm:rounded-xl sm:shadow-[0_16px_48px_rgb(20_33_46/0.22)]"
+        className={`flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-white shadow-[0_-8px_32px_rgb(20_33_46/0.18)] outline-none sm:max-h-full ${size === 'lg' ? 'sm:max-w-2xl' : 'sm:max-w-lg'} sm:rounded-xl sm:shadow-[0_16px_48px_rgb(20_33_46/0.22)]`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">

@@ -1,6 +1,6 @@
-import { EllipsisVertical, Search } from 'lucide-react'
+import { EllipsisVertical, Plus, Search } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { AssetCode, Badge, ConditionBadge } from '../../components/ui/Badge'
@@ -19,10 +19,10 @@ import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
 import type { Loan, LoanStatus } from '../../types/loan'
 import CancelLoanModal from './CancelLoanModal'
-import LoanForm from './LoanForm'
+import LoanFormModal from './LoanFormModal'
 import ReturnLoanModal from './ReturnLoanModal'
 
-type ModalState = { kind: 'return' | 'cancel'; loan: Loan } | null
+type ModalState = { kind: 'return' | 'cancel'; loan: Loan } | { kind: 'borrow' } | null
 
 const statusColor = { Dipinjam: 'blue', Dikembalikan: 'green', Dibatalkan: 'slate', Hilang: 'red' } as const
 
@@ -48,6 +48,7 @@ export default function LoanPage() {
   const toast = useToast()
   const [params, setParams] = useSearchParams()
   const returnLoanId = params.get('return_loan_id')
+  const borrowAssetId = params.get('asset_id')
   const [modal, setModal] = useState<ModalState>(null)
   const activeList = useListParams(listConfigs.activeLoans)
   const historyList = useListParams(listConfigs.loanHistory)
@@ -81,27 +82,35 @@ export default function LoanPage() {
     }
   }, [returnLoanId, setParams, toast])
 
-  const refresh = () => invalidate.loans(queryClient)
-  const closeModal = () => setModal(null)
-  const done = () => {
+  // Stabil: Modal memfokuskan dirinya ulang setiap kali onClose berganti.
+  const closeModal = useCallback(() => {
+    setModal(null)
+    setParams((p) => (p.has('asset_id') ? (p.delete('asset_id'), p) : p), { replace: true })
+  }, [setParams])
+  const done = useCallback(() => {
     closeModal()
-    refresh()
-  }
+    invalidate.loans(queryClient)
+  }, [closeModal, queryClient])
+  const openBorrow = () => setModal({ kind: 'borrow' })
+  // ?asset_id=<id> (dari detail aset / hasil scan) membuka popup pinjam dengan aset terisi. Parameter tetap di URL
+  // sampai popup ditutup atau disimpan, lalu dihapus tanpa menambah riwayat browser (closeModal).
+  const borrowOpen = modal?.kind === 'borrow' || !!borrowAssetId
 
   const activeColumns: Column<Loan>[] = [
+    { header: 'Aset', mobile: 'title', cell: assetCell },
     {
-      header: 'Aset & peminjam',
-      mobile: 'title',
+      header: 'Peminjam & departemen',
       cell: (l) => (
         <>
-          {assetCell(l)}
-          <span className="block text-xs text-slate-500">{l.borrower_name} · {l.borrower_unit}</span>
+          {l.borrower_name}
+          <span className="block text-xs text-slate-500">{l.borrower_unit}</span>
         </>
       ),
     },
+    { header: 'Tgl. pinjam', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.borrow_date)}</span> },
     { header: 'Tempo', mobile: 'badge', cell: (l) => <Tempo loan={l} /> },
     {
-      header: '',
+      header: 'Aksi',
       className: 'text-right',
       cell: (l) => (
         <div className="flex items-center gap-1 md:justify-end">
@@ -151,36 +160,35 @@ export default function LoanPage() {
       <PageHeader
         title="Peminjaman & Pengembalian"
         description="Dicatat admin atas nama peminjam. Approval atasan di luar sistem, nomornya dicatat di sini."
-        actions={<ExportButton type="loans" filters={() => ({ status, search: search.trim() })} />}
+        actions={
+          <>
+            <ExportButton type="loans" filters={() => ({ status, search: search.trim() })} />
+            <Button onClick={openBorrow}>
+              <Plus size={16} /> Catat peminjaman
+            </Button>
+          </>
+        }
       />
 
       {returnLoanId && <p role="status" className="text-sm text-slate-500">Memuat peminjaman…</p>}
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-        <LoanForm onSaved={refresh} />
-
-        <section className="space-y-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-semibold">Sedang dipinjam</h2>
-            <span className="text-sm text-slate-500">{active.data?.meta.total ?? 0} aset</span>
-          </div>
-          <DataTable
-            columns={activeColumns}
-            rows={active.data?.data ?? []}
-            rowKey={(l) => l.id}
-            loading={active.isPending}
-            fetching={active.isPlaceholderData}
-            emptyText="Tidak ada aset yang sedang dipinjam."
-            meta={active.data?.meta}
-            unit="aset"
-            onPageChange={activeList.setPage}
-          />
-          <p className="text-xs text-slate-500">
-            Saat menerima kembali, admin memilih kondisi aset. Rusak Ringan bisa dipilih Tersedia atau Perbaikan, Rusak Berat
-            bisa dipilih Perbaikan atau Tidak Layak Pakai.
-          </p>
-        </section>
-      </div>
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-semibold">Sedang dipinjam</h2>
+          <span className="text-sm text-slate-500">{active.data?.meta.total ?? 0} aset</span>
+        </div>
+        <DataTable
+          columns={activeColumns}
+          rows={active.data?.data ?? []}
+          rowKey={(l) => l.id}
+          loading={active.isPending}
+          fetching={active.isPlaceholderData}
+          emptyText="Tidak ada aset yang sedang dipinjam."
+          meta={active.data?.meta}
+          unit="aset"
+          onPageChange={activeList.setPage}
+        />
+      </section>
 
       <section className="space-y-3">
         <h2 className="font-semibold">Riwayat peminjaman</h2>
@@ -218,6 +226,7 @@ export default function LoanPage() {
         />
       </section>
 
+      {borrowOpen && <LoanFormModal key={borrowAssetId ?? 'baru'} initialAssetId={borrowAssetId} onClose={closeModal} onSaved={done} />}
       {modal?.kind === 'return' && <ReturnLoanModal loan={modal.loan} onClose={closeModal} onDone={done} />}
       {modal?.kind === 'cancel' && <CancelLoanModal loan={modal.loan} onClose={closeModal} onDone={done} />}
     </div>
