@@ -41,7 +41,7 @@ Menu Lisensi Digital tampil nonaktif di sidebar (Fase 2).
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Daftar aset berhalaman: kolom Kode, Nama, Kategori, Lokasi, Sumber Milik SHD atau nama departemen, Kondisi, Status; filter kategori, gedung, ruangan, status; cari nama, kode, S/N, kode lama]
+    A([Mulai]) --> B[Daftar aset berhalaman: kolom Kode, Nama, Kategori, Lokasi, Sumber nama departemen, Kondisi, Status; filter kategori, gedung, ruangan, status; cari nama, kode, S/N, kode lama]
     B --> C{Pilih aksi}
 
     C -- Tambah aset --> T1[Input jenis, nama, merek, S/N, spesifikasi, sumber, PIC, gedung & ruangan, kode keuangan, tgl perolehan, servis berikutnya, kondisi, catatan; kategori tampil otomatis dari jenis; jenis, sumber, gedung, ruangan baru bisa langsung ditambah; jenis baru lewat popup pilih kategori wajib, kategori baru bisa ditambah, kode otomatis; tampil Kode otomatis di bawah nama]

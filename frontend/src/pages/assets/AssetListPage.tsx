@@ -1,5 +1,5 @@
 import { Plus, Search, SlidersHorizontal } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import { AssetCode, StatusBadge } from '../../components/ui/Badge'
@@ -49,6 +49,7 @@ export default function AssetListPage() {
 
   const rows = result?.data ?? []
   const allOnPage = rows.length > 0 && rows.every((a) => selected.has(a.id))
+  const someOnPage = !allOnPage && rows.some((a) => selected.has(a.id))
   const togglePage = () =>
     setSelected((prev) => {
       const next = new Set(prev)
@@ -72,6 +73,19 @@ export default function AssetListPage() {
       header: 'Pilih',
       className: 'w-10',
       mobile: 'badge',
+      headerContent: (
+        <input
+          type="checkbox"
+          checked={allOnPage}
+          ref={(el) => {
+            if (el) el.indeterminate = someOnPage
+          }}
+          disabled={rows.length === 0}
+          onChange={togglePage}
+          aria-label={allOnPage ? 'Batal pilih semua di halaman ini' : 'Pilih semua di halaman ini'}
+          title={allOnPage ? 'Batal pilih semua di halaman ini' : 'Pilih semua di halaman ini'}
+        />
+      ),
       cell: (a) => (
         <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggle(a.id)} aria-label={`Pilih ${a.code}`} />
       ),
@@ -92,15 +106,15 @@ export default function AssetListPage() {
       header: 'Lokasi',
       cell: (a) =>
         a.room_name ? (
-          <>
+          <span className="whitespace-nowrap">
             {a.room_name}
-            <span className="block text-xs text-slate-500">{a.building_name}</span>
-          </>
+            <span className="text-slate-500"> · {a.building_name}</span>
+          </span>
         ) : (
           '-'
         ),
     },
-    { header: 'Sumber', cell: (a) => (a.source_is_internal ? 'Milik SHD' : a.source_name ?? '-') },
+    { header: 'Sumber', cell: (a) => a.source_name ?? '-' },
     { header: 'Kondisi', sortKey: 'condition', cell: (a) => <span className="whitespace-nowrap">{a.condition}</span> },
     { header: 'Status', mobile: 'badge', sortKey: 'status', cell: (a) => <StatusBadge status={a.status} /> },
     {
@@ -119,13 +133,6 @@ export default function AssetListPage() {
   const total = result?.meta.total
   const subtitle =
     total === undefined ? ' ' : hasFilter ? `${total} aset cocok dengan filter` : `${total} aset tercatat`
-
-  const field = (label: string, control: ReactNode, className = '') => (
-    <label className={`block space-y-1.5 ${className}`}>
-      <span className="block text-xs font-medium text-slate-500">{label}</span>
-      {control}
-    </label>
-  )
 
   return (
     <div className="space-y-4">
@@ -160,67 +167,58 @@ export default function AssetListPage() {
         }
       />
 
-      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <Input
-              placeholder="Nama, kode, atau nomor seri"
-              aria-label="Cari aset"
-              value={list.searchText}
-              onChange={(e) => list.setSearchText(e.target.value)}
-              className="pl-9"
-            />
+      <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+          <div className="flex gap-2 xl:min-w-56 xl:flex-1">
+            <div className="relative flex-1">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Input
+                placeholder="Nama, kode, atau nomor seri"
+                aria-label="Cari aset"
+                value={list.searchText}
+                onChange={(e) => list.setSearchText(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Button
+              variant="secondary"
+              className="lg:hidden"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((v) => !v)}
+            >
+              <SlidersHorizontal size={16} /> Filter{activeFilters > 0 ? ` (${activeFilters})` : ''}
+            </Button>
           </div>
-          <Button
-            variant="secondary"
-            className="lg:hidden"
-            aria-expanded={filtersOpen}
-            onClick={() => setFiltersOpen((v) => !v)}
-          >
-            <SlidersHorizontal size={16} /> Filter{activeFilters > 0 ? ` (${activeFilters})` : ''}
-          </Button>
-        </div>
-        <div className={`${filtersOpen ? 'grid' : 'hidden'} gap-3 sm:grid-cols-2 lg:grid lg:grid-cols-5`}>
-        {field(
-          'Kategori',
-          <Select clearable value={list.get('category_id')} onChange={(e) => setFilter('category_id', e.target.value)}>
-            <option value="">Semua kategori</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>,
-        )}
-        {field(
-          'Gedung',
-          <Select clearable value={buildingId} onChange={(e) => setFilter('building_id', e.target.value)}>
-            <option value="">Semua gedung</option>
-            {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </Select>,
-        )}
-        {field(
-          'Ruangan',
-          <Select clearable value={list.get('room_id')} disabled={!buildingId} onChange={(e) => setFilter('room_id', e.target.value)}>
-            <option value="">Semua ruangan</option>
-            {buildingId && rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </Select>,
-        )}
-        {field(
-          'Status',
-          <Select clearable value={list.get('status')} onChange={(e) => setFilter('status', e.target.value)}>
-            <option value="">Semua status</option>
-            {STATUSES.map((s) => <option key={s}>{s}</option>)}
-          </Select>,
-        )}
-        <div className="flex items-end">
-          <Button variant="ghost" className="w-full" disabled={!hasFilter} onClick={list.reset}>
-            Reset filter
-          </Button>
-        </div>
+          {/* Tanpa label di atas: teks "Semua …" menjadi labelnya, nama filter tetap dibacakan lewat aria-label. */}
+          <div className={`${filtersOpen ? 'grid' : 'hidden'} grid-cols-2 gap-2 sm:grid-cols-3 lg:grid lg:grid-cols-5 xl:flex xl:items-center`}>
+            <Select clearable className="xl:w-40" aria-label="Kategori" value={list.get('category_id')} onChange={(e) => setFilter('category_id', e.target.value)}>
+              <option value="">Semua kategori</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+            <Select clearable className="xl:w-40" aria-label="Gedung" value={buildingId} onChange={(e) => setFilter('building_id', e.target.value)}>
+              <option value="">Semua gedung</option>
+              {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
+            <Select clearable className="xl:w-40" aria-label="Ruangan" value={list.get('room_id')} disabled={!buildingId} onChange={(e) => setFilter('room_id', e.target.value)}>
+              <option value="">Semua ruangan</option>
+              {buildingId && rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </Select>
+            <Select clearable className="xl:w-40" aria-label="Status" value={list.get('status')} onChange={(e) => setFilter('status', e.target.value)}>
+              <option value="">Semua status</option>
+              {STATUSES.map((st) => <option key={st}>{st}</option>)}
+            </Select>
+            <Button variant="ghost" className="col-span-2 px-3! sm:col-span-1" disabled={!hasFilter} onClick={list.reset}>
+              Reset
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+      {/* Tabel lebar: pilih semua lewat kotak centang di judul kolom; baris ini hanya muncul saat ada pilihan.
+          HP (kartu, tanpa judul kolom): tautan pilih semua tetap tampil. */}
+      <div className={`${selected.size > 0 ? 'flex' : 'flex md:hidden'} flex-wrap items-center gap-x-4 gap-y-1 text-sm`}>
         <button
-          className="font-semibold text-brand-700 hover:underline disabled:text-slate-500 disabled:no-underline"
+          className="font-semibold text-brand-700 hover:underline disabled:text-slate-500 disabled:no-underline md:hidden"
           disabled={rows.length === 0}
           onClick={togglePage}
         >
@@ -245,6 +243,8 @@ export default function AssetListPage() {
         onPageChange={list.setPage}
         sort={list.sort}
         onSortChange={list.setSort}
+        dense
+        fixedHeight
       />
     </div>
   )

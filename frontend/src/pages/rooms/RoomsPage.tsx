@@ -1,4 +1,4 @@
-import { Plus, Warehouse } from 'lucide-react'
+import { Clock, Pencil, Plus, Trash2, Warehouse } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
@@ -29,12 +29,19 @@ const resultColor = { Sesuai: 'green', Kurang: 'red', 'Belum dicek': 'amber' } a
 const stockColor = { Aman: 'green', Menipis: 'amber', Habis: 'red' } as const
 
 const chip = (active: boolean) =>
-  `inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors ${
+  `inline-flex min-h-8 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-[13px] font-semibold transition-colors ${
     active ? 'border-brand-800 bg-brand-800 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
   }`
 
+/** Tombol ikon kecil di kolom Aksi (Ubah / Hapus). */
+const iconButton =
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900'
+
 // HP: chip digeser horizontal; sm ke atas: membungkus.
-const chipRow = '-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0'
+const chipRow = '-mx-4 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0'
+// Label di kiri sebaris dengan chip (sm ke atas), di atas chip pada HP.
+const selectorRow = 'flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3'
+const selectorLabel = 'shrink-0 text-xs font-medium text-slate-500 sm:w-16 sm:pt-2'
 
 const requestUrl = (roomId: number, s: RoomConsumable) => {
   const p = new URLSearchParams({ room_id: String(roomId), consumable_id: String(s.consumable.id), item_name: s.consumable.name })
@@ -83,7 +90,13 @@ export default function RoomsPage() {
   const toast = useToast()
   const queryClient = useQueryClient()
   const readiness = useReadiness()
-  const buildings = readiness.data ?? null
+  // Ruangan gudang selalu di urutan paling akhir (urutan lain tetap seperti dari server).
+  const buildings = useMemo(
+    () =>
+      readiness.data?.map((b) => ({ ...b, rooms: [...b.rooms].sort((x, y) => Number(x.is_storage) - Number(y.is_storage)) })) ??
+      null,
+    [readiness.data],
+  )
   const [actual, setActual] = useState<Record<number, string>>({})
   const [actualFrom, setActualFrom] = useState<Checklist | null>(null)
   const [saving, setSaving] = useState(false)
@@ -144,8 +157,8 @@ export default function RoomsPage() {
           <Skeleton className="h-7 w-56" />
           <Skeleton className="h-4 w-80 max-w-full" />
         </div>
-        <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-5">
-          {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-10 w-28 rounded-full" />)}
+        <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-white p-4">
+          {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-8 w-24 rounded-full" />)}
         </div>
         <TableSkeleton columns={6} />
       </div>
@@ -231,10 +244,17 @@ export default function RoomsPage() {
       cell: (g) => (g.result ? <Badge color={resultColor[g.result]}>{g.result}</Badge> : <span className="text-slate-500">—</span>),
     },
     {
-      header: 'Aksi',
+      header: '',
+      className: 'w-px whitespace-nowrap text-right',
       cell: (g) => (
-        <button type="button" className="text-xs font-semibold text-brand-700 hover:underline" onClick={() => setStandardTarget({ kind: 'asset', group: g })}>
-          Atur standar
+        <button
+          type="button"
+          className={`${iconButton} md:ml-auto`}
+          aria-label={`Atur standar ${g.asset_type.name}`}
+          title="Atur standar"
+          onClick={() => setStandardTarget({ kind: 'asset', group: g })}
+        >
+          <Pencil size={15} />
         </button>
       ),
     },
@@ -283,10 +303,32 @@ export default function RoomsPage() {
           {s.can_request && roomId && (
             <Link to={requestUrl(roomId, s)} className="block text-xs font-semibold text-brand-700 hover:underline">Ajukan permintaan</Link>
           )}
-          <div className="flex gap-3 text-xs">
-            <button type="button" className="font-semibold text-brand-700 hover:underline" onClick={() => setStandardTarget({ kind: 'consumable', row: s })}>Ubah</button>
-            <button type="button" className="font-semibold text-bad-700 hover:underline" onClick={() => setRemoving(s)}>Hapus</button>
-          </div>
+        </div>
+      ),
+    },
+    {
+      header: '',
+      className: 'w-px whitespace-nowrap text-right',
+      cell: (s) => (
+        <div className="flex items-center gap-1 md:justify-end">
+          <button
+            type="button"
+            className={iconButton}
+            aria-label={`Ubah ${s.item_name}`}
+            title="Ubah"
+            onClick={() => setStandardTarget({ kind: 'consumable', row: s })}
+          >
+            <Pencil size={15} />
+          </button>
+          <button
+            type="button"
+            className={`${iconButton} hover:bg-bad-50! hover:text-bad-700!`}
+            aria-label={`Hapus ${s.item_name}`}
+            title="Hapus"
+            onClick={() => setRemoving(s)}
+          >
+            <Trash2 size={15} />
+          </button>
         </div>
       ),
     },
@@ -299,15 +341,28 @@ export default function RoomsPage() {
         description={`Aset dan barang habis pakai per ruangan · ${totalRooms} ruangan di ${buildings.length} gedung`}
         actions={
           <>
+            {/* Status cek ruangan terpilih, di samping tombol Simpan hasil cek. */}
+            {room && (
+              <p className="flex items-center gap-1.5 text-xs text-slate-500 sm:mr-2">
+                <Clock size={14} className="shrink-0" aria-hidden />
+                <span>
+                  {room.last_checked_at
+                    ? `Dicek ${formatDateTime(room.last_checked_at)} oleh ${room.last_checked_by ?? '-'}`
+                    : 'Belum pernah dicek'}
+                  {checklist && checklist.meta.summary.unchecked_items > 0 && ` · ${checklist.meta.summary.unchecked_items} belum dicek`}
+                  {checklist && !room.is_storage && checklist.meta.summary.total_items === 0 && ' · Belum ada standar'}
+                </span>
+              </p>
+            )}
             <ExportButton type="rooms" filters={() => ({ building_id: building?.id })} />
             <Button loading={saving} disabled={!canSave} onClick={saveCheck} className="max-lg:hidden!">Simpan hasil cek</Button>
           </>
         }
       />
 
-      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
-        <div>
-          <p className="mb-2 text-sm font-medium text-slate-500">Gedung</p>
+      <section className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-4">
+        <div className={selectorRow}>
+          <p className={selectorLabel}>Gedung</p>
           <div className={chipRow}>
             {buildings.map((b) => (
               <button key={b.id} type="button" className={chip(b.id === building?.id)}
@@ -316,29 +371,29 @@ export default function RoomsPage() {
               </button>
             ))}
             <button type="button" className={chip(false)} onClick={() => setModal('building')} aria-label="Tambah gedung">
-              <Plus size={16} />
+              <Plus size={14} />
             </button>
           </div>
         </div>
         {building && (
-          <div className="border-t border-slate-100 pt-4">
-            <p className="mb-2 text-sm font-medium text-slate-500">Ruangan di {building.name}</p>
+          <div className={`${selectorRow} border-t border-slate-100 pt-2.5`}>
+            <p className={selectorLabel} title={`Ruangan di ${building.name}`}>Ruangan</p>
             <div className={chipRow}>
               {building.rooms.map((r) => (
                 <button key={r.id} type="button" className={chip(r.id === roomId)}
                   onClick={() => navigate(`${BASE}/${building.slug}/${r.slug}`)}
                   title={r.is_storage ? 'Gudang' : r.shortage_items ? `Kurang ${r.shortage_items} item` : r.total_items ? 'Lengkap' : 'Belum ada standar'}>
                   {r.name}
-                  {r.is_storage && <Warehouse size={16} className="ml-2 shrink-0" role="img" aria-label="Gudang" />}
+                  {r.is_storage && <Warehouse size={14} className="ml-1.5 shrink-0" role="img" aria-label="Gudang" />}
                   {!r.is_storage && r.shortage_items > 0 && (
-                    <span className={`ml-2 rounded-full px-1.5 text-xs tabular-nums ${r.id === roomId ? 'bg-white/20' : 'bg-bad-50 text-bad-700'}`}>
+                    <span className={`ml-1.5 rounded-full px-1.5 text-[11px] tabular-nums bg-bad-50 text-bad-700`}>
                       −{r.shortage_items}
                     </span>
                   )}
                 </button>
               ))}
               <button type="button" className={chip(false)} onClick={() => setModal('room')} aria-label="Tambah ruangan">
-                <Plus size={16} />
+                <Plus size={14} />
               </button>
             </div>
           </div>
@@ -354,17 +409,6 @@ export default function RoomsPage() {
 
       {room && (
         <>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 className="flex items-center gap-2 font-semibold">{roomLabel}{room.is_storage && <Badge color="blue">Gudang</Badge>}</h2>
-            <span className="text-sm text-slate-500">
-              {room.last_checked_at
-                ? `Dicek terakhir ${formatDateTime(room.last_checked_at)} oleh ${room.last_checked_by ?? '-'}`
-                : 'Belum pernah dicek'}
-              {checklist && checklist.meta.summary.unchecked_items > 0 && ` · ${checklist.meta.summary.unchecked_items} belum dicek`}
-              {checklist && !room.is_storage && checklist.meta.summary.total_items === 0 && ' · Belum ada standar'}
-            </span>
-          </div>
-
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>

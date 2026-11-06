@@ -34,14 +34,24 @@ function Tempo({ loan }: { loan: Loan }) {
   return <span className="whitespace-nowrap text-slate-600">{days} hari lagi</span>
 }
 
-const assetCell = (l: Loan) => (
-  <>
-    {l.asset && <AssetCode code={l.asset.code} />}
-    {l.asset ? (
-      <Link to={`/daftar-aset/${l.asset.id}`} className="mt-1 block font-medium hover:text-brand-700 hover:underline">{l.asset.name}</Link>
-    ) : '-'}
-  </>
+/** Kode + nama aset sebaris (baris tabel tetap pendek). */
+const assetCell = (l: Loan) =>
+  l.asset ? (
+    <span className="flex min-w-0 items-center gap-2">
+      <AssetCode code={l.asset.code} />
+      <Link to={`/daftar-aset/${l.asset.id}`} className="truncate font-medium hover:text-brand-700 hover:underline">{l.asset.name}</Link>
+    </span>
+  ) : '-'
+
+/** "Nama · departemen" sebaris. */
+const borrowerLine = (l: Loan) => (
+  <span className="whitespace-nowrap">
+    {l.borrower_name}
+    <span className="text-slate-500"> · {l.borrower_unit}</span>
+  </span>
 )
+
+const compactButton = 'min-h-8! px-3! text-[13px]!'
 
 export default function LoanPage() {
   const queryClient = useQueryClient()
@@ -100,12 +110,7 @@ export default function LoanPage() {
     { header: 'Aset', mobile: 'title', cell: assetCell },
     {
       header: 'Peminjam & departemen',
-      cell: (l) => (
-        <>
-          {l.borrower_name}
-          <span className="block text-xs text-slate-500">{l.borrower_unit}</span>
-        </>
-      ),
+      cell: borrowerLine,
     },
     { header: 'Tgl. pinjam', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.borrow_date)}</span> },
     { header: 'Tempo', mobile: 'badge', cell: (l) => <Tempo loan={l} /> },
@@ -114,13 +119,13 @@ export default function LoanPage() {
       className: 'text-right',
       cell: (l) => (
         <div className="flex items-center gap-1 md:justify-end">
-          <Button variant="secondary" className="flex-1 px-3! md:flex-none" onClick={() => setModal({ kind: 'return', loan: l })}>
+          <Button variant="secondary" className={`flex-1 md:flex-none ${compactButton}`} onClick={() => setModal({ kind: 'return', loan: l })}>
             Terima kembali
           </Button>
           <DropdownMenu
             label="Aksi lainnya"
             trigger={<EllipsisVertical size={16} />}
-            triggerClassName="px-2.5!"
+            triggerClassName="min-h-8! px-2!"
             items={[{ label: 'Batalkan', danger: true, onClick: () => setModal({ kind: 'cancel', loan: l }) }]}
           />
         </div>
@@ -134,8 +139,8 @@ export default function LoanPage() {
       header: 'Peminjam',
       cell: (l) => (
         <>
-          {l.borrower_name}
-          <span className="block text-xs text-slate-500">{l.borrower_unit} · {l.purpose}</span>
+          {borrowerLine(l)}
+          <span className="block max-w-72 truncate text-xs text-slate-500" title={l.purpose}>{l.purpose}</span>
         </>
       ),
     },
@@ -172,7 +177,7 @@ export default function LoanPage() {
 
       {returnLoanId && <p role="status" className="text-sm text-slate-500">Memuat peminjaman…</p>}
 
-      <section className="space-y-3">
+      <section className="space-y-2">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="font-semibold">Sedang dipinjam</h2>
           <span className="text-sm text-slate-500">{active.data?.meta.total ?? 0} aset</span>
@@ -187,10 +192,11 @@ export default function LoanPage() {
           meta={active.data?.meta}
           unit="aset"
           onPageChange={activeList.setPage}
+          dense
         />
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-2">
         <h2 className="font-semibold">Riwayat peminjaman</h2>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="relative sm:w-80">
@@ -223,6 +229,7 @@ export default function LoanPage() {
           onPageChange={historyList.setPage}
           sort={historyList.sort}
           onSortChange={historyList.setSort}
+          dense
         />
       </section>
 

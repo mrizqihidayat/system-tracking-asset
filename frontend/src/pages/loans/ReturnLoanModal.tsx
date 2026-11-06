@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { AssetCode, ConditionBadge } from '../../components/ui/Badge'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
+import { formatDate } from '../../lib/format'
 import { CONDITIONS, type Condition } from '../../types/asset'
 import type { Loan } from '../../types/loan'
 import ActionModal from '../assets/modals/ActionModal'
@@ -16,6 +18,15 @@ interface Props {
 
 const today = () => new Date().toLocaleDateString('en-CA')
 
+function Info({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="mt-0.5 truncate text-sm">{children}</dd>
+    </div>
+  )
+}
+
 /** Terima kembali: hasil Kembali (kondisi, ruangan simpan, catatan) atau Hilang saat dipinjam. */
 export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
   const toast = useToast()
@@ -29,6 +40,9 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
   const [note, setNote] = useState('')
 
   const lost = result === 'hilang'
+  const destination = loan.destination_room
+    ? `${loan.destination_room.name}${loan.destination_room.building ? ` · ${loan.destination_room.building.name}` : ''}`
+    : loan.destination_note || '-'
   const noteRequired = lost || condition !== 'Baik'
 
   const submit = async () => {
@@ -58,9 +72,32 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
     >
       {(errors) => (
         <>
-          <p className="text-sm text-slate-600">
-            {loan.asset?.name} · dipinjam {loan.borrower_name}, {loan.borrower_unit} · kondisi keluar {loan.condition_out}
-          </p>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <p className="flex min-w-0 items-center gap-2">
+              {loan.asset && <AssetCode code={loan.asset.code} className="bg-white!" />}
+              <span className="truncate font-semibold">{loan.asset?.name}</span>
+            </p>
+            <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-slate-200 pt-2.5">
+              <Info label="Peminjam">
+                {loan.borrower_name}
+                <span className="text-slate-500"> · {loan.borrower_unit}</span>
+              </Info>
+              <Info label="Kondisi keluar">
+                <ConditionBadge condition={loan.condition_out} />
+              </Info>
+              <Info label="Dipinjam dari">
+                {loan.asset?.room ? (
+                  <>
+                    {loan.asset.room.name}
+                    {loan.asset.room.building && <span className="text-slate-500"> · {loan.asset.room.building.name}</span>}
+                  </>
+                ) : '-'}
+              </Info>
+              <Info label="Lokasi tujuan">{destination}</Info>
+              <Info label="Tanggal pinjam">{formatDate(loan.borrow_date)}</Info>
+              <Info label="Rencana kembali">{formatDate(loan.due_date)}</Info>
+            </dl>
+          </div>
           <FormField label="Hasil" required>
             <Select value={result} onChange={(e) => setResult(e.target.value as 'kembali' | 'hilang')}>
               <option value="kembali">Kembali</option>

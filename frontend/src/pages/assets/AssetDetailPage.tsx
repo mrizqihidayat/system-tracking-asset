@@ -35,7 +35,7 @@ type ModalState =
 
 function Field({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
   return (
-    <div className={wide ? 'col-span-2' : ''}>
+    <div className={wide ? 'col-span-full' : ''}>
       <dt className="text-xs font-medium text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-sm">{children || '-'}</dd>
     </div>
@@ -109,7 +109,7 @@ function DetailSkeleton() {
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <Skeleton className="h-4 w-24" />
-          <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4">
+          <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3">
             {Array.from({ length: 8 }, (_, i) => (
               <div key={i} className="space-y-1.5">
                 <Skeleton className="h-3 w-20" />
@@ -221,7 +221,7 @@ export default function AssetDetailPage() {
   ]
 
   const docRow = (label: string, file?: AssetFile) => (
-    <li className="flex items-center justify-between py-2.5 text-sm">
+    <li className="flex items-center justify-between py-2 text-sm">
       <span>{label}</span>
       {file ? (
         <button className="font-semibold text-brand-700 hover:underline" onClick={() => viewFile(file)}>Lihat</button>
@@ -232,7 +232,7 @@ export default function AssetDetailPage() {
   )
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <Link to="/daftar-aset" className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
@@ -273,9 +273,9 @@ export default function AssetDetailPage() {
         </div>
       )}
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Panel title="Data aset">
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
             <Field label="Kategori">{asset.asset_type?.category?.name ?? '-'}</Field>
             <Field label="Jenis aset">{asset.asset_type?.name}</Field>
             <Field label="Sumber">{asset.source_department?.name}</Field>
@@ -315,7 +315,7 @@ export default function AssetDetailPage() {
             <PhotoBox label="Foto kondisi terakhir" file={fileOf('Foto Kondisi')} onOpen={viewFile} />
             <QrBox assetId={asset.id} onOpen={viewLabel} />
           </div>
-          <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
+          <ul className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
             {docRow('BAST penerimaan', fileOf('BAST'))}
             {docRow('Kartu garansi', fileOf('Garansi'))}
           </ul>
@@ -344,7 +344,7 @@ export default function AssetDetailPage() {
         </Panel>
       </div>
 
-      <section className="space-y-3">
+      <section className="space-y-2">
         <h2 className="font-semibold">Riwayat aset</h2>
         <DataTable
           columns={eventColumns}
@@ -352,6 +352,7 @@ export default function AssetDetailPage() {
           rowKey={(e) => e.id}
           loading={eventsQuery.isPending}
           emptyText="Belum ada riwayat."
+          dense
         />
         {eventsQuery.hasNextPage && (
           <Button variant="secondary" loading={eventsQuery.isFetchingNextPage} onClick={() => eventsQuery.fetchNextPage()}>

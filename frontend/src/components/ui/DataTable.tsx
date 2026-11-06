@@ -1,8 +1,11 @@
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { PaginationMeta } from '../../types/api'
-import Button from './Button'
 import { ListSkeletonItems, LoadingLabel, TableSkeletonRows } from './Skeleton'
+
+/** Tombol halaman: ikon saja, kecil, tanpa bingkai. */
+const PAGE_BUTTON =
+  'flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:pointer-events-none disabled:text-slate-300'
 
 export interface Column<T> {
   header: string
@@ -10,6 +13,8 @@ export interface Column<T> {
   className?: string
   /** Kelas tambahan khusus judul kolom (mis. judul di tengah, isi tetap rata kiri). */
   headerClassName?: string
+  /** Isi judul kolom di tabel lebar (mis. kotak centang pilih semua); `header` tetap dipakai di kartu HP. */
+  headerContent?: ReactNode
   /**
    * Tampilan di layar sempit (< md), tempat tabel menjadi daftar kartu:
    * `title` = baris judul kartu (kiri atas), `badge` = pojok kanan atas,
@@ -33,6 +38,10 @@ interface Props<T> {
   /** Satuan di footer: "Menampilkan N dari M {unit}". */
   unit?: string
   onPageChange?: (page: number) => void
+  /** Baris lebih rapat (judul, isi, dan footer). */
+  dense?: boolean
+  /** Tinggi tabel tetap (tabel lebar): baris kosong ditambahkan sampai `meta.per_page`, tiap baris setinggi dua baris teks. */
+  fixedHeight?: boolean
   /** Urutan aktif: `kunci` naik, `-kunci` turun, kosong = bawaan. */
   sort?: string
   onSortChange?: (sort: string) => void
@@ -59,8 +68,13 @@ function SortHeader({ label, sortKey, sort, onSortChange }: { label: string; sor
 
 export default function DataTable<T>({
   columns, rows, rowKey, loading, fetching, emptyText = 'Belum ada data.', meta, unit = 'data', onPageChange,
-  sort, onSortChange,
+  sort, onSortChange, dense, fixedHeight,
 }: Props<T>) {
+  const headPad = dense ? 'py-2' : 'py-2.5'
+  const cellPad = dense ? 'py-2' : 'py-3'
+  // Setinggi dua baris teks: baris yang isinya turun ke baris kedua (mis. "Alat Pelatihan") tidak lebih tinggi dari yang lain.
+  const rowHeight = fixedHeight ? (dense ? 'h-15' : 'h-17') : ''
+  const fillerCount = fixedHeight && meta && rows.length > 0 ? Math.max(0, meta.per_page - rows.length) : 0
   const skeleton = loading && rows.length === 0
   const empty = !skeleton && rows.length === 0 ? emptyText : null
   const titleCols = columns.filter((c) => c.mobile === 'title')
@@ -81,13 +95,13 @@ export default function DataTable<T>({
                   <th
                     key={`${c.header}-${i}`}
                     aria-sort={direction}
-                    className={`whitespace-nowrap px-4 py-2.5 font-semibold ${c.className ?? ''} ${c.headerClassName ?? ''}`}
+                    className={`whitespace-nowrap px-4 ${headPad} font-semibold ${c.className ?? ''} ${c.headerClassName ?? ''}`}
                   >
-                    {c.sortKey && onSortChange ? (
+                    {c.headerContent ?? (c.sortKey && onSortChange ? (
                       <SortHeader label={c.header} sortKey={c.sortKey} sort={sort} onSortChange={onSortChange} />
                     ) : (
                       c.header
-                    )}
+                    ))}
                   </th>
                 )
               })}
@@ -99,13 +113,20 @@ export default function DataTable<T>({
             ) : empty ? (
               <tr><td colSpan={columns.length} className="px-4 py-10 text-center text-slate-500">{empty}</td></tr>
             ) : (
-              rows.map((row) => (
-                <tr key={rowKey(row)} className="transition-colors hover:bg-slate-50">
-                  {columns.map((c, i) => (
-                    <td key={`${c.header}-${i}`} className={`px-4 py-3 align-middle ${c.className ?? ''}`}>{c.cell(row)}</td>
-                  ))}
-                </tr>
-              ))
+              <>
+                {rows.map((row) => (
+                  <tr key={rowKey(row)} className={`transition-colors hover:bg-slate-50 ${rowHeight}`}>
+                    {columns.map((c, i) => (
+                      <td key={`${c.header}-${i}`} className={`px-4 ${cellPad} align-middle ${c.className ?? ''}`}>{c.cell(row)}</td>
+                    ))}
+                  </tr>
+                ))}
+                {Array.from({ length: fillerCount }, (_, i) => (
+                  <tr key={`filler-${i}`} className={rowHeight} aria-hidden>
+                    <td colSpan={columns.length} />
+                  </tr>
+                ))}
+              </>
             )}
           </tbody>
         </table>
@@ -147,30 +168,32 @@ export default function DataTable<T>({
       </ul>
 
       {meta && meta.total > 0 && (
-        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-2.5 text-sm text-slate-600">
+        <div className={`flex items-center justify-between gap-3 border-t border-slate-200 px-4 ${dense ? 'py-1.5' : 'py-2.5'} text-sm text-slate-600`}>
           <span>
             {rows.length} dari {meta.total} {unit}
-            <span className="hidden sm:inline"> · hal. {meta.current_page} dari {meta.last_page}</span>
           </span>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
               aria-label="Halaman sebelumnya"
               disabled={meta.current_page <= 1}
               onClick={() => onPageChange?.(meta.current_page - 1)}
-              className="px-3!"
+              className={PAGE_BUTTON}
             >
-              <ChevronLeft size={16} /> <span className="hidden sm:inline">Sebelumnya</span>
-            </Button>
-            <Button
-              variant="secondary"
+              <ChevronLeft size={16} />
+            </button>
+            <span className="min-w-12 text-center tabular-nums" aria-label={`Halaman ${meta.current_page} dari ${meta.last_page}`}>
+              {meta.current_page} / {meta.last_page}
+            </span>
+            <button
+              type="button"
               aria-label="Halaman berikutnya"
               disabled={meta.current_page >= meta.last_page}
               onClick={() => onPageChange?.(meta.current_page + 1)}
-              className="px-3!"
+              className={PAGE_BUTTON}
             >
-              <span className="hidden sm:inline">Berikutnya</span> <ChevronRight size={16} />
-            </Button>
+              <ChevronRight size={16} />
+            </button>
           </div>
         </div>
       )}

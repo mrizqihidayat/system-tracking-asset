@@ -14,7 +14,7 @@ import type { Paginated } from '../../types/api'
 import type { Asset, AssetListItem } from '../../types/asset'
 import { useScanLookup } from '../scan/useScanLookup'
 
-/** Saran memakai baris daftar, Cari/Scan memakai data lengkap; form hanya butuh field bersama ini. */
+/** Saran memakai baris daftar, Enter/Scan memakai data lengkap; form hanya butuh field bersama ini. */
 export type PickedAsset = Pick<Asset, 'id' | 'code' | 'name' | 'condition' | 'status'>
 
 interface Props {
@@ -61,7 +61,7 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
         setSuggestions({ query, items })
         setActive(-1)
       } catch {
-        // saran opsional; Cari/Scan tetap menampilkan error
+        // saran opsional; Enter/Scan tetap menampilkan error
       }
     }, SEARCH_DELAY_MS)
     return () => {
@@ -190,7 +190,6 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
               document.body,
             )}
           </div>
-          <Button variant="secondary" loading={loading} onClick={() => find(text)}>Cari</Button>
           <Button variant="secondary" aria-label="Scan QR" onClick={() => setScanning(true)}>
             <Camera size={16} />
           </Button>
