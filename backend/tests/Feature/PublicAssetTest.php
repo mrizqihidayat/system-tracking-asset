@@ -8,6 +8,7 @@ use App\Enums\CountMethod;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
+use App\Models\Category;
 use App\Models\Department;
 use App\Models\Loan;
 use App\Models\Room;
@@ -34,7 +35,7 @@ class PublicAssetTest extends TestCase
             ->for(Building::factory()->create(['name' => 'Gedung IHS']))
             ->create(['name' => 'Ruang Kelas 1']);
         $type = AssetType::factory()
-
+            ->for(Category::factory()->create(['name' => 'Elektronik']))
             ->create(['name' => 'Proyektor', 'code' => 'PRJ']);
 
         $this->asset = Asset::factory()->for($type)->for($room)->create([
@@ -55,6 +56,7 @@ class PublicAssetTest extends TestCase
         $response->assertExactJson(['data' => [
             'code' => 'SHD-PRJ-001',
             'name' => 'Proyektor Epson EB-X51',
+            'category' => 'Elektronik',
             'asset_type' => 'Proyektor',
             'source' => ['name' => 'SHD', 'is_internal' => true],
             'building' => 'Gedung IHS',

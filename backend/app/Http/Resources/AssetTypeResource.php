@@ -20,6 +20,8 @@ class AssetTypeResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'code' => $this->code,
+            'category_id' => $this->category_id,
+            'category' => CategoryResource::make($this->whenLoaded('category')),
         ];
     }
 }

@@ -13,10 +13,10 @@ import { api, errorMessage } from '../../lib/api'
 import { openInNewTab } from '../../lib/blob'
 import { listConfigs } from '../../lib/queries/list-configs'
 import { useAssets } from '../../lib/queries/lists'
-import { useAssetTypes, useBuildings, useDepartments, useRooms } from '../../lib/queries/master'
+import { useBuildings, useCategories, useRooms } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
-import { CONDITIONS, STATUSES, type AssetListItem } from '../../types/asset'
+import { STATUSES, type AssetListItem } from '../../types/asset'
 
 const FILTERS = [...listConfigs.assets.filters, 'search']
 const MAX_LABELS = 120
@@ -30,9 +30,8 @@ export default function AssetListPage() {
 
   const buildingId = list.get('building_id')
   const assets = useAssets(list.params)
-  const { data: assetTypes } = useAssetTypes()
+  const { data: categories } = useCategories()
   const { data: buildings } = useBuildings()
-  const { data: departments } = useDepartments()
   const { data: rooms } = useRooms(buildingId ? Number(buildingId) : null, true)
   useErrorToast(assets.error)
   const result = assets.data
@@ -88,7 +87,7 @@ export default function AssetListPage() {
         </Link>
       ),
     },
-    { header: 'Jenis', cell: (a) => a.asset_type_name ?? '-' },
+    { header: 'Kategori', cell: (a) => a.category_name ?? '-' },
     {
       header: 'Lokasi',
       cell: (a) =>
@@ -101,11 +100,11 @@ export default function AssetListPage() {
           '-'
         ),
     },
-    { header: 'Sumber', cell: (a) => a.source_name ?? '-' },
+    { header: 'Sumber', cell: (a) => (a.source_is_internal ? 'Milik SHD' : a.source_name ?? '-') },
     { header: 'Kondisi', sortKey: 'condition', cell: (a) => <span className="whitespace-nowrap">{a.condition}</span> },
     { header: 'Status', mobile: 'badge', sortKey: 'status', cell: (a) => <StatusBadge status={a.status} /> },
     {
-      header: 'Aksi',
+      header: 'Detail',
       className: 'text-right',
       mobile: 'hidden',
       cell: (a) => (
@@ -166,7 +165,7 @@ export default function AssetListPage() {
           <div className="relative flex-1">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <Input
-              placeholder="Cari nama, kode, atau nomor seri"
+              placeholder="Nama, kode, atau nomor seri"
               aria-label="Cari aset"
               value={list.searchText}
               onChange={(e) => list.setSearchText(e.target.value)}
@@ -182,12 +181,12 @@ export default function AssetListPage() {
             <SlidersHorizontal size={16} /> Filter{activeFilters > 0 ? ` (${activeFilters})` : ''}
           </Button>
         </div>
-        <div className={`${filtersOpen ? 'grid' : 'hidden'} gap-3 sm:grid-cols-2 lg:grid lg:grid-cols-7`}>
+        <div className={`${filtersOpen ? 'grid' : 'hidden'} gap-3 sm:grid-cols-2 lg:grid lg:grid-cols-5`}>
         {field(
-          'Jenis',
-          <Select clearable value={list.get('asset_type_id')} onChange={(e) => setFilter('asset_type_id', e.target.value)}>
-            <option value="">Semua jenis</option>
-            {assetTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          'Kategori',
+          <Select clearable value={list.get('category_id')} onChange={(e) => setFilter('category_id', e.target.value)}>
+            <option value="">Semua kategori</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>,
         )}
         {field(
@@ -209,22 +208,6 @@ export default function AssetListPage() {
           <Select clearable value={list.get('status')} onChange={(e) => setFilter('status', e.target.value)}>
             <option value="">Semua status</option>
             {STATUSES.map((s) => <option key={s}>{s}</option>)}
-          </Select>,
-        )}
-        {field(
-          'Sumber',
-          <Select clearable value={list.get('source_department_id')} onChange={(e) => setFilter('source_department_id', e.target.value)}>
-            <option value="">Semua sumber</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </Select>,
-        )}
-        {field(
-          'Kondisi',
-          <Select clearable value={list.get('condition')} onChange={(e) => setFilter('condition', e.target.value)}>
-            <option value="">Semua kondisi</option>
-            {CONDITIONS.map((c) => <option key={c}>{c}</option>)}
           </Select>,
         )}
         <div className="flex items-end">

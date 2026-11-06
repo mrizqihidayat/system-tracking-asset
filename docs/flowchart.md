@@ -41,10 +41,10 @@ Menu Lisensi Digital tampil nonaktif di sidebar (Fase 2).
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Daftar aset berhalaman: filter jenis, gedung, ruangan, status, sumber, kondisi; cari nama, kode, S/N, kode lama]
+    A([Mulai]) --> B[Daftar aset berhalaman: kolom Kode, Nama, Kategori, Lokasi, Sumber Milik SHD atau nama departemen, Kondisi, Status; filter kategori, gedung, ruangan, status; cari nama, kode, S/N, kode lama]
     B --> C{Pilih aksi}
 
-    C -- Tambah aset --> T1[Input jenis, nama, merek, S/N, spesifikasi, sumber, PIC, gedung & ruangan, kode keuangan, tgl perolehan, servis berikutnya, kondisi, catatan; jenis, sumber, gedung, ruangan baru bisa langsung ditambah; jenis baru cukup nama, kode otomatis; tampil Kode otomatis di bawah nama]
+    C -- Tambah aset --> T1[Input jenis, nama, merek, S/N, spesifikasi, sumber, PIC, gedung & ruangan, kode keuangan, tgl perolehan, servis berikutnya, kondisi, catatan; kategori tampil otomatis dari jenis; jenis, sumber, gedung, ruangan baru bisa langsung ditambah; jenis baru lewat popup pilih kategori wajib, kategori baru bisa ditambah, kode otomatis; tampil Kode otomatis di bawah nama]
     T1 --> T1a{Kondisi}
     T1a -- Baik --> T1b[Status Tersedia]
     T1a -- Rusak Berat --> T1c[Status Perbaikan]
@@ -80,7 +80,7 @@ flowchart TD
 
     AK -- Lihat file / label QR --> V1[(Ambil file atau PDF label, buka di tab baru)] --> D1
 
-    AK -- Ubah data --> E1[Form ubah: tanpa kondisi & status; jenis baru bisa langsung ditambah; tampil Kode otomatis di bawah nama]
+    AK -- Ubah data --> E1[Form ubah: tanpa kondisi & status; jenis baru bisa langsung ditambah lewat popup kategori; tampil Kode otomatis di bawah nama]
     E1 -- Kelola foto & dokumen --> E6[(Unggah, ganti slot, atau hapus file: JPG, PNG, WebP, PDF maks. 5 MB; langsung tersimpan, tanpa riwayat)] --> E1
     E1 -- Batal --> D1
     E1 -- Ubah isian --> E0{Jenis diganti?}
@@ -329,13 +329,13 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Tab Gedung & Ruangan, Departemen, Jenis aset, Kategori stok]
+    A([Mulai]) --> B[Tab Gedung & Ruangan, Departemen, Kategori & Jenis aset dikelompokkan per kategori, Kategori stok]
     B --> C{Pilih aksi}
 
     C -- Departemen SHD --> C1[Tanpa aksi: tidak dapat diubah atau dihapus] --> B
 
-    C -- Tambah / Ubah --> T1[Input nama; jenis aset juga kode singkat: saat tambah kosong = otomatis, saat ubah hanya berlaku untuk aset baru] --> T2{Data valid?}
-    T2 -- Tidak --> T3[Tampilkan pesan, mis. kode pernah dipakai jenis lain] --> T1
+    C -- Tambah / Ubah --> T1[Input nama; jenis aset juga kategori wajib dan kode singkat: saat tambah kosong = otomatis, saat ubah hanya berlaku untuk aset baru] --> T2{Data valid?}
+    T2 -- Tidak --> T3[Tampilkan pesan, mis. kode pernah dipakai jenis lain, kategori wajib dipilih] --> T1
     T2 -- Ya --> T4[(Simpan; slug gedung & ruangan tidak berubah)] --> B
 
     C -- Hapus --> H1[(Ambil pemakaian data)] --> H2{Masih dipakai?}

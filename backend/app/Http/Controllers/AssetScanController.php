@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 class AssetScanController extends Controller
 {
     private const RELATIONS = [
-        'assetType',
+        'assetType.category',
         'sourceDepartment',
         'room.building',
         'activeLoan.destinationRoom.building',

@@ -24,6 +24,7 @@ class AssetTypeController extends Controller
     {
         return $this->masterList($request, 'asset-types', fn () => AssetTypeResource::collection(
             $this->applySearch(AssetType::query(), $request->query('search'))
+                ->with('category')
                 ->orderBy('name')
                 ->get()
         )->resolve($request));
@@ -50,19 +51,19 @@ class AssetTypeController extends Controller
             throw ValidationException::withMessages(['code' => 'Kode singkat tidak dapat dibuat dari nama ini, isi kode secara manual.']);
         }
 
-        $assetType = AssetType::create($data);
+        $assetType = AssetType::create($data)->load('category');
 
         return AssetTypeResource::make($assetType)->response()->setStatusCode(201);
     }
 
     /**
-     * Kode aset yang sudah ada tidak ikut berubah (label QR tercetak tetap berlaku).
+     * Bisa mengganti kategori dan kode; kode aset yang sudah ada tidak ikut berubah (label QR tercetak tetap berlaku).
      */
     public function update(UpdateAssetTypeRequest $request, AssetType $assetType): AssetTypeResource
     {
         $assetType->update($request->validated());
 
-        return AssetTypeResource::make($assetType);
+        return AssetTypeResource::make($assetType->load('category'));
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Enums\ReportType;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
+use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\Department;
 use App\Models\Loan;
@@ -52,13 +53,14 @@ class ReportService
     private function assets(array $filters): Report
     {
         $rows = Asset::query()
-            ->with(['assetType', 'sourceDepartment', 'room.building'])
+            ->with(['assetType.category', 'sourceDepartment', 'room.building'])
             ->filter($filters)
             ->orderBy('code')
             ->lazy(self::CHUNK)
             ->map(fn (Asset $asset) => [
                 $asset->code,
                 $asset->name,
+                $asset->assetType->category->name,
                 $asset->assetType->name,
                 $asset->brand,
                 $asset->serial_number,
@@ -75,13 +77,14 @@ class ReportService
 
         $columns = [
             ReportColumn::text('Kode', 16), ReportColumn::text('Nama', 30),
-            ReportColumn::text('Jenis', 18), ReportColumn::text('Merek', 16), ReportColumn::text('No. Seri', 18),
+            ReportColumn::text('Kategori', 16), ReportColumn::text('Jenis', 18), ReportColumn::text('Merek', 16), ReportColumn::text('No. Seri', 18),
             ReportColumn::text('Sumber', 14), ReportColumn::text('Gedung (asal)', 18), ReportColumn::text('Ruangan (asal)', 18),
             ReportColumn::text('PIC', 18), ReportColumn::text('Kondisi', 12), ReportColumn::text('Status', 16),
             ReportColumn::date('Tgl perolehan'), ReportColumn::date('Servis berikutnya'), ReportColumn::text('Kode aset keuangan', 20),
         ];
 
         $summary = $this->summary([
+            'Kategori' => $this->nameOf(Category::class, $filters['category_id'] ?? null),
             'Jenis' => $this->nameOf(AssetType::class, $filters['asset_type_id'] ?? null),
             'Gedung' => $this->nameOf(Building::class, $filters['building_id'] ?? null),
             'Ruangan' => $this->nameOf(Room::class, $filters['room_id'] ?? null),

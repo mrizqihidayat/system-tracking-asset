@@ -1,6 +1,6 @@
 import { TriangleAlert } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AssetCode } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -11,8 +11,9 @@ import { PageHeader } from '../../components/ui/Page'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import AssetFilesManager from './AssetFilesManager'
+import NewAssetTypeModal from './modals/NewAssetTypeModal'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
-import { createAssetType, createBuilding, createDepartment, createRoom } from '../../lib/lookups'
+import { createBuilding, createDepartment, createRoom } from '../../lib/lookups'
 import { invalidate } from '../../lib/queries/invalidate'
 import { assetQueries } from '../../lib/queries/lists'
 import { useAssetTypes, useBuildings, useDepartments, useRooms } from '../../lib/queries/master'
@@ -77,6 +78,11 @@ export default function AssetFormPage() {
   useErrorToast(typesError, departmentsError, buildingsError, roomsError)
   const [preview, setPreview] = useState<{ typeId: number; data: CodePreview } | null>(null)
   const [nextCode, setNextCode] = useState<{ typeId: number; code: string } | null>(null)
+  const [newType, setNewType] = useState<{
+    name: string
+    resolve: (option: ReturnType<typeof typeOption>) => void
+    reject: () => void
+  } | null>(null)
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -147,6 +153,7 @@ export default function AssetFormPage() {
     : nextCode?.typeId === form.asset_type_id ? nextCode?.code : undefined
 
   const typeOptions = useMemo(() => types.map(typeOption), [types])
+  const selectedType = types.find((t) => t.id === form.asset_type_id)
   const departmentOptions = departments.map((d) => ({ id: d.id, label: d.name }))
   const buildingOptions = buildings.map((b) => ({ id: b.id, label: b.name }))
   const roomOptions = form.building_id ? rooms.map((r) => ({ id: r.id, label: r.name })) : []
@@ -175,13 +182,15 @@ export default function AssetFormPage() {
       const r = await createRoom(form.building_id!, name)
       return { id: r.id, label: r.name }
     })
-  /** Kode dibuat otomatis oleh server; hanya bisa diubah di Data Master. Nama aset terisi jika masih kosong. */
+  /** Menunggu popup kategori (batal = teks ketikan tetap). Kode dibuat otomatis oleh server. */
   const addType = (name: string) =>
-    guarded(async () => {
-      const t = await createAssetType(name)
-      setForm((f) => (f.name.trim() ? f : { ...f, name: t.name }))
-      return typeOption(t)
-    })
+    new Promise<ReturnType<typeof typeOption>>((resolve, reject) =>
+      setNewType({ name, resolve, reject: () => reject(new Error('Dibatalkan')) }),
+    )
+  const cancelNewType = useCallback(() => {
+    newType?.reject()
+    setNewType(null)
+  }, [newType])
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -273,6 +282,11 @@ export default function AssetFormPage() {
               error={errors.asset_type_id}
             />
           </FormField>
+          {selectedType && (
+            <p className="mt-1 text-xs text-slate-500">
+              Kategori: <span className="font-medium text-slate-700">{selectedType.category?.name ?? '-'}</span>
+            </p>
+          )}
           {activePreview?.code_will_change && (
             <div role="alert" className="mt-2 flex gap-2 rounded-lg bg-warn-50 px-3 py-2.5 text-sm text-warn-700">
               <TriangleAlert size={18} className="mt-0.5 shrink-0" />
@@ -393,6 +407,17 @@ export default function AssetFormPage() {
       </div>
     </form>
     {editing && original && <AssetFilesManager assetId={original.id} />}
+    {newType && (
+      <NewAssetTypeModal
+        name={newType.name}
+        onClose={cancelNewType}
+        onCreated={(t) => {
+          newType.resolve(typeOption(t))
+          setNewType(null)
+          setForm((f) => (f.name.trim() ? f : { ...f, name: t.name }))
+        }}
+      />
+    )}
     </div>
   )
 }

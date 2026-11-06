@@ -6,6 +6,7 @@ use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
+use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\ConsumableCategory;
 use App\Models\Department;
@@ -67,7 +68,7 @@ class ListPerformanceTest extends TestCase
     public function test_asset_list_returns_only_table_columns(): void
     {
         $room = Room::factory()->for(Building::factory()->create(['name' => 'Gedung A']))->create(['name' => 'Ruang 1']);
-        $type = AssetType::factory()->create(['name' => 'Elektronik']);
+        $type = AssetType::factory()->for(Category::factory()->create(['name' => 'Elektronik']))->create(['name' => 'Proyektor']);
         $source = Department::factory()->create(['is_internal' => false]);
         $asset = Asset::factory()->create([
             'asset_type_id' => $type->id,
@@ -77,14 +78,16 @@ class ListPerformanceTest extends TestCase
 
         $row = $this->getJson('/api/assets')
             ->assertOk()
-            ->assertJsonPath('data.0.asset_type_name', 'Elektronik')
+            ->assertJsonPath('data.0.category_name', 'Elektronik')
+            ->assertJsonPath('data.0.asset_type_name', 'Proyektor')
             ->assertJsonPath('data.0.room_name', 'Ruang 1')
             ->assertJsonPath('data.0.building_name', 'Gedung A')
             ->assertJsonPath('data.0.source_name', $source->name)
+            ->assertJsonPath('data.0.source_is_internal', false)
             ->json('data.0');
 
         $this->assertSame(
-            ['id', 'code', 'name', 'asset_type_name', 'room_name', 'building_name', 'source_name', 'condition', 'status'],
+            ['id', 'code', 'name', 'category_name', 'asset_type_name', 'room_name', 'building_name', 'source_name', 'source_is_internal', 'condition', 'status'],
             array_keys($row),
         );
 

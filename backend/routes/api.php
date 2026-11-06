@@ -10,6 +10,7 @@ use App\Http\Controllers\AssetScanController;
 use App\Http\Controllers\AssetTypeController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BuildingController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ConsumableCategoryController;
 use App\Http\Controllers\ConsumableController;
 use App\Http\Controllers\DashboardController;
@@ -46,6 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/departments/{department}/usage', [DepartmentController::class, 'usage'])->whereNumber('department');
     Route::get('/buildings/{building}/usage', [BuildingController::class, 'usage'])->whereNumber('building');
     Route::get('/rooms/{room}/usage', [RoomController::class, 'usage'])->whereNumber('room');
+    Route::get('/categories/{category}/usage', [CategoryController::class, 'usage'])->whereNumber('category');
     Route::get('/consumable-categories/{consumableCategory}/usage', [ConsumableCategoryController::class, 'usage'])->whereNumber('consumableCategory');
     Route::get('/asset-types/{assetType}/next-code', [AssetTypeController::class, 'nextCode'])->whereNumber('assetType');
     Route::get('/asset-types/{assetType}/usage', [AssetTypeController::class, 'usage'])->whereNumber('assetType');
@@ -56,6 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/rooms', [RoomController::class, 'index']);
     Route::put('/rooms/{room}', [RoomController::class, 'update'])->whereNumber('room');
     Route::delete('/rooms/{room}', [RoomController::class, 'destroy'])->whereNumber('room');
+    Route::apiResource('categories', CategoryController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('consumable-categories', ConsumableCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::apiResource('asset-types', AssetTypeController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('/lookups/borrower-units', [LookupController::class, 'borrowerUnits']);

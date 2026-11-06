@@ -22,6 +22,7 @@ class StoreAssetTypeRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:100', new UniqueCaseInsensitive('asset_types', ignoreId: $this->ignoreId())],
             'code' => ['nullable', 'string', 'regex:/^[A-Z0-9]{2,5}$/', new UniqueCaseInsensitive('asset_types', 'code', $this->ignoreId()), new AssetTypeCodeNotUsedElsewhere($this->ignoreId())],
         ];

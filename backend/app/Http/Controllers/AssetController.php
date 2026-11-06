@@ -31,7 +31,7 @@ class AssetController extends Controller
      * Relasi untuk detail (lokasi asal + lokasi peminjaman saat ini). Daftar memakai Asset::forList().
      */
     private const RELATIONS = [
-        'assetType',
+        'assetType.category',
         'sourceDepartment',
         'room.building',
         'activeLoan.destinationRoom.building',

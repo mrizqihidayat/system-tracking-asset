@@ -2,11 +2,11 @@
 
 Daftar seluruh endpoint backend dan pemakaiannya di frontend web. Parameter dan bentuk respons ada di `docs/SPEC.md` §14.
 
-Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
+Disusun pada 4 November 2026 (diperbarui 6 November 2026, T26x) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
 
 ## Ringkasan
 
-- **88 endpoint API:** 86 dipakai frontend web, 2 tidak dipakai.
+- **93 endpoint API:** 91 dipakai frontend web, 2 tidak dipakai.
 - **6 route non-API:** tidak ada yang dipakai frontend.
 - **Alamat:** semua endpoint API berawalan `/api`. Frontend web mengambil alamat API dari `VITE_API_URL`.
 - **Akses "Token":** wajib header `Authorization: Bearer {token}` dari `POST /api/login`. Tanpa token sah dijawab 401.
@@ -20,6 +20,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Laporan | 1 | 1 | 0 |
 | Data master: departemen | 5 | 5 | 0 |
 | Data master: gedung & ruangan | 11 | 10 | 1 |
+| Data master: kategori aset | 5 | 5 | 0 |
 | Data master: jenis aset | 6 | 6 | 0 |
 | Data master: kategori stok | 5 | 5 | 0 |
 | Lookup | 2 | 1 | 1 |
@@ -28,7 +29,7 @@ Disusun pada 4 November 2026 dari `php artisan route:list` dan kode frontend. Ko
 | Kelengkapan ruangan | 7 | 7 | 0 |
 | Permintaan ke departemen lain | 11 | 11 | 0 |
 | Stok habis pakai | 8 | 8 | 0 |
-| **Total** | **88** | **86** | **2** |
+| **Total** | **93** | **91** | **2** |
 
 ## Endpoint API yang tidak dipakai frontend
 
@@ -125,13 +126,23 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | DELETE | `/api/rooms/{id}` | Hapus ruangan, ditolak jika masih dipakai | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 | GET | `/api/rooms/{id}/usage` | Pemakaian ruangan sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 
+### Data master: kategori aset
+
+| Method | Endpoint | Fungsi | Akses | Dipakai frontend |
+|---|---|---|---|---|
+| GET | `/api/categories` | Daftar kategori aset + jumlah jenis | Token | Ya: Daftar Aset (filter), popup tambah jenis, Data Master (`lib/queries/master.ts`) |
+| POST | `/api/categories` | Tambah kategori aset | Token | Ya: Popup tambah jenis di form aset, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
+| PUT/PATCH | `/api/categories/{id}` | Ubah nama kategori aset | Token | Ya: Data Master (`pages/master/MasterModals.tsx`), memakai PUT |
+| DELETE | `/api/categories/{id}` | Hapus kategori aset, ditolak jika masih dipakai jenis | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
+| GET | `/api/categories/{id}/usage` | Pemakaian kategori aset sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
+
 ### Data master: jenis aset
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
 | GET | `/api/asset-types` | Daftar jenis aset | Token | Ya: Form aset, standar ruangan, Data Master (`lib/queries/master.ts`) |
-| POST | `/api/asset-types` | Tambah jenis aset | Token | Ya: Form aset, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
-| PUT/PATCH | `/api/asset-types/{id}` | Ubah jenis aset | Token | Ya: Data Master (`pages/master/MasterModals.tsx`), memakai PUT |
+| POST | `/api/asset-types` | Tambah jenis aset (`category_id` wajib) | Token | Ya: Form aset, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
+| PUT/PATCH | `/api/asset-types/{id}` | Ubah nama, kategori, atau kode jenis aset | Token | Ya: Data Master (`pages/master/MasterModals.tsx`), memakai PUT |
 | DELETE | `/api/asset-types/{id}` | Hapus jenis aset, ditolak jika masih dipakai | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
 | GET | `/api/asset-types/{id}/next-code` | Pratinjau kode aset berikutnya, tanpa memakai nomor | Token | Ya: Form aset (`pages/assets/AssetFormPage.tsx`) |
 | GET | `/api/asset-types/{id}/usage` | Pemakaian jenis aset sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import Button from '../../components/ui/Button'
-import { FormField, Input } from '../../components/ui/FormField'
+import { FormField, Input, Select } from '../../components/ui/FormField'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
@@ -17,6 +17,8 @@ export interface MasterTarget {
   code?: string
   /** Tanda gudang (hanya ruangan). */
   isStorage?: boolean
+  /** Kategori (hanya jenis aset). */
+  categoryId?: number
 }
 
 interface Usage {
@@ -26,9 +28,9 @@ interface Usage {
   reason: string | null
 }
 
-/** Tambah atau ubah nama (+ kode untuk jenis aset). `createUrl` diisi untuk tambah; `target` untuk ubah. */
+/** Tambah atau ubah nama (+ kategori & kode untuk jenis aset). `createUrl` diisi untuk tambah; `target` untuk ubah. */
 export function MasterFormModal({
-  kind, target, createUrl, withCode, withStorage, onClose, onDone,
+  kind, target, createUrl, withCode, withStorage, categories, categoryId: defaultCategoryId, onClose, onDone,
 }: {
   kind: string
   target?: MasterTarget
@@ -36,6 +38,10 @@ export function MasterFormModal({
   withCode?: boolean
   /** Ruangan: pilihan Gudang / tempat penyimpanan. */
   withStorage?: boolean
+  /** Jenis aset: pilihan kategori (wajib). */
+  categories?: { id: number; name: string }[]
+  /** Kategori awal saat menambah jenis dari grup kategori. */
+  categoryId?: number
   onClose: () => void
   onDone: () => void
 }) {
@@ -43,11 +49,13 @@ export function MasterFormModal({
   const [name, setName] = useState(target?.name ?? '')
   const [code, setCode] = useState(target?.code ?? '')
   const [isStorage, setIsStorage] = useState(target?.isStorage ?? false)
+  const [categoryId, setCategoryId] = useState(String(target?.categoryId ?? defaultCategoryId ?? ''))
 
   const submit = async () => {
     const payload: Record<string, unknown> = { name: name.trim() }
     if (withCode && code.trim()) payload.code = code.trim().toUpperCase()
     if (withStorage) payload.is_storage = isStorage
+    if (categories) payload.category_id = Number(categoryId)
     if (target) await api.put(target.url, payload)
     else await api.post(createUrl!, payload)
     toast.success(target ? `${kind} diperbarui.` : `${kind} ditambahkan.`)
@@ -58,7 +66,7 @@ export function MasterFormModal({
     <ActionModal
       title={target ? `Ubah ${kind.toLowerCase()}` : `Tambah ${kind.toLowerCase()}`}
       submitLabel="Simpan"
-      submitDisabled={!name.trim()}
+      submitDisabled={!name.trim() || (!!categories && !categoryId)}
       onClose={onClose}
       onSubmit={submit}
     >
@@ -67,6 +75,14 @@ export function MasterFormModal({
           <FormField label="Nama" required error={errors.name}>
             <Input value={name} onChange={(e) => setName(e.target.value)} error={errors.name} maxLength={100} autoFocus />
           </FormField>
+          {categories && (
+            <FormField label="Kategori" required error={errors.category_id}>
+              <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} error={errors.category_id}>
+                <option value="">Pilih kategori</option>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            </FormField>
+          )}
           {withStorage && (
             <div>
               <label className="flex min-h-10 items-center gap-2 text-sm font-medium text-slate-700">

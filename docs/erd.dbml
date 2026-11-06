@@ -111,8 +111,18 @@ Table consumable_categories {
   Note: 'Kategori stok habis pakai'
 }
 
+Table categories {
+  id bigint [pk, increment]
+  name varchar(100) [not null, unique, note: 'Elektronik, Furnitur, Alat Pelatihan, ...']
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'Kategori aset (tingkat atas jenis aset); hapus ditolak bila masih dipakai jenis'
+}
+
 Table asset_types {
   id bigint [pk, increment]
+  category_id bigint [not null, ref: > categories.id, note: 'wajib; restrict on delete']
   name varchar(100) [not null, unique, note: 'Proyektor, Laptop, ...']
   code varchar(5) [not null, unique, note: 'PRJ, LPT (otomatis, bisa diedit; tidak boleh kode bekas jenis lain)']
   last_number int [not null, default: 0, note: 'penghitung nomor urut kode aset, tidak pernah turun']

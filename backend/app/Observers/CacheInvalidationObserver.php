@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\Building;
+use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\ConsumableCategory;
 use App\Models\Department;
@@ -39,6 +40,7 @@ class CacheInvalidationObserver implements ShouldHandleEventsAfterCommit
         Department::class => [AppCache::GROUP_MASTER, AppCache::GROUP_OPS],
         RequestCatalog::class => [AppCache::GROUP_MASTER, AppCache::GROUP_OPS],
         ConsumableCategory::class => [AppCache::GROUP_MASTER, AppCache::GROUP_OPS],
+        Category::class => [AppCache::GROUP_MASTER],
         AssetType::class => [AppCache::GROUP_MASTER],
     ];
 

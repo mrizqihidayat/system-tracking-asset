@@ -6,7 +6,7 @@ import type { ListConfig } from '../useListParams'
  */
 export const listConfigs = {
   assets: {
-    filters: ['asset_type_id', 'building_id', 'room_id', 'source_department_id', 'condition', 'status'],
+    filters: ['category_id', 'building_id', 'room_id', 'status'],
   },
   activeLoans: { prefix: 'aktif_', perPage: 10, fixed: { status: 'Dipinjam' } },
   loanHistory: { filters: ['status'], perPage: 10 },

@@ -1,0 +1,59 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Concerns\CachesMasterList;
+use App\Http\Requests\StoreCategoryRequest;
+use App\Http\Requests\UpdateCategoryRequest;
+use App\Http\Resources\CategoryResource;
+use App\Models\Category;
+use App\Services\MasterDataService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class CategoryController extends Controller
+{
+    use CachesMasterList;
+
+    public function __construct(private MasterDataService $master) {}
+
+    public function index(Request $request): JsonResponse
+    {
+        return $this->masterList($request, 'categories', fn () => CategoryResource::collection(
+            $this->applySearch(Category::query(), $request->query('search'))
+                ->withCount('assetTypes')
+                ->orderBy('name')
+                ->get()
+        )->resolve($request));
+    }
+
+    public function store(StoreCategoryRequest $request): JsonResponse
+    {
+        $category = Category::create($request->validated())->loadCount('assetTypes');
+
+        return CategoryResource::make($category)->response()->setStatusCode(201);
+    }
+
+    public function update(UpdateCategoryRequest $request, Category $category): CategoryResource
+    {
+        $category->update($request->validated());
+
+        return CategoryResource::make($category->loadCount('assetTypes'));
+    }
+
+    /**
+     * Pemakaian sebelum hapus (popup Data Master): rincian, total, can_delete.
+     */
+    public function usage(Category $category): JsonResponse
+    {
+        return response()->json(['data' => $this->master->usage($category)]);
+    }
+
+    public function destroy(Category $category): JsonResponse
+    {
+        $name = $category->name;
+        $this->master->deleteCategory($category);
+
+        return response()->json(['message' => "Kategori {$name} dihapus."]);
+    }
+}

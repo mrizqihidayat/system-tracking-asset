@@ -120,6 +120,7 @@ return [
         'from' => 'tanggal awal',
         'to' => 'tanggal akhir',
         'category' => 'kategori',
+        'category_id' => 'kategori',
         'consumable_category_id' => 'kategori',
         'unit' => 'satuan',
         'quantity' => 'jumlah',

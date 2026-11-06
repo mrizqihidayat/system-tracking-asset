@@ -11,6 +11,7 @@ use App\Enums\RequestStatus;
 use App\Models\Asset;
 use App\Models\AssetCodeHistory;
 use App\Models\AssetType;
+use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\Department;
 use App\Models\Loan;
@@ -39,6 +40,17 @@ class SeederConsistencyTest extends TestCase
         $this->assertSame(3, Department::where('is_internal', false)->count());
         $this->assertEqualsWithDelta(30, Asset::count(), 3);
         $this->assertEqualsWithDelta(14, Consumable::count(), 2);
+    }
+
+    public function test_asset_types_are_grouped_into_seeded_categories(): void
+    {
+        $this->assertEquals([
+            'Alat Pelatihan' => ['Flipchart', 'Papan Tulis'],
+            'Elektronik' => ['Laptop', 'Layar Proyektor', 'Mikrofon Nirkabel', 'Proyektor', 'Speaker Aktif'],
+            'Furnitur' => ['Kursi', 'Meja Peserta'],
+        ], Category::with('assetTypes')->orderBy('name')->get()
+            ->mapWithKeys(fn (Category $c) => [$c->name => $c->assetTypes->pluck('name')->sort()->values()->all()])
+            ->all());
     }
 
     public function test_asset_status_matches_active_loans(): void
