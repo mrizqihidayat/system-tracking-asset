@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Plus, Warehouse } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
@@ -329,9 +329,7 @@ export default function RoomsPage() {
                   onClick={() => navigate(`${BASE}/${building.slug}/${r.slug}`)}
                   title={r.is_storage ? 'Gudang' : r.shortage_items ? `Kurang ${r.shortage_items} item` : r.total_items ? 'Lengkap' : 'Belum ada standar'}>
                   {r.name}
-                  {r.is_storage && (
-                    <span className={`ml-2 rounded-full px-1.5 text-xs ${r.id === roomId ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}>Gudang</span>
-                  )}
+                  {r.is_storage && <Warehouse size={16} className="ml-2 shrink-0" role="img" aria-label="Gudang" />}
                   {!r.is_storage && r.shortage_items > 0 && (
                     <span className={`ml-2 rounded-full px-1.5 text-xs tabular-nums ${r.id === roomId ? 'bg-white/20' : 'bg-bad-50 text-bad-700'}`}>
                       −{r.shortage_items}
@@ -473,7 +471,7 @@ export default function RoomsPage() {
       )}
       {modal === 'room' && building && (
         <NameModal
-          title={`Tambah ruangan — ${building.name}`}
+          title={`Tambah ruangan • ${building.name}`}
           label="Nama ruangan"
           placeholder="Misal: Lt. 8 – Ruang A"
           onClose={() => setModal(null)}

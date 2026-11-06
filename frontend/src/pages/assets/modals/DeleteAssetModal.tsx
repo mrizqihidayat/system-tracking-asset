@@ -35,7 +35,7 @@ export default function DeleteAssetModal({ asset, onClose, onDone }: Props) {
 
   return (
     <ActionModal
-      title={`Hapus aset — ${asset.code}`}
+      title={`Hapus aset • ${asset.code}`}
       submitLabel="Hapus permanen"
       danger
       submitDisabled={!impact || (needsCode && !codeMatches)}
@@ -68,7 +68,7 @@ export default function DeleteAssetModal({ asset, onClose, onDone }: Props) {
                 Mengurangi jumlah &ldquo;Ada&rdquo; pada standar ruangan:
                 <ul className="mt-1 list-disc pl-5">
                   {impact.affected_room_standards.map((s) => (
-                    <li key={`${s.room_id}-${s.item_name}`}>{s.item_name} — {s.room}, {s.building}</li>
+                    <li key={`${s.room_id}-${s.item_name}`}>{s.item_name} • {s.room}, {s.building}</li>
                   ))}
                 </ul>
               </div>

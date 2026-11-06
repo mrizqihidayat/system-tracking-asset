@@ -45,7 +45,7 @@ export default function StockCardModal({ item, onClose }: { item: ConsumableItem
   return (
     <Modal
       open
-      title={`Kartu stok — ${item.name}`}
+      title={`Kartu stok • ${item.name}`}
       onClose={onClose}
       footer={<Button variant="secondary" onClick={onClose}>Tutup</Button>}
     >

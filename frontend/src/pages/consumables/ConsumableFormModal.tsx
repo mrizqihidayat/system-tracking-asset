@@ -102,7 +102,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
     <ActionModal
       title={item ? `Ubah ${item.name}` : 'Tambah barang habis pakai'}
       submitLabel="Simpan"
-      submitDisabled={!name.trim() || !unit.trim() || !providerId || categoryPending || buildingPending || roomPending}
+      submitDisabled={!name.trim() || !unit.trim() || !providerId || !roomId || categoryPending || buildingPending || roomPending}
       onClose={onClose}
       onSubmit={submit}
     >
@@ -151,7 +151,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
             </Select>
           </FormField>
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Gedung lokasi simpan (opsional)">
+            <FormField label="Gedung lokasi simpan" required>
               <EntityCombobox
                 value={buildingId}
                 options={buildings.map((b) => ({ id: b.id, label: b.name }))}
@@ -166,7 +166,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
                 placeholder="Ketik nama gedung…"
               />
             </FormField>
-            <FormField label="Ruangan lokasi simpan (opsional)" error={errors.room_id}>
+            <FormField label="Ruangan lokasi simpan" required error={errors.room_id}>
               <EntityCombobox
                 key={buildingId ?? 'none'}
                 value={roomId}
@@ -185,7 +185,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
           {roomBlocked ? (
             <p role="alert" className="-mt-1 text-xs font-medium text-warn-700">Ruangan ini sudah ada tetapi bukan gudang. Tandai sebagai gudang di Data Master.</p>
           ) : (buildingPending || roomPending) && (
-            <p className="-mt-1 text-xs text-slate-500">Pilih gedung/ruangan dari daftar atau klik Tambah, atau kosongkan.</p>
+            <p className="-mt-1 text-xs text-slate-500">Pilih gedung/ruangan dari daftar atau klik Tambah.</p>
           )}
           <FormField label="Catatan (opsional)" error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} />

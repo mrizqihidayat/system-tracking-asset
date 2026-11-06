@@ -129,7 +129,7 @@ export function MasterDeleteModal({ target, onClose, onDone }: { target: MasterT
   return (
     <Modal
       open
-      title={`Hapus ${target.kind.toLowerCase()} — ${target.name}`}
+      title={`Hapus ${target.kind.toLowerCase()} • ${target.name}`}
       onClose={onClose}
       footer={
         <>

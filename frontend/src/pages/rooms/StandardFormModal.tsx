@@ -65,8 +65,8 @@ export default function StandardFormModal({ roomId, roomName, target, usedAssetT
   }
 
   const title = isAsset
-    ? `Standar ${group?.asset_type.name ?? 'jenis aset'} — ${roomName}`
-    : `${row ? 'Ubah' : 'Tambah'} barang — ${roomName}`
+    ? `Standar ${group?.asset_type.name ?? 'jenis aset'} • ${roomName}`
+    : `${row ? 'Ubah' : 'Tambah'} barang • ${roomName}`
 
   return (
     <ActionModal

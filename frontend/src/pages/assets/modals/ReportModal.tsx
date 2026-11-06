@@ -40,7 +40,7 @@ export default function ReportModal({ asset, mode, onClose, onDone }: Props) {
   }
 
   return (
-    <ActionModal title={`${titles[mode]} — ${asset.code}`} submitLabel="Simpan" danger={mode !== 'rusak'} onClose={onClose} onSubmit={submit}>
+    <ActionModal title={`${titles[mode]} • ${asset.code}`} submitLabel="Simpan" danger={mode !== 'rusak'} onClose={onClose} onSubmit={submit}>
       {(errors) => (
         <>
           {mode === 'rusak' && (

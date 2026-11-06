@@ -50,7 +50,7 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
 
   return (
     <ActionModal
-      title={`Terima kembali — ${loan.asset?.code}`}
+      title={`Terima kembali • ${loan.asset?.code}`}
       submitLabel="Simpan"
       danger={lost}
       onClose={onClose}

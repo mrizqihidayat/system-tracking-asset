@@ -29,7 +29,7 @@ export default function FoundModal({ asset, onClose, onDone }: Props) {
   }
 
   return (
-    <ActionModal title={`Tandai ditemukan — ${asset.code}`} submitLabel="Simpan" onClose={onClose} onSubmit={submit}>
+    <ActionModal title={`Tandai ditemukan • ${asset.code}`} submitLabel="Simpan" onClose={onClose} onSubmit={submit}>
       {(errors) => (
         <>
           <ConditionStatusFields

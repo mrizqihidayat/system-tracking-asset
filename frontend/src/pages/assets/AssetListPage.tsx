@@ -101,7 +101,7 @@ export default function AssetListPage() {
           '-'
         ),
     },
-    { header: 'Sumber', cell: (a) => (a.source_is_internal ? 'Milik SHD' : 'Departemen lain') },
+    { header: 'Sumber', cell: (a) => a.source_name ?? '-' },
     { header: 'Kondisi', sortKey: 'condition', cell: (a) => <span className="whitespace-nowrap">{a.condition}</span> },
     { header: 'Status', mobile: 'badge', sortKey: 'status', cell: (a) => <StatusBadge status={a.status} /> },
     {

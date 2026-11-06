@@ -42,7 +42,7 @@ export default function ServiceModal({ asset, onClose, onDone }: Props) {
   }
 
   return (
-    <ActionModal title={`Catat servis — ${asset.code}`} submitLabel="Simpan" onClose={onClose} onSubmit={submit}>
+    <ActionModal title={`Catat servis • ${asset.code}`} submitLabel="Simpan" onClose={onClose} onSubmit={submit}>
       {(errors) => (
         <>
           <div className="grid gap-3 sm:grid-cols-2">

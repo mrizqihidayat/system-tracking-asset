@@ -80,7 +80,10 @@ class RoomStorageTest extends TestCase
 
         $this->putJson("/api/consumables/{$id}", ['room_id' => $biasa->id])
             ->assertJsonValidationErrors(['room_id' => 'Lokasi simpan harus ruangan gudang.']);
-        $this->putJson("/api/consumables/{$id}", ['room_id' => null])->assertOk()->assertJsonPath('data.room', null);
+        $this->putJson("/api/consumables/{$id}", ['room_id' => null])
+            ->assertJsonValidationErrors(['room_id' => 'Lokasi simpan wajib dipilih.']);
+        $this->postJson('/api/consumables', [...$payload, 'name' => 'Pensil'])
+            ->assertJsonValidationErrors(['room_id' => 'Lokasi simpan wajib dipilih.']);
     }
 
     public function test_stored_stock_section_only_for_storage_room(): void

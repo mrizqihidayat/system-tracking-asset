@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useAnchoredPanel } from './useAnchoredPanel'
 
 export interface MenuItem {
   label: string
@@ -18,41 +20,44 @@ interface Props {
 
 export default function DropdownMenu({ trigger, items, label, align = 'right', triggerClassName = '', onOpen }: Props) {
   const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLUListElement>(null)
+  const close = useCallback(() => setOpen(false), [])
+  // Dirender ke body agar tidak terpotong area scroll tabel. Baris menu 36px, bingkai + padding 10px.
+  const { style, place } = useAnchoredPanel(button, panel, open, items.length, close, { fit: align, optionHeight: 36, panelPadding: 10 })
 
   useEffect(() => {
     if (!open) return
-    const close = (e: MouseEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
-    }
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
-    document.addEventListener('mousedown', close)
     document.addEventListener('keydown', esc)
-    return () => {
-      document.removeEventListener('mousedown', close)
-      document.removeEventListener('keydown', esc)
-    }
+    return () => document.removeEventListener('keydown', esc)
   }, [open])
 
   return (
-    <div ref={box} className="relative">
+    <div className="relative">
       <button
+        ref={button}
         type="button"
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => {
-          if (!open) onOpen?.()
+          if (!open) {
+            onOpen?.()
+            place()
+          }
           setOpen((v) => !v)
         }}
         className={`inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-300 hover:bg-slate-50 ${triggerClassName}`}
       >
         {trigger}
       </button>
-      {open && (
+      {open && createPortal(
         <ul
+          ref={panel}
           role="menu"
-          className={`absolute z-20 mt-1 min-w-52 rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-[0_8px_24px_rgb(20_33_46/0.12)] ${align === 'right' ? 'right-0' : 'left-0'}`}
+          style={style}
+          className="fixed z-50 min-w-52 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-[0_8px_24px_rgb(20_33_46/0.12)]"
         >
           {items.map((item) => (
             <li key={item.label} role="none">
@@ -69,7 +74,8 @@ export default function DropdownMenu({ trigger, items, label, align = 'right', t
               </button>
             </li>
           ))}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   )

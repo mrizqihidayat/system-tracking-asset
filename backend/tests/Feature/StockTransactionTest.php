@@ -38,7 +38,8 @@ class StockTransactionTest extends TestCase
     private function createItem(int $quantity = 10, array $overrides = []): Consumable
     {
         $id = $this->postJson('/api/consumables', [
-            'name' => 'Pulpen', 'unit' => 'pcs', 'quantity' => $quantity, 'min_quantity' => 5, 'provider_department_id' => $this->sga->id, ...$overrides,
+            'name' => 'Pulpen', 'unit' => 'pcs', 'quantity' => $quantity, 'min_quantity' => 5, 'provider_department_id' => $this->sga->id,
+            'room_id' => Room::factory()->create(['is_storage' => true])->id, ...$overrides,
         ])->assertCreated()->json('data.id');
 
         return Consumable::query()->findOrFail($id);

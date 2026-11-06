@@ -322,6 +322,7 @@ class ReportTest extends TestCase
     {
         $make = fn (string $name) => $this->postJson('/api/consumables', [
             'name' => $name, 'unit' => 'pcs', 'quantity' => 5, 'min_quantity' => 1, 'provider_department_id' => $this->deptA->id,
+            'room_id' => Room::factory()->create(['is_storage' => true])->id,
         ])->assertCreated()->json('data.id');
         $pulpen = $make('Pulpen');
         $make('Tinta');

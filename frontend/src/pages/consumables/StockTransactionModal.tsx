@@ -6,11 +6,11 @@ import type { ConsumableItem, StockTransactionType } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import RoomSelect from '../loans/RoomSelect'
 
-const TYPES: { value: StockTransactionType; hint: string }[] = [
+const TYPES: { value: StockTransactionType; hint?: string }[] = [
   { value: 'Barang Masuk', hint: 'Stok bertambah.' },
-  { value: 'Pemakaian', hint: 'Stok berkurang. Ruangan opsional, hanya mencatat tujuan; jumlah Ada ruangan tidak berubah.' },
+  { value: 'Pemakaian',  hint: 'Stok berkurang.' },
   { value: 'Koreksi', hint: 'Isi positif untuk menambah, negatif untuk mengurangi. Keterangan wajib.' },
-  { value: 'Penghapusan', hint: 'Stok berkurang karena tidak bisa dipakai lagi. Alasan wajib.' },
+  { value: 'Penghapusan', hint: 'Stok berkurang karena tidak bisa dipakai lagi.' },
 ]
 
 const REASONS = [
@@ -35,6 +35,7 @@ export default function StockTransactionModal({ item, onClose, onDone }: Props) 
   const [buildingId, setBuildingId] = useState<number | null>(null)
   const [roomId, setRoomId] = useState<number | null>(null)
 
+  const hint = TYPES.find((t) => t.value === type)?.hint
   const value = Number(quantity)
   const delta = type === 'Pemakaian' || type === 'Penghapusan' ? -value : value
   const noteRequired = type === 'Koreksi' || reason === 'lainnya'
@@ -55,7 +56,7 @@ export default function StockTransactionModal({ item, onClose, onDone }: Props) 
 
   return (
     <ActionModal
-      title={`Catat transaksi — ${item.name}`}
+      title={`Catat transaksi • ${item.name}`}
       submitLabel="Simpan"
       submitDisabled={!valid || (type === 'Penghapusan' && !reason) || (noteRequired && !note.trim())}
       onClose={onClose}
@@ -81,10 +82,12 @@ export default function StockTransactionModal({ item, onClose, onDone }: Props) 
               />
             </FormField>
           </div>
-          <p className="-mt-1 text-xs text-slate-500">
-            {TYPES.find((t) => t.value === type)?.hint}
-            {valid && <> Stok setelah transaksi: <b className={after < 0 ? 'text-bad-700' : ''}>{after} {item.unit}</b>.</>}
-          </p>
+          {(hint || valid) && (
+            <p className="-mt-1 text-xs text-slate-500">
+              {hint}
+              {valid && <> Stok setelah transaksi: <b className={after < 0 ? 'text-bad-700' : ''}>{after} {item.unit}</b>.</>}
+            </p>
+          )}
           {type === 'Penghapusan' && (
             <FormField label="Alasan" required error={errors.reason}>
               <Select value={reason} onChange={(e) => setReason(e.target.value)} error={errors.reason}>

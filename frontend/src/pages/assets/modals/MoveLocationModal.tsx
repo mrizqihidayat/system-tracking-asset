@@ -52,7 +52,7 @@ export default function MoveLocationModal({ asset, onClose, onDone }: Props) {
   }
 
   return (
-    <ActionModal title={`Pindah lokasi — ${asset.code}`} submitLabel="Pindahkan" submitDisabled={!roomId} onClose={onClose} onSubmit={submit}>
+    <ActionModal title={`Pindah lokasi • ${asset.code}`} submitLabel="Pindahkan" submitDisabled={!roomId} onClose={onClose} onSubmit={submit}>
       {(errors) => (
         <>
           <p className="text-sm text-slate-600">

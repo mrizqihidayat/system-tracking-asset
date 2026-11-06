@@ -74,7 +74,7 @@ export interface AssetListItem extends Pick<Asset, 'id' | 'code' | 'name' | 'con
   asset_type_name: string | null
   room_name: string | null
   building_name: string | null
-  source_is_internal: boolean
+  source_name: string | null
 }
 
 export interface AssetEvent {

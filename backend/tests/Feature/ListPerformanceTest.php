@@ -80,11 +80,11 @@ class ListPerformanceTest extends TestCase
             ->assertJsonPath('data.0.asset_type_name', 'Elektronik')
             ->assertJsonPath('data.0.room_name', 'Ruang 1')
             ->assertJsonPath('data.0.building_name', 'Gedung A')
-            ->assertJsonPath('data.0.source_is_internal', false)
+            ->assertJsonPath('data.0.source_name', $source->name)
             ->json('data.0');
 
         $this->assertSame(
-            ['id', 'code', 'name', 'asset_type_name', 'room_name', 'building_name', 'source_is_internal', 'condition', 'status'],
+            ['id', 'code', 'name', 'asset_type_name', 'room_name', 'building_name', 'source_name', 'condition', 'status'],
             array_keys($row),
         );
 

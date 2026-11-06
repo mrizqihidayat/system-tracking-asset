@@ -226,8 +226,8 @@ class Asset extends Model
                 ->select('buildings.name')
                 ->join('rooms', 'rooms.building_id', '=', 'buildings.id')
                 ->whereColumn('rooms.id', 'assets.room_id'),
-            'source_is_internal' => Department::query()
-                ->select('departments.is_internal')
+            'source_name' => Department::query()
+                ->select('departments.name')
                 ->whereColumn('departments.id', 'assets.source_department_id'),
         ]);
     }

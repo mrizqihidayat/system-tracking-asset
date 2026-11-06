@@ -27,7 +27,7 @@ class StoreConsumableRequest extends FormRequest
             'quantity' => ['required', 'integer', 'min:0', 'max:'.DbInteger::MAX],
             'min_quantity' => ['required', 'integer', 'min:0', 'max:'.DbInteger::MAX],
             'provider_department_id' => ['required', 'integer', 'exists:departments,id'],
-            'room_id' => ['nullable', 'integer', Rule::exists('rooms', 'id')->where('is_storage', true)],
+            'room_id' => ['required', 'integer', Rule::exists('rooms', 'id')->where('is_storage', true)],
             'note' => ['nullable', 'string', 'max:1000'],
         ];
     }
@@ -37,7 +37,10 @@ class StoreConsumableRequest extends FormRequest
      */
     public function messages(): array
     {
-        return ['room_id.exists' => 'Lokasi simpan harus ruangan gudang.'];
+        return [
+            'room_id.required' => 'Lokasi simpan wajib dipilih.',
+            'room_id.exists' => 'Lokasi simpan harus ruangan gudang.',
+        ];
     }
 
     protected function ignoreId(): ?int

@@ -45,6 +45,7 @@ class ConsumableTest extends TestCase
             'quantity' => 50,
             'min_quantity' => 10,
             'provider_department_id' => $this->sga->id,
+            'room_id' => $overrides['room_id'] ?? Room::factory()->create(['is_storage' => true])->id,
             ...$overrides,
         ];
     }
@@ -157,6 +158,7 @@ class ConsumableTest extends TestCase
                 'name' => 'Nama wajib diisi.',
                 'unit' => 'Satuan wajib diisi.',
                 'provider_department_id' => 'Minta ke wajib diisi.',
+                'room_id' => 'Lokasi simpan wajib dipilih.',
             ]);
     }
 
@@ -244,7 +246,7 @@ class ConsumableTest extends TestCase
         $this->getJson("/api/consumables?room_id={$mh->id}")->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Pensil');
 
         $this->postJson('/api/consumables', $this->payload(['name' => 'Tinta', 'room_id' => 999]))->assertJsonValidationErrors('room_id');
-        $this->postJson('/api/consumables', $this->payload(['name' => 'Tinta', 'storage_location' => 'Gudang']))->assertCreated()->assertJsonPath('data.room', null);
+        $this->postJson('/api/consumables', $this->payload(['name' => 'Tinta', 'storage_location' => 'Gudang']))->assertCreated()->assertJsonMissingPath('data.storage_location');
         $this->getJson('/api/lookups/storage-locations')->assertNotFound();
     }
 

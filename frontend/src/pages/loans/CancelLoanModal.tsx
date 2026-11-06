@@ -23,7 +23,7 @@ export default function CancelLoanModal({ loan, onClose, onDone }: Props) {
 
   return (
     <ActionModal
-      title={`Batalkan peminjaman — ${loan.asset?.code}`}
+      title={`Batalkan peminjaman • ${loan.asset?.code}`}
       submitLabel="Batalkan peminjaman"
       danger
       submitDisabled={!reason.trim()}

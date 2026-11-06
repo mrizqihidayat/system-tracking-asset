@@ -113,7 +113,7 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
             >
               <option value="">Pilih item katalog</option>
               {catalog.map((c) => (
-                <option key={c.id} value={c.id}>{c.item_name} — {c.provider_department?.name}</option>
+                <option key={c.id} value={c.id}>{c.item_name} • {c.provider_department?.name}</option>
               ))}
               <option value={MANUAL}>Item lain (tidak ada di katalog)</option>
             </Select>
