@@ -92,7 +92,7 @@ export default function FillFromStockModal({ row, roomName, requestHref, onClose
             </p>
           )}
 
-          <FormField label="Keterangan (opsional)" error={errors.note}>
+          <FormField label="Keterangan" error={errors.note}>
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}

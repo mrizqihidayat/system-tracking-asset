@@ -109,7 +109,7 @@ export default function StockTransactionModal({ item, onClose, onDone }: Props) 
               error={errors.room_id}
             />
           )}
-          <FormField label={noteRequired ? 'Keterangan' : 'Keterangan (opsional)'} required={noteRequired} error={errors.note}>
+          <FormField label="Keterangan" required={noteRequired} error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} />
           </FormField>
         </>

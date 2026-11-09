@@ -1,5 +1,5 @@
 import {
-  Boxes, ClipboardCheck, FileKey, HandHelping, LayoutDashboard, LogOut, Menu, PackageOpen, Send, Settings, X,
+  Boxes, ClipboardCheck, HandHelping, LayoutDashboard, LogOut, Menu, PackageOpen, Send, Settings, X,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -95,13 +95,6 @@ export default function AppLayout() {
               <span>{label}</span>
             </NavLink>
           ))}
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#9fb8cc]" aria-disabled="true">
-            <FileKey size={18} className="shrink-0" />
-            <span className="flex flex-1 items-center justify-between gap-2">
-              Lisensi Digital
-              <span className="rounded border border-white/25 px-1.5 py-0.5 text-[11px] text-[#c4d6e4]">Fase 2</span>
-            </span>
-          </div>
 
           <p className="px-3 pb-1 pt-5 text-xs font-semibold text-[#b5cadb]">Pengaturan</p>
           <NavLink
