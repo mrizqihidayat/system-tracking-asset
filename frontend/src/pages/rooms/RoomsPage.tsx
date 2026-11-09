@@ -19,7 +19,7 @@ import { queryKeys } from '../../lib/queries/keys'
 import { useChecklist, useReadiness } from '../../lib/queries/lists'
 import { prefetchRoomOptions } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
-import type { Checklist, ChecklistResult, RoomAssetGroup, RoomConsumable } from '../../types/room'
+import type { Checklist, ChecklistResult, RoomAssetGroup, RoomConsumable, RoomStoredStock } from '../../types/room'
 import FillFromStockModal from './FillFromStockModal'
 import NameModal from './NameModal'
 import StandardFormModal, { type StandardTarget } from './StandardFormModal'
@@ -86,6 +86,62 @@ const differenceCell = (difference: number | null) =>
     <span className={`tabular-nums ${difference < 0 ? 'font-semibold text-bad-700' : ''}`}>{difference}</span>
   )
 
+const storedAssetColumns: Column<RoomAssetGroup>[] = [
+  {
+    header: 'Jenis aset',
+    mobile: 'title',
+    cell: (g) => (
+      <>
+        <span className="font-medium">{g.asset_type.name}</span>
+        <AssetCodes group={g} />
+      </>
+    ),
+  },
+  { header: 'Jumlah', cell: (g) => <span className="tabular-nums">{g.total}</span> },
+]
+
+const storedStockColumns: Column<RoomStoredStock>[] = [
+  { header: 'Barang', mobile: 'title', cell: (s) => <span className="font-medium">{s.name}</span> },
+  { header: 'Jumlah', cell: (s) => <span className="tabular-nums">{s.quantity} {s.unit}</span> },
+  // Status dihitung backend dari batas minimum barang.
+  { header: 'Status', mobile: 'badge', cell: (s) => <Badge color={stockColor[s.status]}>{s.status}</Badge> },
+]
+
+/** Tampilan gudang: hanya Aset tersimpan & Stok tersimpan, tanpa standar dan cek. */
+function StorageRoomView({ checklist, loading }: { checklist: Checklist | null; loading: boolean }) {
+  return (
+    <>
+      <section className="space-y-3">
+        <div>
+          <h3 className="font-semibold">Aset tersimpan</h3>
+          <p className="text-sm text-slate-500">Otomatis dari aset berlokasi asal di gudang ini.</p>
+        </div>
+        <DataTable
+          columns={storedAssetColumns}
+          rows={loading ? [] : (checklist?.data.assets ?? [])}
+          rowKey={(g) => g.asset_type.id}
+          loading={loading}
+          emptyText="Belum ada aset tersimpan di gudang ini."
+        />
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h3 className="font-semibold">Stok tersimpan</h3>
+          <p className="text-sm text-slate-500">Barang habis pakai yang lokasi simpannya gudang ini.</p>
+        </div>
+        <DataTable
+          columns={storedStockColumns}
+          rows={loading ? [] : (checklist?.data.stored_stock ?? [])}
+          rowKey={(s) => s.id}
+          loading={loading}
+          emptyText="Belum ada stok tersimpan di gudang ini."
+        />
+      </section>
+    </>
+  )
+}
+
 export default function RoomsPage() {
   const { building: buildingSlug, room: roomSlug } = useParams()
   const navigate = useNavigate()
@@ -121,12 +177,13 @@ export default function RoomsPage() {
   useErrorToast(readiness.error, checklistQuery.error)
 
   // Data checklist baru (ruangan lain / setelah simpan) → isi ulang kolom Ada barang habis pakai.
+  // Gudang tidak dicek: form dikosongkan.
   if (checklist && checklist !== actualFrom) {
     setActualFrom(checklist)
     setActual(
-      Object.fromEntries(
-        checklist.data.consumables.map((s) => [s.id, s.present_quantity?.toString() ?? '']),
-      ),
+      checklist.meta.room.is_storage
+        ? {}
+        : Object.fromEntries(checklist.data.consumables.map((s) => [s.id, s.present_quantity?.toString() ?? ''])),
     )
   }
 
@@ -178,7 +235,8 @@ export default function RoomsPage() {
   const totalRooms = buildings.reduce((n, b) => n + b.rooms_count, 0)
   const shortages = assetRows.filter((g) => g.result === 'Kurang').length + consumableRows.filter((s) => s.result === 'Kurang').length
   const roomLabel = room && building ? `${room.name} · ${building.name}` : ''
-  const canSave = !!roomId && consumableRows.length > 0
+  const isStorage = !!room?.is_storage
+  const canSave = !!roomId && !isStorage && consumableRows.length > 0
 
   const saveCheck = async () => {
     if (!roomId) return
@@ -331,7 +389,13 @@ export default function RoomsPage() {
         actions={
           <>
             {/* Status cek ruangan terpilih, di samping tombol Simpan hasil cek. */}
-            {room && (
+            {room && isStorage && (
+              <p className="flex items-center gap-2 text-xs text-slate-500 sm:mr-2">
+                <Badge>Gudang</Badge>
+                <span>Gudang tidak dicek terhadap standar</span>
+              </p>
+            )}
+            {room && !isStorage && (
               <p className="flex items-center gap-1.5 text-xs text-slate-500 sm:mr-2">
                 <Clock size={14} className="shrink-0" aria-hidden />
                 <span>
@@ -339,12 +403,14 @@ export default function RoomsPage() {
                     ? `Dicek ${formatDateTime(room.last_checked_at)} oleh ${room.last_checked_by ?? '-'}`
                     : 'Belum pernah dicek'}
                   {checklist && checklist.meta.summary.unchecked_items > 0 && ` · ${checklist.meta.summary.unchecked_items} belum dicek`}
-                  {checklist && !room.is_storage && checklist.meta.summary.total_items === 0 && ' · Belum ada standar'}
+                  {checklist && checklist.meta.summary.total_items === 0 && ' · Belum ada standar'}
                 </span>
               </p>
             )}
             <ExportButton type="rooms" filters={() => ({ building_id: building?.id })} />
-            <Button loading={saving} disabled={!canSave} onClick={saveCheck} className="max-lg:hidden!">Simpan hasil cek</Button>
+            {!isStorage && (
+              <Button loading={saving} disabled={!canSave} onClick={saveCheck} className="max-lg:hidden!">Simpan hasil cek</Button>
+            )}
           </>
         }
       />
@@ -389,14 +455,16 @@ export default function RoomsPage() {
         )}
       </section>
 
-      {room && !room.is_storage && shortages > 0 && (
+      {room && !isStorage && shortages > 0 && (
         <div className="rounded-xl bg-warn-50 px-5 py-4 text-sm text-warn-700">
           <b>{room.name} kurang {shortages} item.</b>
           {consumableRows.some((s) => s.result === 'Kurang') && ' Barang habis pakai dapat diambil dari stok, atau ajukan permintaan jika stok habis.'}
         </div>
       )}
 
-      {room && (
+      {room && isStorage && <StorageRoomView checklist={checklist} loading={!checklistReady} />}
+
+      {room && !isStorage && (
         <>
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -435,24 +503,6 @@ export default function RoomsPage() {
               emptyText="Belum ada barang habis pakai. Klik “Tambah barang” untuk menambah."
             />
           </section>
-
-          {!!checklist && checklistReady && checklist.data.stored_stock.length > 0 && (
-            <section className="rounded-xl border border-slate-200 bg-white p-5">
-              <h3 className="font-semibold">Stok tersimpan di sini</h3>
-              <p className="text-sm text-slate-500">Hanya informasi; tidak dihitung sebagai Ada di ruangan ini.</p>
-              <ul className="mt-2 divide-y divide-slate-100">
-                {checklist.data.stored_stock.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                    <span className="min-w-0 font-medium">{s.name}</span>
-                    <span className="flex shrink-0 items-center gap-3">
-                      <span className="tabular-nums">{s.quantity} {s.unit}</span>
-                      <Badge color={stockColor[s.status]}>{s.status}</Badge>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
         </>
       )}
       {canSave && (
