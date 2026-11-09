@@ -1,10 +1,10 @@
-import { Clock, Pencil, Plus, Trash2, Warehouse } from 'lucide-react'
+import { Clock, Pencil, Plus, Trash2, TriangleAlert, Warehouse } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
-import { Badge, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
+import { Badge, ConditionBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { controlClass } from '../../components/ui/control-class'
 import DataTable, { type Column } from '../../components/ui/DataTable'
@@ -53,62 +53,70 @@ const requestUrl = (roomId: number, s: RoomConsumable, quantity = s.shortage) =>
   return `/permintaan?${p}`
 }
 
+/** Tombol sekunder kecil di judul bagian. */
+const compactButton = 'min-h-8! px-3! text-xs!'
+
+const MAX_ASSET_CODES = 5
 const NOT_COUNTED_LABELS = { Dipinjam: 'sedang dipinjam', Perbaikan: 'dalam perbaikan', Hilang: 'hilang' } as const
-// Warna teks ringkasan kondisi, senada dengan ConditionBadge.
-const conditionText: Record<Condition, string> = { Baik: 'text-ok-700', 'Rusak Ringan': 'text-warn-700', 'Rusak Berat': 'text-bad-700' }
 
-const assetLink = (a: RoomAssetGroup['assets'][number]) => (
-  <Link to={`/daftar-aset/${a.id}`} className="hover:text-brand-700 hover:underline">{a.code}</Link>
-)
-
-/**
- * Kode aset (klik menuju detail) + kondisi + keterangan aset yang tidak dihitung "Ada".
- * Satu aset: kode + lencana kondisi. Banyak aset: ringkasan kondisi, detail per kode saat dibuka.
- */
+/** Kode aset (klik menuju detail) + keterangan aset yang tidak dihitung "Ada". */
 function AssetCodes({ group }: { group: RoomAssetGroup }) {
+  const shown = group.assets.slice(0, MAX_ASSET_CODES)
+  const hidden = group.assets.slice(MAX_ASSET_CODES)
   const notCounted = (Object.keys(NOT_COUNTED_LABELS) as (keyof typeof NOT_COUNTED_LABELS)[])
     .filter((status) => group.not_counted[status])
     .map((status) => `${group.not_counted[status]} ${NOT_COUNTED_LABELS[status]}`)
-  const [single] = group.assets
-  const conditions = Object.entries(group.conditions) as [Condition, number][]
 
   return (
     <span className="block text-xs text-slate-500">
-      {group.assets.length === 0 && 'Belum ada aset'}
-      {group.assets.length === 1 && (
-        <span className="flex flex-wrap items-center gap-1.5">
-          {assetLink(single)}
-          <ConditionBadge condition={single.condition} />
-        </span>
-      )}
-      {group.assets.length > 1 && (
-        <details className="group/codes">
-          <summary
-            className="flex cursor-pointer list-none flex-wrap items-center gap-x-1 hover:text-slate-700 [&::-webkit-details-marker]:hidden"
-            title={group.assets.map((a) => `${a.code}: ${a.condition}`).join('\n')}
-          >
-            {conditions.map(([condition, count], i) => (
-              <span key={condition}>
-                {i > 0 && <span aria-hidden> · </span>}
-                <span className={`font-semibold ${conditionText[condition]}`}>{count} {condition}</span>
-              </span>
-            ))}
-            <span className="ml-1 text-brand-700 group-open/codes:hidden">Lihat per kode</span>
-            <span className="ml-1 hidden text-brand-700 group-open/codes:inline">Tutup</span>
-          </summary>
-          <ul className="mt-1.5 space-y-1">
-            {group.assets.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center gap-1.5">
-                {assetLink(a)}
-                <ConditionBadge condition={a.condition} />
-                {a.status !== 'Tersedia' && <StatusBadge status={a.status} />}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-      {notCounted.length > 0 && <span className="mt-0.5 block text-warn-700">{notCounted.join(' · ')}</span>}
+      {shown.length === 0
+        ? 'Belum ada aset'
+        : shown.map((a, i) => (
+            <span key={a.id}>
+              {i > 0 && ', '}
+              <Link to={`/daftar-aset/${a.id}`} className="hover:text-brand-700 hover:underline">{a.code}</Link>
+            </span>
+          ))}
+      {hidden.length > 0 && <span title={hidden.map((a) => a.code).join(', ')}> +{hidden.length}</span>}
+      {notCounted.length > 0 && <span className="block text-warn-700">{notCounted.join(' · ')}</span>}
     </span>
+  )
+}
+
+/**
+ * Kolom Kondisi: satu aset → lencana kondisi; banyak aset → lencana per kondisi + jumlah.
+ * Hover lencana menampilkan kode aset dengan kondisi itu.
+ */
+function ConditionSummary({ group }: { group: RoomAssetGroup }) {
+  if (group.assets.length === 0) return <span className="text-slate-500">—</span>
+  if (group.assets.length === 1) return <ConditionBadge condition={group.assets[0].condition} />
+
+  return (
+    <span className="flex flex-wrap gap-1">
+      {(Object.entries(group.conditions) as [Condition, number][]).map(([condition, count]) => (
+        <span
+          key={condition}
+          title={group.assets.filter((a) => a.condition === condition).map((a) => a.code).join(', ')}
+        >
+          <ConditionBadge condition={condition} label={`${count} ${condition}`} />
+        </span>
+      ))}
+    </span>
+  )
+}
+
+const conditionColumn: Column<RoomAssetGroup> = { header: 'Kondisi', cell: (g) => <ConditionSummary group={g} /> }
+
+/** Judul bagian tabel: judul, keterangan singkat, dan aksi opsional di kanan. */
+function SectionHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  return (
+    <div className={`flex flex-wrap justify-between gap-2 ${description ? 'items-end' : 'items-center'}`}>
+      <div>
+        <h3 className="font-semibold">{title}</h3>
+        {description && <p className="text-xs text-slate-500">{description}</p>}
+      </div>
+      {action}
+    </div>
   )
 }
 
@@ -131,6 +139,7 @@ const storedAssetColumns: Column<RoomAssetGroup>[] = [
     ),
   },
   { header: 'Jumlah', cell: (g) => <span className="tabular-nums">{g.total}</span> },
+  conditionColumn,
 ]
 
 const storedStockColumns: Column<RoomStoredStock>[] = [
@@ -143,12 +152,9 @@ const storedStockColumns: Column<RoomStoredStock>[] = [
 /** Tampilan gudang: hanya Aset tersimpan & Stok tersimpan, tanpa standar dan cek. */
 function StorageRoomView({ checklist, loading }: { checklist: Checklist | null; loading: boolean }) {
   return (
-    <>
-      <section className="space-y-3">
-        <div>
-          <h3 className="font-semibold">Aset tersimpan</h3>
-          <p className="text-sm text-slate-500">Otomatis dari aset berlokasi asal di gudang ini.</p>
-        </div>
+    <div className="grid items-start gap-4 lg:grid-cols-2">
+      <section className="min-w-0 space-y-2">
+        <SectionHeader title="Aset tersimpan" description="Aset yang terdaftar dengan lokasi asal di gudang ini." />
         <DataTable
           columns={storedAssetColumns}
           rows={loading ? [] : (checklist?.data.assets ?? [])}
@@ -158,11 +164,8 @@ function StorageRoomView({ checklist, loading }: { checklist: Checklist | null; 
         />
       </section>
 
-      <section className="space-y-3">
-        <div>
-          <h3 className="font-semibold">Stok tersimpan</h3>
-          <p className="text-sm text-slate-500">Barang habis pakai yang lokasi simpannya gudang ini.</p>
-        </div>
+      <section className="min-w-0 space-y-2">
+        <SectionHeader title="Stok tersimpan" description="Barang habis pakai yang disimpan di gudang ini." />
         <DataTable
           columns={storedStockColumns}
           rows={loading ? [] : (checklist?.data.stored_stock ?? [])}
@@ -171,7 +174,7 @@ function StorageRoomView({ checklist, loading }: { checklist: Checklist | null; 
           emptyText="Belum ada stok tersimpan di gudang ini."
         />
       </section>
-    </>
+    </div>
   )
 }
 
@@ -315,6 +318,7 @@ export default function RoomsPage() {
       ),
     },
     { header: 'Jumlah', cell: (g) => <span className="tabular-nums">{g.total}</span> },
+    conditionColumn,
     { header: 'Standar', cell: (g) => <span className="tabular-nums">{g.standard_quantity}</span> },
     { header: 'Ada', cell: (g) => <span className="tabular-nums">{g.present_quantity}</span> },
     { header: 'Selisih', cell: (g) => differenceCell(g.difference) },
@@ -415,7 +419,7 @@ export default function RoomsPage() {
   ]
 
   return (
-    <div className={`space-y-5 ${canSave ? 'pb-20 lg:pb-0' : ''}`}>
+    <div className={`space-y-3 ${canSave ? 'pb-20 lg:pb-0' : ''}`}>
       <PageHeader
         title="Kelengkapan Ruangan"
         description={`Aset dan barang habis pakai per ruangan · ${totalRooms} ruangan di ${buildings.length} gedung`}
@@ -489,9 +493,12 @@ export default function RoomsPage() {
       </section>
 
       {room && !isStorage && shortages > 0 && (
-        <div className="rounded-xl bg-warn-50 px-5 py-4 text-sm text-warn-700">
-          <b>{room.name} kurang {shortages} item.</b>
-          {consumableRows.some((s) => s.result === 'Kurang') && ' Barang habis pakai dapat diambil dari stok, atau ajukan permintaan jika stok habis.'}
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-warn-700/40 bg-warn-50 px-4 py-3 text-sm text-warn-700">
+          <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden />
+          <p>
+            <b>{room.name} kurang {shortages} item.</b>
+            {consumableRows.some((s) => s.result === 'Kurang') && ' Barang habis pakai dapat diambil dari stok, atau ajukan permintaan jika stok habis.'}
+          </p>
         </div>
       )}
 
@@ -499,16 +506,15 @@ export default function RoomsPage() {
 
       {room && !isStorage && (
         <>
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="font-semibold">Aset di ruangan</h3>
-                <p className="text-sm text-slate-500">Otomatis dari aset berlokasi asal di ruangan ini. Standar opsional per jenis.</p>
-              </div>
-              <Button variant="secondary" onClick={() => setStandardTarget({ kind: 'asset', group: null })}>
-                <Plus size={16} /> Tambah standar jenis
-              </Button>
-            </div>
+          <section className="space-y-1.5">
+            <SectionHeader
+              title="Aset di ruangan"
+              action={
+                <Button variant="secondary" className={compactButton} onClick={() => setStandardTarget({ kind: 'asset', group: null })}>
+                  <Plus size={14} /> Tambah standar jenis
+                </Button>
+              }
+            />
             <DataTable
               columns={assetColumns}
               rows={assetRows}
@@ -518,16 +524,15 @@ export default function RoomsPage() {
             />
           </section>
 
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="font-semibold">Barang habis pakai</h3>
-                <p className="text-sm text-slate-500">Barang dari Stok dengan jumlah standar. Isi kolom Ada, lalu klik “Simpan hasil cek”.</p>
-              </div>
-              <Button variant="secondary" onClick={() => setStandardTarget({ kind: 'consumable', row: null })}>
-                <Plus size={16} /> Tambah barang
-              </Button>
-            </div>
+          <section className="space-y-1.5">
+            <SectionHeader
+              title="Barang habis pakai"
+              action={
+                <Button variant="secondary" className={compactButton} onClick={() => setStandardTarget({ kind: 'consumable', row: null })}>
+                  <Plus size={14} /> Tambah barang
+                </Button>
+              }
+            />
             <DataTable
               columns={consumableColumns}
               rows={consumableRows}

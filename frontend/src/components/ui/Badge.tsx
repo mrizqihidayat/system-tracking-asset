@@ -32,8 +32,9 @@ const conditionColor: Record<Condition, BadgeColor> = {
 }
 
 export const StatusBadge = ({ status }: { status: Status }) => <Badge color={statusColor[status]}>{status}</Badge>
-export const ConditionBadge = ({ condition }: { condition: Condition }) => (
-  <Badge color={conditionColor[condition]}>{condition}</Badge>
+/** `label` opsional mengganti teks (mis. "3 Baik"), warna tetap mengikuti kondisi. */
+export const ConditionBadge = ({ condition, label }: { condition: Condition; label?: string }) => (
+  <Badge color={conditionColor[condition]}>{label ?? condition}</Badge>
 )
 
 /** Kode aset sebagai label pelat mono; tidak pernah patah baris. */
