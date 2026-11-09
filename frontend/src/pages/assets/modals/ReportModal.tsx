@@ -67,7 +67,7 @@ export default function ReportModal({ asset, mode, onClose, onDone }: Props) {
             </p>
           )}
           {mode !== 'hilang' && (
-            <FormField label="Pihak pelapor (opsional, default SHD)" error={errors.party}>
+            <FormField label="Pihak pelapor" error={errors.party}>
               <Input value={party} onChange={(e) => setParty(e.target.value)} error={errors.party} maxLength={150} placeholder="SHD" />
             </FormField>
           )}
