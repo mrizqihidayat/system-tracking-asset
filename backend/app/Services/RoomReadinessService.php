@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Enums\ChecklistResult;
 use App\Enums\CountMethod;
@@ -80,6 +81,7 @@ class RoomReadinessService
     /**
      * Bagian "Aset di ruangan": aset berlokasi asal di ruangan ini per jenis (Tidak Layak Pakai tidak tampil).
      * Tanpa baris standar berarti standar 0: tampil jumlah Ada tanpa Hasil. Standar > 0 tampil walau asetnya 0.
+     * Kondisi per aset dan ringkasan `conditions` (urut Baik → Rusak Berat) dihitung dari query yang sama.
      *
      * @param  Collection<int, RoomStandard>  $standards  sudah melewati checklist()
      * @return list<array<string, mixed>>
@@ -92,7 +94,7 @@ class RoomReadinessService
             ->where('room_id', $room->id)
             ->where('status', '!=', AssetStatus::TidakLayakPakai->value)
             ->orderBy('code')
-            ->select('id', 'code', 'status', 'asset_type_id')
+            ->select('id', 'code', 'status', 'condition', 'asset_type_id')
             ->toBase()
             ->get()
             ->groupBy('asset_type_id');
@@ -108,12 +110,22 @@ class RoomReadinessService
                 $standard = $standardsByType->get($type->id);
                 $notCounted = $rows->filter(fn ($asset) => in_array($asset->status, $excluded, true));
                 $present = $rows->count() - $notCounted->count();
+                $conditionCounts = $rows->countBy('condition');
+                $conditions = collect(AssetCondition::cases())
+                    ->filter(fn (AssetCondition $c) => $conditionCounts->has($c->value))
+                    ->mapWithKeys(fn (AssetCondition $c) => [$c->value => $conditionCounts->get($c->value)]);
 
                 return [
                     'asset_type' => ['id' => $type->id, 'name' => $type->name, 'code' => $type->code],
                     'total' => $rows->count(),
-                    'assets' => $rows->map(fn ($asset) => ['id' => (int) $asset->id, 'code' => $asset->code, 'status' => $asset->status])->values()->all(),
+                    'assets' => $rows->map(fn ($asset) => [
+                        'id' => (int) $asset->id,
+                        'code' => $asset->code,
+                        'status' => $asset->status,
+                        'condition' => $asset->condition,
+                    ])->values()->all(),
                     'not_counted' => (object) $notCounted->countBy('status')->all(),
+                    'conditions' => (object) $conditions->all(),
                     'standard_id' => $standard?->id,
                     'standard_quantity' => $standard?->standard_quantity ?? 0,
                     'present_quantity' => $present,

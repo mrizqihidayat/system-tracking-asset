@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import ExportButton from '../../components/ExportButton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
-import { Badge } from '../../components/ui/Badge'
+import { Badge, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { controlClass } from '../../components/ui/control-class'
 import DataTable, { type Column } from '../../components/ui/DataTable'
@@ -19,6 +19,7 @@ import { queryKeys } from '../../lib/queries/keys'
 import { useChecklist, useReadiness } from '../../lib/queries/lists'
 import { prefetchRoomOptions } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
+import type { Condition } from '../../types/asset'
 import type { Checklist, ChecklistResult, RoomAssetGroup, RoomConsumable, RoomStoredStock } from '../../types/room'
 import FillFromStockModal from './FillFromStockModal'
 import NameModal from './NameModal'
@@ -52,29 +53,61 @@ const requestUrl = (roomId: number, s: RoomConsumable, quantity = s.shortage) =>
   return `/permintaan?${p}`
 }
 
-const MAX_ASSET_CODES = 5
 const NOT_COUNTED_LABELS = { Dipinjam: 'sedang dipinjam', Perbaikan: 'dalam perbaikan', Hilang: 'hilang' } as const
+// Warna teks ringkasan kondisi, senada dengan ConditionBadge.
+const conditionText: Record<Condition, string> = { Baik: 'text-ok-700', 'Rusak Ringan': 'text-warn-700', 'Rusak Berat': 'text-bad-700' }
 
-/** Kode aset (klik menuju detail) + keterangan aset yang tidak dihitung "Ada". */
+const assetLink = (a: RoomAssetGroup['assets'][number]) => (
+  <Link to={`/daftar-aset/${a.id}`} className="hover:text-brand-700 hover:underline">{a.code}</Link>
+)
+
+/**
+ * Kode aset (klik menuju detail) + kondisi + keterangan aset yang tidak dihitung "Ada".
+ * Satu aset: kode + lencana kondisi. Banyak aset: ringkasan kondisi, detail per kode saat dibuka.
+ */
 function AssetCodes({ group }: { group: RoomAssetGroup }) {
-  const shown = group.assets.slice(0, MAX_ASSET_CODES)
-  const hidden = group.assets.slice(MAX_ASSET_CODES)
   const notCounted = (Object.keys(NOT_COUNTED_LABELS) as (keyof typeof NOT_COUNTED_LABELS)[])
     .filter((status) => group.not_counted[status])
     .map((status) => `${group.not_counted[status]} ${NOT_COUNTED_LABELS[status]}`)
+  const [single] = group.assets
+  const conditions = Object.entries(group.conditions) as [Condition, number][]
 
   return (
     <span className="block text-xs text-slate-500">
-      {shown.length === 0
-        ? 'Belum ada aset'
-        : shown.map((a, i) => (
-            <span key={a.id}>
-              {i > 0 && ', '}
-              <Link to={`/daftar-aset/${a.id}`} className="hover:text-brand-700 hover:underline">{a.code}</Link>
-            </span>
-          ))}
-      {hidden.length > 0 && <span title={hidden.map((a) => a.code).join(', ')}> +{hidden.length}</span>}
-      {notCounted.length > 0 && <span className="block text-warn-700">{notCounted.join(' · ')}</span>}
+      {group.assets.length === 0 && 'Belum ada aset'}
+      {group.assets.length === 1 && (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {assetLink(single)}
+          <ConditionBadge condition={single.condition} />
+        </span>
+      )}
+      {group.assets.length > 1 && (
+        <details className="group/codes">
+          <summary
+            className="flex cursor-pointer list-none flex-wrap items-center gap-x-1 hover:text-slate-700 [&::-webkit-details-marker]:hidden"
+            title={group.assets.map((a) => `${a.code}: ${a.condition}`).join('\n')}
+          >
+            {conditions.map(([condition, count], i) => (
+              <span key={condition}>
+                {i > 0 && <span aria-hidden> · </span>}
+                <span className={`font-semibold ${conditionText[condition]}`}>{count} {condition}</span>
+              </span>
+            ))}
+            <span className="ml-1 text-brand-700 group-open/codes:hidden">Lihat per kode</span>
+            <span className="ml-1 hidden text-brand-700 group-open/codes:inline">Tutup</span>
+          </summary>
+          <ul className="mt-1.5 space-y-1">
+            {group.assets.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-1.5">
+                {assetLink(a)}
+                <ConditionBadge condition={a.condition} />
+                {a.status !== 'Tersedia' && <StatusBadge status={a.status} />}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {notCounted.length > 0 && <span className="mt-0.5 block text-warn-700">{notCounted.join(' · ')}</span>}
     </span>
   )
 }

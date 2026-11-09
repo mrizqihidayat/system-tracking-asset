@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Enums\CountMethod;
 use App\Models\Asset;
@@ -89,13 +90,13 @@ class RoomReadinessTest extends TestCase
     {
         $proyektor = AssetType::factory()->create(['name' => 'Proyektor', 'code' => 'PRJ']);
         $kursi = AssetType::factory()->create(['name' => 'Kursi', 'code' => 'KRS']);
-        $make = fn (AssetType $type, string $code, AssetStatus $status) => Asset::factory()->create([
-            'code' => $code, 'asset_type_id' => $type->id, 'room_id' => $this->room->id, 'status' => $status,
+        $make = fn (AssetType $type, string $code, AssetStatus $status, AssetCondition $condition = AssetCondition::Baik) => Asset::factory()->create([
+            'code' => $code, 'asset_type_id' => $type->id, 'room_id' => $this->room->id, 'status' => $status, 'condition' => $condition,
         ]);
 
-        $second = $make($proyektor, 'SHD-PRJ-002', AssetStatus::Dipinjam);
+        $second = $make($proyektor, 'SHD-PRJ-002', AssetStatus::Dipinjam, AssetCondition::RusakRingan);
         $first = $make($proyektor, 'SHD-PRJ-001', AssetStatus::Tersedia);
-        $make($proyektor, 'SHD-PRJ-003', AssetStatus::Perbaikan);
+        $make($proyektor, 'SHD-PRJ-003', AssetStatus::Perbaikan, AssetCondition::RusakBerat);
         $make($proyektor, 'SHD-PRJ-004', AssetStatus::TidakLayakPakai);
         $make($kursi, 'SHD-KRS-001', AssetStatus::Tersedia);
         Asset::factory()->create(['asset_type_id' => $proyektor->id, 'status' => AssetStatus::Tersedia]);
@@ -107,12 +108,15 @@ class RoomReadinessTest extends TestCase
         $this->assertSame(3, $groups[1]['total']);
         $this->assertSame(
             [
-                ['id' => $first->id, 'code' => 'SHD-PRJ-001', 'status' => 'Tersedia'],
-                ['id' => $second->id, 'code' => 'SHD-PRJ-002', 'status' => 'Dipinjam'],
+                ['id' => $first->id, 'code' => 'SHD-PRJ-001', 'status' => 'Tersedia', 'condition' => 'Baik'],
+                ['id' => $second->id, 'code' => 'SHD-PRJ-002', 'status' => 'Dipinjam', 'condition' => 'Rusak Ringan'],
             ],
             array_slice($groups[1]['assets'], 0, 2),
         );
         $this->assertSame(['Dipinjam' => 1, 'Perbaikan' => 1], $groups[1]['not_counted']);
+        // Ringkasan kondisi urut Baik → Rusak Berat; Tidak Layak Pakai tidak ikut.
+        $this->assertSame(['Baik' => 1, 'Rusak Ringan' => 1, 'Rusak Berat' => 1], $groups[1]['conditions']);
+        $this->assertSame(['Baik' => 1], $groups[0]['conditions']);
         // Standar 0: jumlah Ada tampil, tanpa Selisih/Hasil dan tidak dihitung Kurang.
         $this->assertNull($groups[1]['standard_id']);
         $this->assertSame(0, $groups[1]['standard_quantity']);

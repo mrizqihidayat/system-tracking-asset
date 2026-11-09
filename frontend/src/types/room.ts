@@ -1,4 +1,4 @@
-import type { Department, Room } from './asset'
+import type { Condition, Department, Room, Status } from './asset'
 
 export type ChecklistResult = 'Sesuai' | 'Kurang' | 'Belum dicek'
 
@@ -31,9 +31,11 @@ export interface ReadinessBuilding {
 export interface RoomAssetGroup {
   asset_type: { id: number; name: string; code: string }
   total: number
-  assets: { id: number; code: string; status: string }[]
+  assets: { id: number; code: string; status: Status; condition: Condition }[]
   /** Jumlah aset yang tidak dihitung "Ada", per status. */
   not_counted: Partial<Record<'Dipinjam' | 'Perbaikan' | 'Hilang', number>>
+  /** Jumlah aset per kondisi, urut Baik → Rusak Berat (hanya kondisi yang ada). */
+  conditions: Partial<Record<Condition, number>>
   standard_id: number | null
   standard_quantity: number
   present_quantity: number
