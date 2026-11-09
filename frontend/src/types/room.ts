@@ -57,12 +57,31 @@ export interface RoomConsumable {
     min_quantity: number
     provider_department: Department | null
   }
+  /** Ada; null selama Belum dicek. */
   present_quantity: number | null
+  /** Saldo catatan transaksi ruangan (selalu terisi), dasar Terpakai/Koreksi saat cek. */
+  recorded_quantity: number
+  checked_at: string | null
+  /** Transaksi Terpakai terakhir. */
+  last_usage: { quantity: number; date: string } | null
   difference: number | null
   shortage: number | null
   result: ChecklistResult
   can_fill_from_stock: boolean
   can_request: boolean
+}
+
+/** Baris kartu ruangan. */
+export interface RoomStockTransaction {
+  id: number
+  type: 'Saldo awal' | 'Diisi' | 'Terpakai' | 'Koreksi'
+  quantity: number
+  balance_after: number
+  transaction_date: string
+  note: string | null
+  stock_transaction_id: number | null
+  created_by: string | null
+  created_at: string | null
 }
 
 /** Bagian hanya-baca: barang yang lokasi simpannya ruangan ini; tidak dihitung sebagai Ada. */

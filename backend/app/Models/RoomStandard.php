@@ -12,9 +12,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Standar kelengkapan ruangan: per jenis aset (QR, opsional) atau per barang stok (Manual, Ada diisi saat cek).
+ * Standar kelengkapan ruangan: per jenis aset (QR, opsional) atau per barang stok (Manual).
+ * Manual: actual_quantity = saldo transaksi ruangan (RoomStockService), checked_at null = Belum dicek.
  */
-#[Fillable(['room_id', 'standard_quantity', 'count_method', 'asset_type_id', 'actual_quantity', 'consumable_id'])]
+#[Fillable(['room_id', 'standard_quantity', 'count_method', 'asset_type_id', 'actual_quantity', 'checked_at', 'consumable_id'])]
 class RoomStandard extends Model
 {
     /** @use HasFactory<RoomStandardFactory> */
@@ -26,11 +27,22 @@ class RoomStandard extends Model
     public ?int $qrPresentQuantity = null;
 
     /**
-     * Jumlah "Ada": QR dari hitungan aset, Manual dari actual_quantity (null = Belum dicek).
+     * Terpakai terakhir baris Manual ({quantity, date}), diisi RoomReadinessService::fillLastUsage() (bukan kolom tabel).
+     *
+     * @var array{quantity: int, date: string}|null
+     */
+    public ?array $lastUsage = null;
+
+    /**
+     * Jumlah "Ada": QR dari hitungan aset, Manual dari saldo actual_quantity; null = Belum dicek (checked_at kosong).
      */
     public function presentQuantity(): ?int
     {
-        return $this->count_method === CountMethod::Qr ? (int) $this->qrPresentQuantity : $this->actual_quantity;
+        if ($this->count_method === CountMethod::Qr) {
+            return (int) $this->qrPresentQuantity;
+        }
+
+        return $this->checked_at === null ? null : $this->actual_quantity;
     }
 
     public function checklistResult(): ChecklistResult
@@ -87,6 +99,7 @@ class RoomStandard extends Model
         return [
             'standard_quantity' => 'integer',
             'actual_quantity' => 'integer',
+            'checked_at' => 'datetime',
             'count_method' => CountMethod::class,
         ];
     }

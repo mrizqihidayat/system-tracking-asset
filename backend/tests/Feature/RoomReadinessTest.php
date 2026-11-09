@@ -66,8 +66,8 @@ class RoomReadinessTest extends TestCase
 
         $manual = $this->standard();
 
-        $this->postJson("/api/rooms/{$this->room->id}/check", ['items' => [['id' => $manual->id, 'actual_quantity' => 2147483648]]])
-            ->assertJsonValidationErrors('items.0.actual_quantity');
+        $this->postJson("/api/room-standards/{$manual->id}/adjust", ['quantity' => 2147483648])
+            ->assertJsonValidationErrors('quantity');
         $this->assertNull($manual->fresh()->actual_quantity);
     }
 
@@ -330,25 +330,22 @@ class RoomReadinessTest extends TestCase
         $this->assertTrue($row($fill)['can_request']);
     }
 
-    public function test_save_check_stores_consumable_quantities_and_checker(): void
+    public function test_mark_checked_stores_checker_without_changing_quantities(): void
     {
-        $manual = $this->standard();
-        $qr = $this->assetStandard(AssetType::factory()->create());
-        $otherRoom = RoomStandard::factory()->create();
-        $url = "/api/rooms/{$this->room->id}/check";
+        $manual = $this->standard(['actual_quantity' => 2, 'checked_at' => null]);
+        $this->assetStandard(AssetType::factory()->create());
 
-        $this->postJson($url, ['items' => [['id' => $qr->id, 'actual_quantity' => 1]]])->assertJsonValidationErrors('items');
-        $this->postJson($url, ['items' => [['id' => $otherRoom->id, 'actual_quantity' => 1]]])->assertJsonValidationErrors('items');
-        $this->postJson($url, ['items' => [['id' => $manual->id, 'actual_quantity' => -1]]])->assertJsonValidationErrors('items.0.actual_quantity');
-
-        $this->postJson($url, ['items' => [['id' => $manual->id, 'actual_quantity' => 3]]])
+        // `items` dari klien lama diabaikan, tidak ditolak dan tidak mengubah Ada.
+        $this->postJson("/api/rooms/{$this->room->id}/check", ['items' => [['id' => $manual->id, 'actual_quantity' => 9]]])
             ->assertOk()
-            ->assertJsonPath('data.consumables.0.present_quantity', 3)
+            ->assertJsonPath('data.consumables.0.present_quantity', 2)
             ->assertJsonPath('meta.last_checked_by', 'Staf SHD');
 
         $this->room->refresh();
         $this->assertNotNull($this->room->last_checked_at);
         $this->assertSame($this->user->id, $this->room->last_checked_by);
+        $this->assertNotNull($manual->fresh()->checked_at);
+        $this->assertSame(2, $manual->fresh()->actual_quantity);
     }
 
     public function test_fill_from_stock_uses_min_of_shortage_and_stock(): void

@@ -3,10 +3,12 @@
 namespace Database\Seeders;
 
 use App\Enums\CountMethod;
+use App\Enums\RoomStockTransactionType;
 use App\Models\AssetType;
 use App\Models\Consumable;
 use App\Models\Room;
 use App\Models\User;
+use App\Services\RoomStockService;
 use Illuminate\Database\Seeder;
 
 /**
@@ -23,9 +25,12 @@ class RoomStandardSeeder extends Seeder
         $asset = fn (string $type, int $standard): array => [
             'standard_quantity' => $standard, 'count_method' => CountMethod::Qr, 'asset_type_id' => $types[$type],
         ];
+        // Ada barang stok dicatat lewat RoomStockService sebagai Saldo awal (bukan langsung ke actual_quantity).
         $stock = fn (string $consumable, int $standard, int $actual): array => [
-            'standard_quantity' => $standard, 'count_method' => CountMethod::Manual, 'actual_quantity' => $actual, 'consumable_id' => $consumables[$consumable],
+            'standard_quantity' => $standard, 'count_method' => CountMethod::Manual, 'actual_quantity' => 0, 'consumable_id' => $consumables[$consumable],
+            'counted' => $actual,
         ];
+        $roomStock = app(RoomStockService::class);
 
         $standards = [
             'Ruang Kelas 1' => [
@@ -39,9 +44,9 @@ class RoomStandardSeeder extends Seeder
             ],
             'Ruang Kelas 2' => [
                 $asset('Proyektor', 1),
-                $asset('Flipchart', 1),
+                $asset('Mikrofon Nirkabel', 2),
                 $stock('Spidol Whiteboard', 4, 1),
-                $stock('Kotak P3K', 1, 1),
+                $stock('Tisu', 1, 1),
             ],
             'Ruang Rapat' => [
                 $asset('Proyektor', 1),
@@ -59,8 +64,19 @@ class RoomStandardSeeder extends Seeder
 
         foreach ($standards as $roomName => $rows) {
             $room = Room::where('name', $roomName)->firstOrFail();
-            $room->standards()->createMany($rows);
-            $room->update(['last_checked_at' => now()->subDays(rand(1, 10)), 'last_checked_by' => $staff->id]);
+            $checkedAt = now()->subDays(rand(1, 10));
+
+            foreach ($rows as $row) {
+                $counted = $row['counted'] ?? null;
+                unset($row['counted']);
+                $standard = $room->standards()->create($row + ($counted === null ? [] : ['checked_at' => $checkedAt]));
+
+                if ($counted > 0) {
+                    $roomStock->record($standard, RoomStockTransactionType::SaldoAwal, $counted, [], $staff);
+                }
+            }
+
+            $room->update(['last_checked_at' => $checkedAt, 'last_checked_by' => $staff->id]);
         }
     }
 }

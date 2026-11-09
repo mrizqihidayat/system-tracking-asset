@@ -284,12 +284,34 @@ Table room_standards {
   standard_quantity int [not null, note: '> 0; jenis aset tanpa baris berarti standar 0']
   count_method count_method [not null]
   asset_type_id bigint [ref: > asset_types.id, note: 'wajib jika QR; unik per ruangan']
-  actual_quantity int [note: 'diisi jika Manual; null = Belum dicek (bukan kurang)']
+  actual_quantity int [note: 'Manual: saldo transaksi ruangan + barang (= balance_after terakhir, 0 tanpa transaksi), diubah hanya lewat RoomStockService; null hanya untuk baris QR']
+  checked_at timestamp [note: 'Manual: waktu cek terakhir; null = Belum dicek (bukan kurang). Barang yang ditambahkan ke ruangan selalu null']
   consumable_id bigint [ref: > consumables.id, note: 'wajib jika Manual; unik per ruangan; ON DELETE CASCADE']
   created_at timestamp
   updated_at timestamp
 
   Note: 'QR = standar per jenis aset. Manual = barang dari Stok. Nama mengikuti jenis/barangnya'
+}
+
+Table room_stock_transactions {
+  id bigint [pk, increment]
+  room_id bigint [not null, ref: > rooms.id, note: 'ruangan bukan gudang; hapus ruangan ditolak bila punya riwayat']
+  consumable_id bigint [not null, ref: > consumables.id, note: 'ON DELETE CASCADE (barang hanya bisa dihapus permanen saat salah input)']
+  type varchar(20) [not null, note: 'Saldo awal | Diisi | Terpakai | Hilang | Rusak | Kedaluwarsa | Koreksi']
+  quantity int [not null, note: 'bertanda, tidak 0']
+  balance_after int [not null, note: 'jumlah Ada setelah transaksi, >= 0']
+  transaction_date date [not null]
+  note text [note: 'wajib untuk Koreksi; boleh kosong untuk jenis lain']
+  stock_transaction_id bigint [ref: > stock_transactions.id, note: 'Diisi dari Isi dari stok; ON DELETE SET NULL']
+  created_by bigint [ref: > users.id, note: 'staf pencatat; kosong untuk Saldo awal hasil migrasi']
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (room_id, consumable_id, id)
+  }
+
+  Note: 'Kartu ruangan (T30). Dikunci per ruangan + barang, bukan baris standar: riwayat tetap saat barang dilepas. Hanya ditulis lewat RoomStockService::record()'
 }
 
 Table consumables {

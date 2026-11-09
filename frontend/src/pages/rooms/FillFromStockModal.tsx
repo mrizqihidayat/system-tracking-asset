@@ -96,7 +96,6 @@ export default function FillFromStockModal({ row, roomName, requestHref, onClose
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Misal: untuk pelatihan K3 besok"
               error={errors.note}
               maxLength={1000}
             />

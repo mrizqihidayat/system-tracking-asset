@@ -96,6 +96,8 @@ class AssetSeeder extends Seeder
             'mic1' => ['Mikrofon Nirkabel', 'Mikrofon Shure BLX24', 'Shure', 'Auditorium', $shd, 36, null],
             'mic2' => ['Mikrofon Nirkabel', 'Mikrofon Shure BLX24', 'Shure', 'Auditorium', $shd, 36, null],
             'mic3' => ['Mikrofon Nirkabel', 'Mikrofon Sennheiser XSW 1', 'Sennheiser', 'Gudang IHS', $shd, 8, null],
+            'mic4' => ['Mikrofon Nirkabel', 'Mikrofon Shure BLX24', 'Shure', 'Ruang Kelas 2', $shd, 6, null],
+            'mic5' => ['Mikrofon Nirkabel', 'Mikrofon Shure BLX24', 'Shure', 'Ruang Kelas 2', $shd, 6, null],
             'lyr1' => ['Layar Proyektor', 'Layar Proyektor Tripod 70"', 'Brite', 'Ruang Kelas 1', $shd, 30, null],
             'lyr2' => ['Layar Proyektor', 'Layar Proyektor Tripod 70"', 'Brite', 'Ruang Kelas 2', $shd, 30, null],
             'mja1' => ['Meja Peserta', 'Meja Lipat Peserta', 'Chitose', 'Ruang Kelas 1', $sga, 40, null],

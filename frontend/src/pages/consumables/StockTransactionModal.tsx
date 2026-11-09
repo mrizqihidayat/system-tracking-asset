@@ -97,17 +97,21 @@ export default function StockTransactionModal({ item, onClose, onDone }: Props) 
             </FormField>
           )}
           {type === 'Pemakaian' && (
-            <RoomSelect
-              buildingLabel="Gedung tujuan (opsional)"
-              roomLabel="Ruangan tujuan (opsional)"
-              buildingId={buildingId}
-              roomId={roomId}
-              onChange={(b, r) => {
-                setBuildingId(b)
-                setRoomId(r)
-              }}
-              error={errors.room_id}
-            />
+            <>
+              <RoomSelect
+                buildingLabel="Gedung tujuan (opsional)"
+                roomLabel="Ruangan tujuan (opsional)"
+                buildingId={buildingId}
+                roomId={roomId}
+                onChange={(b, r) => {
+                  setBuildingId(b)
+                  setRoomId(r)
+                }}
+                error={errors.room_id}
+              />
+              {/* Ruangan di sini hanya mencatat tujuan; jumlah Ada ruangan tidak berubah (SPEC §10). */}
+              <p className="text-xs text-slate-500">Untuk mengisi ruangan, gunakan Isi dari stok di Kelengkapan Ruangan.</p>
+            </>
           )}
           <FormField label="Keterangan" required={noteRequired} error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} />

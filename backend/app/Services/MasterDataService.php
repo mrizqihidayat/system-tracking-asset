@@ -105,6 +105,7 @@ class MasterDataService
                 'standar ruangan' => ['room_standards', 'room_id'],
                 'barang stok (lokasi simpan)' => ['consumables', 'room_id'],
                 'riwayat stok' => ['stock_transactions', 'room_id'],
+                'riwayat barang ruangan' => ['room_stock_transactions', 'room_id'],
             ],
             $model instanceof Category => ['jenis aset' => ['asset_types', 'category_id']],
             $model instanceof ConsumableCategory => ['barang habis pakai' => ['consumables', 'consumable_category_id']],

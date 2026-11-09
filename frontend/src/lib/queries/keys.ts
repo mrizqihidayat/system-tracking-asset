@@ -37,6 +37,8 @@ export const queryKeys = {
     all: ['room-readiness'] as const,
     readiness: () => ['room-readiness', 'summary'] as const,
     checklist: (roomId: number) => ['room-readiness', 'checklist', roomId] as const,
+    /** Kartu ruangan (per baris standar barang). */
+    transactions: (standardId: number, page: number) => ['room-readiness', 'transactions', standardId, page] as const,
   },
   master: {
     all: ['master'] as const,

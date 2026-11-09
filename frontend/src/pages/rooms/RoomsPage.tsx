@@ -1,4 +1,4 @@
-import { Clock, Pencil, Plus, Trash2, TriangleAlert, Warehouse } from 'lucide-react'
+import { Clock, History, Pencil, Plus, Trash2, TriangleAlert, Warehouse } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
@@ -6,13 +6,12 @@ import ExportButton from '../../components/ExportButton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { Badge, ConditionBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import { controlClass } from '../../components/ui/control-class'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import { PageHeader } from '../../components/ui/Page'
 import { LoadingLabel, Skeleton, TableSkeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
-import { formatDateTime } from '../../lib/format'
+import { formatDate, formatDateTime } from '../../lib/format'
 import { createBuilding, createRoom } from '../../lib/lookups'
 import { invalidate } from '../../lib/queries/invalidate'
 import { queryKeys } from '../../lib/queries/keys'
@@ -20,8 +19,10 @@ import { useChecklist, useReadiness } from '../../lib/queries/lists'
 import { prefetchRoomOptions } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { Condition } from '../../types/asset'
-import type { Checklist, ChecklistResult, RoomAssetGroup, RoomConsumable, RoomStoredStock } from '../../types/room'
+import type { Checklist, RoomAssetGroup, RoomConsumable, RoomStoredStock } from '../../types/room'
+import AdjustRoomStockModal from './AdjustRoomStockModal'
 import FillFromStockModal from './FillFromStockModal'
+import RoomCardModal from './RoomCardModal'
 import NameModal from './NameModal'
 import StandardFormModal, { type StandardTarget } from './StandardFormModal'
 
@@ -51,6 +52,22 @@ const requestUrl = (roomId: number, s: RoomConsumable, quantity = s.shortage) =>
   if (s.consumable.provider_department) p.set('provider_department_id', String(s.consumable.provider_department.id))
   if (quantity) p.set('quantity', String(quantity))
   return `/permintaan?${p}`
+}
+
+/** Kolom angka/lencana rata tengah (tabel desktop; kartu HP tidak terpengaruh). */
+const CENTER = 'text-center'
+
+/**
+ * Lebar tetap kolom tabel Aset di ruangan & Barang habis pakai agar kedua tabel lurus:
+ * nama (sisa ruang) | Standar | Jumlah | Selisih | Hasil | Kondisi/Aksi | ikon. Hanya tabel desktop.
+ */
+const COL = {
+  standard: `${CENTER} md:w-24`,
+  quantity: `${CENTER} md:w-36`,
+  difference: `${CENTER} md:w-24`,
+  result: `${CENTER} md:w-32`,
+  extra: `${CENTER} md:w-48`,
+  icons: 'md:w-36 whitespace-nowrap text-right',
 }
 
 /** Tombol sekunder kecil di judul bagian. */
@@ -92,7 +109,7 @@ function ConditionSummary({ group }: { group: RoomAssetGroup }) {
   if (group.assets.length === 1) return <ConditionBadge condition={group.assets[0].condition} />
 
   return (
-    <span className="flex flex-wrap gap-1">
+    <span className="flex flex-wrap gap-1 md:justify-center">
       {(Object.entries(group.conditions) as [Condition, number][]).map(([condition, count]) => (
         <span
           key={condition}
@@ -105,7 +122,7 @@ function ConditionSummary({ group }: { group: RoomAssetGroup }) {
   )
 }
 
-const conditionColumn: Column<RoomAssetGroup> = { header: 'Kondisi', cell: (g) => <ConditionSummary group={g} /> }
+const conditionColumn: Column<RoomAssetGroup> = { header: 'Kondisi', className: CENTER, cell: (g) => <ConditionSummary group={g} /> }
 
 /** Judul bagian tabel: judul, keterangan singkat, dan aksi opsional di kanan. */
 function SectionHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
@@ -138,15 +155,15 @@ const storedAssetColumns: Column<RoomAssetGroup>[] = [
       </>
     ),
   },
-  { header: 'Jumlah', cell: (g) => <span className="tabular-nums">{g.total}</span> },
+  { header: 'Jumlah', className: CENTER, cell: (g) => <span className="tabular-nums">{g.total}</span> },
   conditionColumn,
 ]
 
 const storedStockColumns: Column<RoomStoredStock>[] = [
   { header: 'Barang', mobile: 'title', cell: (s) => <span className="font-medium">{s.name}</span> },
-  { header: 'Jumlah', cell: (s) => <span className="tabular-nums">{s.quantity} {s.unit}</span> },
+  { header: 'Jumlah', className: CENTER, cell: (s) => <span className="tabular-nums">{s.quantity} {s.unit}</span> },
   // Status dihitung backend dari batas minimum barang.
-  { header: 'Status', mobile: 'badge', cell: (s) => <Badge color={stockColor[s.status]}>{s.status}</Badge> },
+  { header: 'Status', className: CENTER, mobile: 'badge', cell: (s) => <Badge color={stockColor[s.status]}>{s.status}</Badge> },
 ]
 
 /** Tampilan gudang: hanya Aset tersimpan & Stok tersimpan, tanpa standar dan cek. */
@@ -156,6 +173,7 @@ function StorageRoomView({ checklist, loading }: { checklist: Checklist | null; 
       <section className="min-w-0 space-y-2">
         <SectionHeader title="Aset tersimpan" description="Aset yang terdaftar dengan lokasi asal di gudang ini." />
         <DataTable
+          dense
           columns={storedAssetColumns}
           rows={loading ? [] : (checklist?.data.assets ?? [])}
           rowKey={(g) => g.asset_type.id}
@@ -167,6 +185,7 @@ function StorageRoomView({ checklist, loading }: { checklist: Checklist | null; 
       <section className="min-w-0 space-y-2">
         <SectionHeader title="Stok tersimpan" description="Barang habis pakai yang disimpan di gudang ini." />
         <DataTable
+          dense
           columns={storedStockColumns}
           rows={loading ? [] : (checklist?.data.stored_stock ?? [])}
           rowKey={(s) => s.id}
@@ -191,13 +210,15 @@ export default function RoomsPage() {
       null,
     [readiness.data],
   )
-  const [actual, setActual] = useState<Record<number, string>>({})
-  const [actualFrom, setActualFrom] = useState<Checklist | null>(null)
+  const [confirmingCheck, setConfirmingCheck] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filling, setFilling] = useState<RoomConsumable | null>(null)
+  const [adjusting, setAdjusting] = useState<RoomConsumable | null>(null)
+  const [card, setCard] = useState<RoomConsumable | null>(null)
   const [modal, setModal] = useState<'building' | 'room' | null>(null)
   const [standardTarget, setStandardTarget] = useState<StandardTarget | null>(null)
   const [removing, setRemoving] = useState<RoomConsumable | null>(null)
+  const [removingAsset, setRemovingAsset] = useState<RoomAssetGroup | null>(null)
   const [busy, setBusy] = useState(false)
 
   // "Buat permintaan" membuka form berisi gedung & ruangan: datanya disiapkan dari sini.
@@ -212,17 +233,6 @@ export default function RoomsPage() {
   const checklist = checklistQuery.data ?? null
   useErrorToast(readiness.error, checklistQuery.error)
 
-  // Data checklist baru (ruangan lain / setelah simpan) → isi ulang kolom Ada barang habis pakai.
-  // Gudang tidak dicek: form dikosongkan.
-  if (checklist && checklist !== actualFrom) {
-    setActualFrom(checklist)
-    setActual(
-      checklist.meta.room.is_storage
-        ? {}
-        : Object.fromEntries(checklist.data.consumables.map((s) => [s.id, s.present_quantity?.toString() ?? ''])),
-    )
-  }
-
   const reloadAll = () => invalidate.rooms(queryClient)
   const reloadReadiness = () => queryClient.invalidateQueries({ queryKey: queryKeys.rooms.readiness() })
 
@@ -230,19 +240,8 @@ export default function RoomsPage() {
   const checklistReady = checklist !== null && checklist.meta.room.id === roomId
 
   const assetRows = checklistReady ? checklist.data.assets : []
-
-  // Pratinjau langsung: barang habis pakai memakai angka yang sedang diketik.
-  const consumableRows = useMemo(
-    () =>
-      (checklistReady ? checklist.data.consumables : []).map((s) => {
-        const raw = actual[s.id] ?? ''
-        const present = raw === '' ? null : Number(raw)
-        const difference = present === null ? null : present - s.standard_quantity
-        const result: ChecklistResult = present === null ? 'Belum dicek' : difference! < 0 ? 'Kurang' : 'Sesuai'
-        return { ...s, present_quantity: present, difference, result }
-      }),
-    [checklist, checklistReady, actual],
-  )
+  // Setiap perubahan barang langsung tersimpan (popup Catat perubahan), jadi baris diambil apa adanya dari server.
+  const consumableRows = checklistReady ? checklist.data.consumables : []
 
   if (!buildings) {
     return (
@@ -272,22 +271,38 @@ export default function RoomsPage() {
   const shortages = assetRows.filter((g) => g.result === 'Kurang').length + consumableRows.filter((s) => s.result === 'Kurang').length
   const roomLabel = room && building ? `${room.name} · ${building.name}` : ''
   const isStorage = !!room?.is_storage
-  const canSave = !!roomId && !isStorage && consumableRows.length > 0
+  // Ringkasan untuk dialog Tandai sudah dicek (kosong = semua sesuai, cukup konfirmasi singkat).
+  const assetShortages = assetRows.filter((g) => g.result === 'Kurang').length
+  const consumableShortages = consumableRows.filter((s) => s.result === 'Kurang').length
+  const uncheckedItems = consumableRows.filter((s) => s.result === 'Belum dicek').length
 
-  const saveCheck = async () => {
+  const markChecked = async () => {
     if (!roomId) return
-    const items = consumableRows
-      .filter((s) => (actual[s.id] ?? '') !== '')
-      .map((s) => ({ id: s.id, actual_quantity: Number(actual[s.id]) }))
     setSaving(true)
     try {
-      await api.post(`/rooms/${roomId}/check`, { items })
-      toast.success(`Hasil cek ${room?.name} tersimpan.`)
+      await api.post(`/rooms/${roomId}/check`)
+      toast.success(`${room?.name} ditandai sudah dicek.`)
+      setConfirmingCheck(false)
       await reloadAll()
     } catch (e) {
       toast.error(errorMessage(e))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const removeAssetStandard = async () => {
+    if (!removingAsset?.standard_id) return
+    setBusy(true)
+    try {
+      await api.delete(`/room-standards/${removingAsset.standard_id}`)
+      toast.success(`Standar ${removingAsset.asset_type.name} dihapus.`)
+      setRemovingAsset(null)
+      await reloadAll()
+    } catch (e) {
+      toast.error(errorMessage(e))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -317,29 +332,43 @@ export default function RoomsPage() {
         </>
       ),
     },
-    { header: 'Jumlah', cell: (g) => <span className="tabular-nums">{g.total}</span> },
-    conditionColumn,
-    { header: 'Standar', cell: (g) => <span className="tabular-nums">{g.standard_quantity}</span> },
-    { header: 'Ada', cell: (g) => <span className="tabular-nums">{g.present_quantity}</span> },
-    { header: 'Selisih', cell: (g) => differenceCell(g.difference) },
+    { header: 'Standar', className: COL.standard, cell: (g) => <span className="tabular-nums">{g.standard_quantity}</span> },
+    // Jumlah = aset yang dihitung Ada (tanpa Dipinjam/Perbaikan/Hilang; keterangannya di bawah nama jenis).
+    { header: 'Jumlah', className: COL.quantity, cell: (g) => <span className="tabular-nums">{g.present_quantity}</span> },
+    { header: 'Selisih', className: COL.difference, cell: (g) => differenceCell(g.difference) },
     {
-      header: 'Hasil',
+      header: 'Hasil', className: COL.result,
       mobile: 'badge',
       cell: (g) => (g.result ? <Badge color={resultColor[g.result]}>{g.result}</Badge> : <span className="text-slate-500">—</span>),
     },
+    { ...conditionColumn, className: COL.extra },
     {
       header: '',
-      className: 'w-px whitespace-nowrap text-right',
+      className: COL.icons,
       cell: (g) => (
-        <button
-          type="button"
-          className={`${iconButton} md:ml-auto`}
-          aria-label={`Atur standar ${g.asset_type.name}`}
-          title="Atur standar"
-          onClick={() => setStandardTarget({ kind: 'asset', group: g })}
-        >
-          <Pencil size={15} />
-        </button>
+        <div className="flex items-center gap-1 md:justify-end">
+          <button
+            type="button"
+            className={iconButton}
+            aria-label={`Atur standar ${g.asset_type.name}`}
+            title="Atur standar"
+            onClick={() => setStandardTarget({ kind: 'asset', group: g })}
+          >
+            <Pencil size={15} />
+          </button>
+          {/* Hanya jenis yang punya standar (> 0); standar 0 tidak disimpan sebagai baris. */}
+          {g.standard_id !== null && (
+            <button
+              type="button"
+              className={`${iconButton} hover:bg-bad-50! hover:text-bad-700!`}
+              aria-label={`Hapus standar ${g.asset_type.name}`}
+              title="Hapus standar"
+              onClick={() => setRemovingAsset(g)}
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
       ),
     },
   ]
@@ -354,29 +383,35 @@ export default function RoomsPage() {
           <span className="block text-xs text-slate-500">
             Stok {s.consumable.quantity} {s.consumable.unit} · {s.consumable.provider_department?.name ?? '-'}
           </span>
+          {s.last_usage && (
+            <span className="block text-xs text-slate-500">
+              Terpakai {s.last_usage.quantity} {s.consumable.unit} pada cek {formatDate(s.last_usage.date)}
+            </span>
+          )}
         </>
       ),
     },
-    { header: 'Standar', cell: (s) => <span className="tabular-nums">{s.standard_quantity}</span> },
+    { header: 'Standar', className: COL.standard, cell: (s) => <span className="tabular-nums">{s.standard_quantity}</span> },
     {
-      header: 'Ada',
+      header: 'Jumlah', className: COL.quantity,
+      // Saldo catatan; Belum dicek tetap tampil angkanya (Hasil = Belum dicek). Perubahan lewat popup.
       cell: (s) => (
-        <input
-          type="number"
-          min={0}
-          value={actual[s.id] ?? ''}
-          onChange={(e) => setActual((a) => ({ ...a, [s.id]: e.target.value }))}
-          placeholder="—"
-          aria-label={`Jumlah ada ${s.item_name}`}
-          inputMode="numeric"
-          className={`${controlClass()} w-24! tabular-nums`}
-        />
+        <div>
+          <span className={`tabular-nums ${s.checked_at ? '' : 'text-slate-500'}`}>{s.recorded_quantity}</span>
+          <button
+            type="button"
+            className="block text-xs font-semibold text-brand-700 hover:underline md:mx-auto"
+            onClick={() => setAdjusting(s)}
+          >
+            Catat perubahan
+          </button>
+        </div>
       ),
     },
-    { header: 'Selisih', cell: (s) => differenceCell(s.difference) },
-    { header: 'Hasil', mobile: 'badge', cell: (s) => <Badge color={resultColor[s.result]}>{s.result}</Badge> },
+    { header: 'Selisih', className: COL.difference, cell: (s) => differenceCell(s.difference) },
+    { header: 'Hasil', className: COL.result, mobile: 'badge', cell: (s) => <Badge color={resultColor[s.result]}>{s.result}</Badge> },
     {
-      header: 'Aksi',
+      header: 'Aksi', className: COL.extra,
       cell: (s) => (
         <div className="space-y-1">
           {s.can_fill_from_stock && (
@@ -392,9 +427,18 @@ export default function RoomsPage() {
     },
     {
       header: '',
-      className: 'w-px whitespace-nowrap text-right',
+      className: COL.icons,
       cell: (s) => (
         <div className="flex items-center gap-1 md:justify-end">
+          <button
+            type="button"
+            className={iconButton}
+            aria-label={`Kartu ruangan ${s.item_name}`}
+            title="Kartu ruangan"
+            onClick={() => setCard(s)}
+          >
+            <History size={15} />
+          </button>
           <button
             type="button"
             className={iconButton}
@@ -419,13 +463,13 @@ export default function RoomsPage() {
   ]
 
   return (
-    <div className={`space-y-3 ${canSave ? 'pb-20 lg:pb-0' : ''}`}>
+    <div className="space-y-3">
       <PageHeader
         title="Kelengkapan Ruangan"
         description={`Aset dan barang habis pakai per ruangan · ${totalRooms} ruangan di ${buildings.length} gedung`}
         actions={
           <>
-            {/* Status cek ruangan terpilih, di samping tombol Simpan hasil cek. */}
+            {/* Status cek ruangan terpilih (hanya berubah lewat Tandai sudah dicek). */}
             {room && isStorage && (
               <p className="flex items-center gap-2 text-xs text-slate-500 sm:mr-2">
                 <Badge>Gudang</Badge>
@@ -445,9 +489,7 @@ export default function RoomsPage() {
               </p>
             )}
             <ExportButton type="rooms" filters={() => ({ building_id: building?.id })} />
-            {!isStorage && (
-              <Button loading={saving} disabled={!canSave} onClick={saveCheck} className="max-lg:hidden!">Simpan hasil cek</Button>
-            )}
+            {room && !isStorage && <Button onClick={() => setConfirmingCheck(true)} disabled={!checklistReady}>Tandai sudah dicek</Button>}
           </>
         }
       />
@@ -516,6 +558,7 @@ export default function RoomsPage() {
               }
             />
             <DataTable
+              dense
               columns={assetColumns}
               rows={assetRows}
               rowKey={(g) => g.asset_type.id}
@@ -534,6 +577,7 @@ export default function RoomsPage() {
               }
             />
             <DataTable
+              dense
               columns={consumableColumns}
               rows={consumableRows}
               rowKey={(s) => s.id}
@@ -542,11 +586,6 @@ export default function RoomsPage() {
             />
           </section>
         </>
-      )}
-      {canSave && (
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
-          <Button loading={saving} onClick={saveCheck} className="w-full">Simpan hasil cek</Button>
-        </div>
       )}
       {building && building.rooms.length === 0 && (
         <p className="text-sm text-slate-500">Belum ada ruangan di {building.name}. Tambah ruangan dengan tombol +.</p>
@@ -557,7 +596,8 @@ export default function RoomsPage() {
           roomId={roomId}
           roomName={roomLabel}
           target={standardTarget}
-          usedAssetTypeIds={assetRows.map((g) => g.asset_type.id)}
+          // Hanya jenis yang sudah punya standar (> 0); jenis dengan standar 0 (mis. aset ada tanpa standar) tetap bisa dipilih.
+          usedAssetTypeIds={assetRows.filter((g) => g.standard_id !== null).map((g) => g.asset_type.id)}
           usedConsumableIds={consumableRows.map((s) => s.consumable.id)}
           onClose={() => setStandardTarget(null)}
           onDone={() => {
@@ -578,6 +618,47 @@ export default function RoomsPage() {
           }}
         />
       )}
+      {card && <RoomCardModal row={card} roomName={roomLabel} onClose={() => setCard(null)} />}
+      {adjusting && (
+        <AdjustRoomStockModal
+          row={adjusting}
+          roomName={roomLabel}
+          onClose={() => setAdjusting(null)}
+          onDone={() => {
+            setAdjusting(null)
+            reloadAll()
+          }}
+        />
+      )}
+      <ConfirmDialog
+        open={confirmingCheck}
+        title="Tandai sudah dicek"
+        confirmLabel="Tandai sudah dicek"
+        loading={saving}
+        onConfirm={markChecked}
+        onClose={() => setConfirmingCheck(false)}
+      >
+        {assetShortages + consumableShortages + uncheckedItems === 0 ? (
+          `Tandai ${roomLabel} sudah dicek?`
+        ) : (
+          <span className="block space-y-1">
+            {assetShortages > 0 && <span className="block">Ada {assetShortages} aset Kurang. Aset hilang dicatat lewat detail aset.</span>}
+            {consumableShortages > 0 && <span className="block">Ada {consumableShortages} barang habis pakai Kurang.</span>}
+            {uncheckedItems > 0 && <span className="block">{uncheckedItems} barang belum dicek akan dianggap sesuai catatan.</span>}
+          </span>
+        )}
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={removingAsset !== null}
+        title="Hapus standar jenis aset"
+        confirmLabel="Hapus"
+        danger
+        loading={busy}
+        onConfirm={removeAssetStandard}
+        onClose={() => setRemovingAsset(null)}
+      >
+        Hapus standar {removingAsset?.asset_type.name} di {roomLabel}? Standar kembali 0. Aset di ruangan ini tidak berubah.
+      </ConfirmDialog>
       <ConfirmDialog
         open={removing !== null}
         title="Lepas barang dari ruangan"
@@ -587,7 +668,8 @@ export default function RoomsPage() {
         onConfirm={removeConsumable}
         onClose={() => setRemoving(null)}
       >
-        Lepas "{removing?.item_name}" dari {roomLabel}? Stok barang tidak berubah.
+        Lepas "{removing?.item_name}" dari {roomLabel}? Stok barang tidak berubah. Riwayat barang di ruangan ini tetap tersimpan dan
+        berlanjut jika barang ditambahkan lagi.
       </ConfirmDialog>
       {modal === 'building' && (
         <NameModal

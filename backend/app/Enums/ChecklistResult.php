@@ -4,7 +4,7 @@ namespace App\Enums;
 
 /**
  * Hasil baris checklist kelengkapan ruangan (dihitung, tidak disimpan; SPEC §8).
- * Belum dicek = baris Manual dengan actual_quantity kosong: tidak dihitung kurang.
+ * Belum dicek = baris Manual dengan checked_at kosong (Ada dikirim null): tidak dihitung kurang.
  */
 enum ChecklistResult: string
 {

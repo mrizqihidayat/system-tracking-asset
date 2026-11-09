@@ -26,6 +26,17 @@ class RoomStandardFactory extends Factory
             'count_method' => CountMethod::Manual,
             'consumable_id' => fn (array $attributes) => $attributes['count_method'] === CountMethod::Qr ? null : Consumable::factory(),
             'actual_quantity' => 0,
+            // Baris Manual dengan Ada terisi dianggap sudah dicek; actual_quantity null = Belum dicek (gaya lama test).
+            'checked_at' => fn (array $attributes) => CountMethod::from($attributes['count_method'] instanceof CountMethod ? $attributes['count_method']->value : $attributes['count_method']) !== CountMethod::Qr
+                && $attributes['actual_quantity'] !== null ? now() : null,
         ];
+    }
+
+    /**
+     * Barang yang baru ditambahkan ke ruangan: Ada = saldo, belum dicek.
+     */
+    public function unchecked(): static
+    {
+        return $this->state(['checked_at' => null]);
     }
 }

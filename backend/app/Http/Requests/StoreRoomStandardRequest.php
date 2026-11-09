@@ -45,7 +45,7 @@ class StoreRoomStandardRequest extends FormRequest
             'asset_type_id.prohibits' => 'Pilih salah satu: jenis aset atau barang stok.',
             'asset_type_id.unique' => 'Jenis aset ini sudah punya standar di ruangan ini.',
             'consumable_id.unique' => 'Barang ini sudah ada di ruangan ini.',
-            'actual_quantity.prohibited' => 'Jumlah Ada diisi lewat simpan hasil cek.',
+            'actual_quantity.prohibited' => 'Jumlah Ada diubah lewat Catat perubahan.',
         ];
     }
 

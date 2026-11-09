@@ -20,7 +20,7 @@ interface Props {
   roomId: number
   roomName: string
   target: StandardTarget
-  /** Jenis/barang yang sudah tampil di ruangan: tidak ditawarkan lagi saat menambah. */
+  /** Jenis yang sudah punya standar / barang yang sudah ada di ruangan: tidak ditawarkan lagi saat menambah. */
   usedAssetTypeIds: number[]
   usedConsumableIds: number[]
   onClose: () => void
@@ -86,6 +86,9 @@ export default function StandardFormModal({ roomId, roomName, target, usedAssetT
               </Select>
             </FormField>
           )}
+          {isAsset && !group && usedAssetTypeIds.length > 0 && (
+            <p className="-mt-2 text-xs text-slate-500">Jenis yang sudah punya standar di ruangan ini diubah lewat ikon pensil di barisnya.</p>
+          )}
 
           {!isAsset && (
             <div className="space-y-1.5">
@@ -115,7 +118,7 @@ export default function StandardFormModal({ roomId, roomName, target, usedAssetT
           <FormField label="Jumlah standar" required error={errors.standard_quantity}>
             <Input type="number" min={isAsset ? 0 : 1} value={quantity} onChange={(e) => setQuantity(e.target.value)} error={errors.standard_quantity} />
           </FormField>
-          {isAsset && <p className="text-xs text-slate-500">Standar 0: jumlah Ada tetap tampil, tetapi tidak dihitung kurang.</p>}
+          {isAsset && <p className="text-xs text-slate-500">Standar 0: jumlah tetap tampil, tetapi tidak dihitung kurang.</p>}
         </>
       )}
     </ActionModal>

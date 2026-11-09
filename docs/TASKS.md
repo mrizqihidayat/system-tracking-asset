@@ -118,6 +118,116 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - [ ] **T27 QA & demo** — skenario: login → tambah aset → cetak label → scan → pinjam → terima kembali rusak → konfirmasi → servis → cek ruangan kurang → buat permintaan → stok menipis → ekspor.
 - [ ] **T28 Dokumentasi** — README (setup, env, deploy, HTTPS kamera, storage), ERD & flowchart final.
 
+## Setelah demo
+- [x] **T30 Barang habis pakai ruangan berbasis transaksi [Lengkap]** — tahap 1 dan **Revisi R1** (alur cek per barang lewat popup, di akhir task ini; mengganti sebagian tahap 1) selesai. Migration `2026_11_09_034958_create_room_stock_transactions_table` dan `2026_11_09_044334_add_loss_types_to_room_stock_transactions`. Penyimpangan kecil tahap 1 dari rencana: `present_quantity` tetap null selama Belum dicek dan saldo dikirim lewat field baru `recorded_quantity` (kontrak lama tetap berlaku); keterangan bisa diisi untuk Terpakai maupun Koreksi.
+  Jumlah Ada barang habis pakai di ruangan (bukan gudang) dihitung dari transaksi ruangan, seperti stok (§10): `room_standards.actual_quantity` menjadi saldo yang hanya diubah lewat satu service, sehingga selalu sama dengan hasil transaksi. Tujuannya riwayat per barang per ruangan (kartu ruangan) dan angka pemakaian antar cek.
+
+  **Keputusan pengguna**
+  - Jenis transaksi: **Saldo awal**, **Diisi** (+), **Terpakai** (−), **Koreksi** (±). Rusak/Hilang dan Dikembalikan ke gudang ditunda.
+  - Simpan hasil cek: hitungan < saldo → **Terpakai** sebesar selisih (keterangan opsional); hitungan > saldo → **Koreksi +** dengan keterangan otomatis "Hasil cek {tanggal}" yang bisa diubah; sama → tidak ada transaksi.
+  - Transaksi bernilai 0 tidak pernah disimpan (simpan cek berulang tidak menambah baris).
+  - Isi dari stok: transaksi stok (Pemakaian) dan transaksi ruangan (Diisi, tertaut ke transaksi stoknya) dalam satu `DB::transaction()`.
+  - Migration membuat transaksi **Saldo awal** dari `actual_quantity` yang ada, bukan Koreksi.
+  - Ruangan gudang tidak memakai ledger ini.
+  - Semua barang masuk lewat stok (pilihan a): permintaan yang Diterima tetap menambah stok gudang, ruangan diisi hanya lewat Isi dari stok. Tidak ada transaksi pembalik untuk permintaan.
+  - Riwayat dikunci per **ruangan + barang** (`room_id` + `consumable_id`), bukan per baris standar. Lepas barang hanya menghapus standar, transaksinya tetap. Jika barang ditambahkan lagi ke ruangan yang sama, saldo dan riwayat berlanjut.
+  - Barang yang ditambahkan ke ruangan (baru maupun ditambahkan lagi setelah dilepas) **selalu berstatus Belum dicek**, tanpa pengecualian. Ada tetap diisi dari saldo terakhir (0 jika belum pernah ada transaksi). Karena itu "Belum dicek" tidak lagi ditandai `actual_quantity = null`, melainkan `checked_at = null`.
+  - Pemakaian dari form Stok dengan ruangan tujuan tetap hanya mencatat tujuan (Ada ruangan tidak berubah); form diberi petunjuk "Untuk mengisi ruangan, gunakan Isi dari stok di Kelengkapan Ruangan."
+
+  **Skema (ERD)**
+  - Tabel baru `room_stock_transactions`: `id`, `room_id` (FK rooms), `consumable_id` (FK consumables, ON DELETE CASCADE, sama seperti `stock_transactions`: barang hanya bisa dihapus permanen saat salah input), `type` varchar (`Saldo awal | Diisi | Terpakai | Koreksi`), `quantity` int bertanda (≠ 0), `balance_after` int (≥ 0), `transaction_date` date, `note` text (nullable), `stock_transaction_id` (FK nullable, ON DELETE SET NULL; Diisi dari stok), `created_by` (FK users, nullable untuk Saldo awal hasil migrasi), `created_at`, `updated_at`. Index `(room_id, consumable_id, id)`.
+  - `room_standards.actual_quantity`: note menjadi "saldo transaksi ruangan untuk barang ini (= `balance_after` terakhir, 0 tanpa transaksi); diubah hanya lewat RoomStockService; null hanya untuk baris QR".
+  - Kolom baru `room_standards.checked_at` timestamp nullable: waktu cek terakhir baris Manual; null = **Belum dicek**. Migration mengisi `checked_at` dari `updated_at` untuk baris Manual yang `actual_quantity`-nya tidak null, lalu baris Manual yang null diisi 0.
+  - Enum PHP `RoomStockTransactionType`.
+
+  **Backend**
+  - `RoomStockService::record(RoomStandard, type, quantity, attrs, user)`: satu-satunya jalur ubah `actual_quantity`; `lockForUpdate()` baris standar; transaksi ditulis dengan `room_id` + `consumable_id` dari standar; tolak quantity 0 (guard), tolak saldo negatif, tolak ruangan gudang & baris QR; isi `balance_after`.
+  - Tambah barang ke ruangan (`POST /rooms/{id}/standards`, barang stok): `actual_quantity` = `balance_after` terakhir untuk ruangan + barang itu (0 tanpa riwayat), `checked_at` = null (selalu Belum dicek). Ganti barang di `PUT /room-standards/{id}` diperlakukan sama untuk barang barunya; ubah jumlah standar saja tidak mengubah status cek.
+  - `ChecklistResult`, `RoomStandard::presentQuantity()/shortage()`, dan `summarize()` memakai `checked_at` untuk Belum dicek (bukan `actual_quantity` null). Isi dari stok tetap mensyaratkan sudah dicek.
+  - Lepas barang (`DELETE /room-standards/{id}`): hanya menghapus standar, transaksi tetap.
+  - Hapus ruangan: `room_stock_transactions` masuk daftar pemakaian di `MasterDataService`, sehingga ruangan yang punya riwayat barang ditolak 422 seperti data terpakai lain (tidak hard delete riwayat).
+  - `RoomReadinessService::saveCheck()`: per baris hitung selisih terhadap saldo → Terpakai / Koreksi / tanpa transaksi. Jika ruangan + barang belum punya transaksi sama sekali, hitungan > 0 dicatat sebagai **Saldo awal** (hitungan 0 tanpa transaksi). Setiap baris yang dicek mendapat `checked_at = now()`. `items[].note` opsional (maks. 1000). Gudang ditolak 422 "Gudang tidak dicek terhadap standar."
+  - `RoomReadinessService::fillFromStock()`: `ConsumableService::record()` (Pemakaian) lalu `RoomStockService::record()` (Diisi, `stock_transaction_id`), satu transaksi DB. Gudang ditolak 422.
+  - `GET /room-standards/{id}/transactions`: kartu ruangan untuk ruangan + barang baris itu, termasuk transaksi sebelum barang pernah dilepas (terbaru dulu, paginasi), lewat API Resource baru.
+  - `RoomStandardResource` (checklist): tambah `last_usage` = jumlah Terpakai pada cek terakhir + tanggalnya (null jika tidak ada), dihitung tanpa query per baris.
+  - Migration baru (tidak mengubah migration lama): buat tabel, lalu Saldo awal untuk baris Manual dengan `actual_quantity > 0` di ruangan bukan gudang (`transaction_date` = tanggal `updated_at` baris, `created_by` null). Rollback hanya menghapus tabel.
+  - `CLAUDE.md` (Larangan): tambah aturan "Setiap perubahan jumlah Ada barang habis pakai ruangan wajib lewat `RoomStockService::record()`".
+
+  **Frontend** (`RoomsPage.tsx` dan modal baru)
+  - Kolom Ada untuk baris Belum dicek: isian kosong dengan keterangan "Catatan: N" (saldo), sehingga staf tetap menghitung ulang.
+  - Kolom Ada: saat angka yang diketik berbeda dari saldo, tampil pratinjau "Terpakai N" atau "Koreksi +N"; untuk Koreksi + muncul isian keterangan terisi "Hasil cek {tanggal}".
+  - Di bawah nama barang: "Terpakai N sejak cek {tanggal}" dari `last_usage`.
+  - Tombol **Kartu ruangan** di baris barang → popup riwayat transaksi (tanggal, jenis, jumlah, saldo, keterangan, pencatat).
+  - Popup **Lepas barang**: teks menjadi "Lepas "{barang}" dari {ruangan}? Stok barang tidak berubah. Riwayat barang di ruangan ini tetap tersimpan dan berlanjut jika barang ditambahkan lagi."
+  - Form **Catat transaksi** di Stok (`StockTransactionModal.tsx`), jenis Pemakaian: petunjuk di bawah pilihan ruangan tujuan "Untuk mengisi ruangan, gunakan Isi dari stok di Kelengkapan Ruangan."
+
+  **Perubahan SPEC/ERD (diterapkan saat T30 dikerjakan)**
+  - §8: bullet Ada barang habis pakai (baris 92), Isi dari stok (95), dan Cek ruangan (98) disesuaikan dengan aturan transaksi di atas; bullet baru "Transaksi ruangan & kartu ruangan" (jenis, aturan selisih cek, nilai 0 tidak disimpan, riwayat per ruangan + barang yang tetap ada saat barang dilepas, gudang tidak memakai).
+  - §4/§8: ruangan yang punya riwayat barang tidak bisa dihapus.
+  - §10: Pemakaian dari form Stok dengan ruangan tetap hanya mencatat tujuan, ditambah petunjuk form.
+  - §14: `POST /rooms/{id}/check` menerima `items[].note`; endpoint `GET /room-standards/{id}/transactions`; field `last_usage` di checklist.
+  - `erd.dbml`: tabel `room_stock_transactions` dan note `room_standards.actual_quantity` di atas.
+
+  Kriteria: `php artisan test` (test baru: cek kurang → Terpakai, cek lebih → Koreksi + keterangan otomatis, cek sama/berulang → tanpa baris, cek pertama → Saldo awal, isi dari stok → dua transaksi dalam satu transaksi DB & rollback bersama, gudang ditolak, saldo selalu = jumlah transaksi, lepas barang → transaksi tetap, tambah lagi → Ada = saldo terakhir & riwayat berlanjut tetapi Belum dicek, barang baru tanpa riwayat → Ada 0 & Belum dicek, Belum dicek tidak dihitung kurang & tidak bisa Isi dari stok, hapus ruangan dengan riwayat ditolak, migration Saldo awal), `pint`, `npm test`, `npm run build`, `npm run lint` lulus. Migration baru wajib dijalankan (`php artisan migrate`). Rencana dan implementasi di-commit bersama.
+
+  **Revisi R1 — catat perubahan per barang lewat popup (selesai)**
+  Keputusan Pertanyaan R1: (1) label **Tandai sudah dicek**, dialog ringkas berisi ringkasan kondisi (aset Kurang, barang Kurang, barang belum dicek), konfirmasi singkat jika semua sesuai; (2) baris Belum dicek dengan jumlah sama → **Konfirmasi jumlah** (hanya `checked_at`, tanpa transaksi); (3) status cek ruangan hanya dari tombol itu; (4) `items` di `/check` diabaikan. Pesan Isi dari stok untuk baris Belum dicek menjadi "Barang belum dicek. Catat perubahan atau tandai ruangan sudah dicek dulu."
+  Mengganti alur "isi kolom Ada lalu Simpan hasil cek" dari tahap 1. Bagian tahap 1 yang tidak disebut di sini tetap berlaku (ledger per ruangan + barang, Saldo awal, Diisi dari Isi dari stok, Belum dicek lewat `checked_at`, lepas/tambah lagi, gudang tidak memakai, kartu ruangan, hapus ruangan ditolak).
+
+  *Keputusan pengguna (R1)*
+  - Kolom **Ada** menjadi angka biasa (saldo catatan), bukan isian. Di bawahnya tautan **Catat perubahan** yang membuka popup.
+  - Popup berisi: catatan sekarang (saldo), **jumlah sekarang** (hasil hitung staf), **selisih** otomatis, **alasan**, **keterangan**, dan tombol **Simpan** yang langsung menyimpan satu transaksi lewat `RoomStockService::record()`.
+    - Berkurang → alasan dipilih staf: **Terpakai**, **Hilang**, **Rusak**, **Kedaluwarsa**. Keterangan boleh kosong.
+    - Bertambah → **Koreksi**, keterangan wajib.
+    - Jumlah sama → Simpan nonaktif.
+    - Label ditulis "Keterangan" saja, tanpa "(opsional)", walaupun boleh kosong (aturan yang sama dengan form lain).
+  - Tombol **Tandai semua sesuai**: mencatat ruangan sudah dicek tanpa membuat transaksi. Status cek ruangan ("Dicek {waktu} oleh {staf}") hanya diambil dari tombol ini.
+  - Tombol **Simpan hasil cek** dan state form cek barang habis pakai dihapus, karena setiap perubahan langsung tersimpan.
+  - Keputusan tahap 1 "selisih kurang otomatis Terpakai" dan keterangan bawaan "Hasil cek {tanggal}" diganti: alasan dipilih staf di popup.
+
+  *Jenis transaksi ruangan (R1)*
+  | Jenis | Arah | Dipicu oleh |
+  |---|---|---|
+  | Saldo awal | + | Catat perubahan pertama untuk ruangan + barang yang belum punya transaksi (jumlah > 0), atau migrasi data lama; tanpa pilihan alasan |
+  | Diisi | + | Isi dari stok (tertaut transaksi Pemakaian di stok) |
+  | Terpakai | − | Catat perubahan, alasan Terpakai |
+  | Hilang | − | Catat perubahan, alasan Hilang |
+  | Rusak | − | Catat perubahan, alasan Rusak |
+  | Kedaluwarsa | − | Catat perubahan, alasan Kedaluwarsa |
+  | Koreksi | + | Catat perubahan saat jumlah bertambah; keterangan wajib |
+
+  *Skema (R1)*
+  - Migration baru (migration tahap 1 sudah dijalankan, tidak diubah): ganti CHECK constraint PostgreSQL `room_stock_transactions_type_check` menjadi tujuh jenis di atas. Kolom `type` varchar(20) cukup.
+  - Enum `RoomStockTransactionType`: tambah `Hilang`, `Rusak`, `Kedaluwarsa`.
+
+  *Backend (R1)*
+  - Endpoint baru `POST /room-standards/{id}/adjust` (FormRequest `AdjustRoomStockRequest`): `quantity` (jumlah sekarang, integer ≥ 0, maks. batas kolom), `reason` (`Terpakai | Hilang | Rusak | Kedaluwarsa`), `note` (maks. 1000). Logika di `RoomReadinessService::adjust()` dalam `DB::transaction()` + `lockForUpdate()`:
+    - selisih = jumlah sekarang − saldo; selisih 0 → 422 "Jumlah sama dengan catatan.";
+    - ruangan + barang tanpa riwayat dan jumlah > 0 → Saldo awal (alasan & keterangan diabaikan kecuali keterangan diisi);
+    - selisih < 0 → jenis = `reason` (wajib, 422 "Pilih alasan.");
+    - selisih > 0 → Koreksi, `note` wajib (422 "Keterangan wajib diisi untuk koreksi.");
+    - baris mendapat `checked_at = now()`. Gudang & baris aset ditolak 422.
+    - Respons: baris standar terbaru (`RoomStandardResource`) + transaksi yang dibuat.
+  - `POST /rooms/{id}/check` berubah menjadi **Tandai semua sesuai**: tanpa `items`; semua baris barang habis pakai ruangan mendapat `checked_at = now()` (Ada tidak berubah, tanpa transaksi), ruangan mendapat `last_checked_at`/`last_checked_by`. Boleh untuk ruangan yang hanya punya aset. Gudang ditolak 422. `items` dikirim → diabaikan atau 422 (lihat Pertanyaan R1-4).
+  - `saveCheck()`/`recordCount()` dan `SaveRoomCheckRequest` (items, note) dihapus/diganti; keterangan bawaan "Hasil cek {tanggal}" dihapus.
+  - `last_usage` tetap dari transaksi Terpakai terakhir (Hilang/Rusak/Kedaluwarsa tidak dihitung sebagai pemakaian).
+
+  *Frontend (R1)*
+  - `RoomsPage.tsx`: hapus state `actual`/`notes`/`actualFrom`, tombol Simpan hasil cek (header & bar bawah HP) beserta padding bawahnya. Kolom Ada menampilkan saldo; baris Belum dicek tetap berlabel Hasil `Belum dicek`. Tautan **Catat perubahan** di bawah angka Ada.
+  - Tombol **Tandai semua sesuai** di header (pengganti Simpan hasil cek), dengan dialog konfirmasi.
+  - Popup baru `AdjustRoomStockModal.tsx`: catatan sekarang, isian jumlah sekarang, selisih otomatis ("Berkurang 3" / "Bertambah 2"), pilihan alasan (hanya saat berkurang), Keterangan (wajib saat bertambah), Simpan nonaktif saat sama; untuk Saldo awal tampil keterangan "Dicatat sebagai saldo awal".
+  - Kartu ruangan & Terpakai terakhir tetap.
+
+  *SPEC/ERD (R1)*: §8 bullet Ada, Cek ruangan, dan Transaksi ruangan diganti sesuai R1; §14 `POST /room-standards/{id}/adjust` dan perubahan `POST /rooms/{id}/check`; `erd.dbml` note `type` tujuh jenis.
+
+  *Test (R1)* — mengganti test cek tahap 1 di `RoomStockTransactionTest`: berkurang + alasan Terpakai/Hilang/Rusak/Kedaluwarsa → jenis sesuai & saldo turun; berkurang tanpa alasan → 422; bertambah tanpa keterangan → 422; bertambah dengan keterangan → Koreksi; jumlah sama → 422 tanpa baris; adjust pertama tanpa riwayat → Saldo awal; adjust mengisi `checked_at` baris itu saja dan tidak mengubah `last_checked_at` ruangan; Tandai semua sesuai → semua baris Manual `checked_at` terisi, `last_checked_at` ruangan terisi, tanpa transaksi, Ada tetap; Tandai semua sesuai di ruangan tanpa barang (hanya aset) → boleh; gudang → 422 untuk adjust & Tandai semua; saldo melebihi batas/negatif ditolak; saldo selalu = jumlah transaksi; migration constraint jenis; test arsitektur tetap.
+
+  *Pertanyaan R1 (bentrok/perlu keputusan)*
+  1. **"Tandai semua sesuai" dan aset.** Ada aset dihitung otomatis dan tidak bisa ditandai; aset yang tidak ditemukan dicatat lewat detail aset (Kehilangan/Pindah lokasi). Tombol ini menandai ruangan sudah dicek walaupun ada aset Kurang, dan kata "sesuai" bentrok dengan Hasil `Sesuai` (= memenuhi standar). Usul: label **"Tandai sudah dicek"** dengan dialog "Barang habis pakai sesuai catatan. Aset dihitung otomatis; catat aset hilang/pindah lewat detail aset."
+  2. **Barang Belum dicek yang jumlahnya sama dengan catatan** (termasuk barang baru dengan 0): Simpan nonaktif, sehingga baris itu hanya bisa jadi "sudah dicek" lewat tombol semua ruangan. Usul: untuk baris Belum dicek, Simpan tetap aktif saat jumlah sama ("Konfirmasi jumlah"), hanya mengisi `checked_at` tanpa transaksi.
+  3. **Status cek ruangan** hanya dari Tandai semua sesuai: ruangan yang semua barangnya sudah dicatat lewat popup tetap tertulis "Belum pernah dicek"/tanggal lama sampai tombol ditekan. Usul: biarkan (sesuai keputusan), tampilkan jumlah baris Belum dicek seperti sekarang.
+  4. `POST /rooms/{id}/check` yang masih dikirimi `items` (klien lama/versi HP): usul diabaikan saja, tidak 422.
+
 ## Fase 2
 - [ ] **T29 Lisensi Digital** — sesuai SPEC §16.
 
@@ -129,7 +239,13 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - (T26m, keputusan pengguna, mengganti keputusan T26i) Barang yang tidak disimpan SHD bukan bagian stok: baris standar Manual tanpa `consumable_id` dengan sumber bukan SHD (`RoomStandard::isOtherUnit()`). Permintaannya tertaut lewat `room_standard_id`. "Perlu dilengkapi" kini hanya baris bersumber SHD tanpa barang stok. Lokasi simpan tidak lagi tertaut ruangan, jadi ruangan bisa dihapus walau pernah jadi lokasi stok dan filter `building_id`/`room_id` stok dihapus.
 - (Ide setelah demo, T26y) Riwayat isi per ruangan: daftar transaksi Pemakaian ke ruangan itu per barang (dari `stock_transactions.room_id`), dibuka dari baris Barang habis pakai.
 - (Ide setelah demo, T26y) Perhitungan pemakaian antar cek: Ada di cek sebelumnya + jumlah yang diisi − Ada sekarang, misal "Tisu terpakai 6 dus sejak cek 1 Nov", sebagai dasar standar & jadwal isi ulang.
+- (Slug ikut nama) Migration `2026_11_09_040532_sync_building_and_room_slugs` menyamakan slug gedung & ruangan yang diganti namanya sebelum aturan baru (aturan sama dengan `HasSlug`; slug yang sudah sesuai tidak diubah; `down()` tidak mengembalikan slug lama). Wajib dijalankan (`php artisan migrate`).
 - (Keputusan pengguna, mengganti keputusan T7) Slug gedung & ruangan kini ikut berubah saat nama diganti (`HasSlug` membuat ulang slug saat `name` berubah; bentrok tetap `-2`). Tautan yang memakai slug lama tidak berlaku lagi dan diarahkan ke gedung & ruangan pertama, tanpa redirect dari slug lama. Data yang sudah ada tidak diubah sampai namanya diganti.
+- (T30) Migration `2026_11_09_034958_create_room_stock_transactions_table` wajib dijalankan (`php artisan migrate`) bersamaan dengan kode T30. Data demo lewat seeder ikut mencatat Saldo awal. Rollback mengembalikan Belum dicek ke `actual_quantity` null, riwayat ruangan hilang.
+- (T30, di luar scope) `AssetScanLabelTest::test_label_html_contains_code_and_qr_with_public_url` sesekali gagal (decoder QR `checkAndNudgePoints`), lolos saat diulang: kemungkinan bergantung token acak. Perlu dibuat deterministik.
+- (T30, di luar scope) SPEC §8 bullet gudang ("tetap menampilkan Hasil `Kurang`") dan "Stok tersimpan di sini" belum disesuaikan dengan tampilan gudang T26z (hanya Aset tersimpan & Stok tersimpan).
+- (T30 R1) Teks "dicatat sebagai saldo awal / Koreksi" di popup Catat perubahan adalah perkiraan frontend (belum dicek, catatan 0, tanpa Terpakai); backend yang menentukan jenis transaksi sebenarnya. Barang yang pernah dilepas dengan saldo 0 bisa salah tampil "saldo awal" padahal tercatat Koreksi (keterangan tetap wajib dari backend).
+- (T30 R1) Migration `2026_11_09_044334_add_loss_types_to_room_stock_transactions` wajib dijalankan (`php artisan migrate`). Migration ini juga membuang cache ringkasan kesiapan & data master; dua migration sebelumnya (transaksi ruangan, penyelarasan slug) dikembalikan ke isi saat dijalankan.
 - (T26z) Standar (aset maupun barang habis pakai) yang sudah terlanjur ada di ruangan gudang tidak ditampilkan di Kelengkapan Ruangan; datanya tetap ada di database dan API checklist.
 - (Ide setelah demo, keputusan pengguna) Tanggal rencana dikembalikan untuk permintaan yang harus dikembalikan beserta peringatan jika lewat.
 - (Ide setelah demo, keputusan pengguna) Popup jumlah yang datang (diterima sebagian) saat menandai permintaan Diterima; sekarang Diterima dianggap penuh sesuai jumlah permintaan.

@@ -105,6 +105,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/room-standards/{roomStandard}', [RoomStandardController::class, 'update'])->whereNumber('roomStandard');
     Route::delete('/room-standards/{roomStandard}', [RoomStandardController::class, 'destroy'])->whereNumber('roomStandard');
     Route::post('/room-standards/{roomStandard}/fill-from-stock', [RoomStandardController::class, 'fillFromStock'])->whereNumber('roomStandard');
+    Route::get('/room-standards/{roomStandard}/transactions', [RoomStandardController::class, 'transactions'])->whereNumber('roomStandard');
+    Route::post('/room-standards/{roomStandard}/adjust', [RoomStandardController::class, 'adjust'])->whereNumber('roomStandard');
 
     // Permintaan ke departemen lain (SPEC §9); tanpa hapus permintaan (batal lewat status)
     Route::get('/request-catalog/{requestCatalog}/usage', [RequestCatalogController::class, 'usage'])->whereNumber('requestCatalog');

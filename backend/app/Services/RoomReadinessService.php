@@ -6,6 +6,7 @@ use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Enums\ChecklistResult;
 use App\Enums\CountMethod;
+use App\Enums\RoomStockTransactionType;
 use App\Enums\StockTransactionType;
 use App\Models\Asset;
 use App\Models\AssetType;
@@ -13,6 +14,7 @@ use App\Models\Building;
 use App\Models\Consumable;
 use App\Models\Room;
 use App\Models\RoomStandard;
+use App\Models\RoomStockTransaction;
 use App\Models\User;
 use App\Support\AppCache;
 use Illuminate\Database\Eloquent\Collection;
@@ -20,7 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Kelengkapan ruangan (SPEC §8): aset di ruangan, standar, simpan hasil cek, ambil dari stok, ringkasan kesiapan.
+ * Kelengkapan ruangan (SPEC §8): aset di ruangan, standar, catat perubahan barang, tandai sudah dicek, isi dari stok, ringkasan kesiapan.
  * summarize() dipakai dashboard & laporan: Belum dicek bukan kekurangan.
  */
 class RoomReadinessService
@@ -37,14 +39,46 @@ class RoomReadinessService
 
     public const RELATIONS = ['assetType', 'consumable.providerDepartment'];
 
-    public function __construct(private ConsumableService $consumables) {}
+    public function __construct(private ConsumableService $consumables, private RoomStockService $roomStock) {}
 
     /**
      * @return Collection<int, RoomStandard>
      */
     public function checklist(Room $room): Collection
     {
-        return $this->fillQrCounts($room->standards()->with(self::RELATIONS)->orderBy('id')->get());
+        return $this->fillLastUsage($this->fillQrCounts($room->standards()->with(self::RELATIONS)->orderBy('id')->get()));
+    }
+
+    /**
+     * Isi "Terpakai terakhir" baris Manual dengan satu query: transaksi Terpakai terbaru per ruangan + barang.
+     *
+     * @param  Collection<int, RoomStandard>  $standards
+     * @return Collection<int, RoomStandard>
+     */
+    public function fillLastUsage(Collection $standards): Collection
+    {
+        $manual = $standards->filter(fn (RoomStandard $s) => $s->count_method === CountMethod::Manual && $s->consumable_id !== null);
+
+        if ($manual->isEmpty()) {
+            return $standards;
+        }
+
+        $latest = RoomStockTransaction::query()
+            ->whereIn('id', RoomStockTransaction::query()
+                ->selectRaw('max(id)')
+                ->where('type', RoomStockTransactionType::Terpakai->value)
+                ->whereIn('room_id', $manual->pluck('room_id')->unique()->values())
+                ->whereIn('consumable_id', $manual->pluck('consumable_id')->unique()->values())
+                ->groupBy('room_id', 'consumable_id'))
+            ->get(['room_id', 'consumable_id', 'quantity', 'transaction_date'])
+            ->keyBy(fn (RoomStockTransaction $t) => "{$t->room_id}:{$t->consumable_id}");
+
+        foreach ($manual as $standard) {
+            $usage = $latest->get("{$standard->room_id}:{$standard->consumable_id}");
+            $standard->lastUsage = $usage ? ['quantity' => abs($usage->quantity), 'date' => $usage->transaction_date->toDateString()] : null;
+        }
+
+        return $standards;
     }
 
     /**
@@ -237,51 +271,101 @@ class RoomReadinessService
     }
 
     /**
-     * Simpan hasil cek: jumlah Ada baris Manual + waktu & staf pengecek (hanya hasil terakhir).
-     *
-     * @param  list<array{id: int, actual_quantity: int}>  $rows
+     * Tandai sudah dicek (T30 R1): semua barang habis pakai ruangan dianggap sesuai catatan (Ada tidak berubah,
+     * tanpa transaksi) dan ruangan menyimpan waktu & staf pengecek. Satu-satunya sumber status cek ruangan.
+     * Boleh untuk ruangan yang hanya punya aset (Ada aset dihitung otomatis).
      */
-    public function saveCheck(Room $room, array $rows, User $user): Room
+    public function markChecked(Room $room, User $user): Room
     {
-        return DB::transaction(function () use ($room, $rows, $user) {
+        return DB::transaction(function () use ($room, $user) {
             $room = Room::query()->whereKey($room->getKey())->lockForUpdate()->firstOrFail();
-            $standards = $room->standards()->whereKey(array_column($rows, 'id'))->lockForUpdate()->get()->keyBy('id');
 
-            foreach ($rows as $row) {
-                $standard = $standards->get($row['id']);
-
-                if (! $standard || $standard->count_method !== CountMethod::Manual) {
-                    throw ValidationException::withMessages(['items' => 'Hanya barang habis pakai ruangan ini yang bisa diisi.']);
-                }
-
-                $standard->update(['actual_quantity' => $row['actual_quantity']]);
+            if ($room->is_storage) {
+                throw ValidationException::withMessages(['room' => 'Gudang tidak dicek terhadap standar.']);
             }
 
-            $room->update(['last_checked_at' => now(), 'last_checked_by' => $user->id]);
+            $now = now();
+            $room->standards()->where('count_method', CountMethod::Manual->value)->update(['checked_at' => $now]);
+            $room->update(['last_checked_at' => $now, 'last_checked_by' => $user->id]);
 
             return $room;
         });
     }
 
     /**
+     * Catat perubahan satu barang (popup, T30 R1). `$counted` = jumlah sekarang hasil hitung staf.
+     * - Sama dengan catatan: baris Belum dicek → Konfirmasi jumlah (hanya checked_at, tanpa transaksi); selain itu 422.
+     * - Ruangan + barang tanpa riwayat dan jumlah > 0 → Saldo awal.
+     * - Berkurang → jenis = alasan pilihan staf (Terpakai/Hilang/Rusak/Kedaluwarsa), wajib.
+     * - Bertambah → Koreksi, keterangan wajib.
+     * Baris mendapat checked_at; status cek ruangan tidak berubah (hanya lewat markChecked()).
+     *
+     * @return array{standard: RoomStandard, transaction: ?RoomStockTransaction}
+     */
+    public function adjust(RoomStandard $standard, int $counted, ?string $reason, ?string $note, User $user): array
+    {
+        return DB::transaction(function () use ($standard, $counted, $reason, $note, $user) {
+            $standard = RoomStandard::query()->with('room')->whereKey($standard->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($standard->count_method !== CountMethod::Manual || $standard->consumable_id === null) {
+                throw ValidationException::withMessages(['standard' => 'Baris ini bukan barang stok.']);
+            }
+
+            if ($standard->room->is_storage) {
+                throw ValidationException::withMessages(['standard' => 'Gudang tidak dicek terhadap standar.']);
+            }
+
+            $delta = $counted - (int) $standard->actual_quantity;
+            $note = trim((string) $note);
+            $transaction = null;
+
+            if ($delta === 0) {
+                if ($standard->checked_at !== null) {
+                    throw ValidationException::withMessages(['quantity' => 'Jumlah sama dengan catatan.']);
+                }
+            } else {
+                $type = match (true) {
+                    $delta > 0 && ! $this->roomStock->hasHistory($standard->room_id, $standard->consumable_id) => RoomStockTransactionType::SaldoAwal,
+                    $delta < 0 => $reason === null || $reason === ''
+                        ? throw ValidationException::withMessages(['reason' => 'Pilih alasan.'])
+                        : RoomStockTransactionType::from($reason),
+                    $note === '' => throw ValidationException::withMessages(['note' => 'Keterangan wajib diisi untuk koreksi.']),
+                    default => RoomStockTransactionType::Koreksi,
+                };
+
+                $transaction = $this->roomStock->record($standard, $type, $delta, ['note' => $note === '' ? null : $note], $user);
+            }
+
+            // Hanya checked_at yang ditulis di sini; Ada diubah lewat RoomStockService.
+            RoomStandard::query()->whereKey($standard->id)->update(['checked_at' => now()]);
+
+            return ['standard' => $standard->refresh(), 'transaction' => $transaction];
+        });
+    }
+
+    /**
      * Isi dari stok: jumlah = `$quantity` (boleh melebihi kekurangan, maks. sisa stok) atau, jika kosong, min(kekurangan, stok).
-     * Pemakaian tercatat di kartu stok (dengan keterangan) & Ada bertambah dalam satu transaksi; sisa kekurangan tetap tercatat.
+     * Pemakaian di kartu stok dan Diisi di kartu ruangan (tertaut) dalam satu transaksi DB; sisa kekurangan tetap tercatat.
      *
      * @return array{standard: RoomStandard, filled: int, remaining_shortage: int, stock_remaining: int}
      */
     public function fillFromStock(RoomStandard $standard, User $user, ?int $quantity = null, ?string $note = null): array
     {
         return DB::transaction(function () use ($standard, $user, $quantity, $note) {
-            $standard = RoomStandard::query()->whereKey($standard->getKey())->lockForUpdate()->firstOrFail();
+            $standard = RoomStandard::query()->with('room')->whereKey($standard->getKey())->lockForUpdate()->firstOrFail();
 
             if ($standard->count_method !== CountMethod::Manual) {
                 throw ValidationException::withMessages(['standard' => 'Baris ini bukan barang stok.']);
             }
 
+            if ($standard->room->is_storage) {
+                throw ValidationException::withMessages(['standard' => 'Gudang tidak dicek terhadap standar.']);
+            }
+
             $shortage = $standard->shortage();
 
             if ($shortage === null) {
-                throw ValidationException::withMessages(['standard' => 'Simpan hasil cek ruangan dulu.']);
+                throw ValidationException::withMessages(['standard' => 'Barang belum dicek. Catat perubahan atau tandai ruangan sudah dicek dulu.']);
             }
 
             if ($shortage === 0) {
@@ -298,14 +382,18 @@ class RoomReadinessService
             $filled = $quantity ?? min($shortage, $consumable->quantity);
             $note = trim((string) $note);
 
+            $note = $note === '' ? 'Isi dari stok' : "Isi dari stok · {$note}";
             $transaction = $this->consumables->record($consumable, StockTransactionType::Pemakaian, -$filled, [
-                'note' => $note === '' ? 'Isi dari stok' : "Isi dari stok · {$note}",
+                'note' => $note,
                 'room_id' => $standard->room_id,
             ], $user);
-            $standard->update(['actual_quantity' => $standard->actual_quantity + $filled]);
+            $this->roomStock->record($standard, RoomStockTransactionType::Diisi, $filled, [
+                'note' => $note,
+                'stock_transaction_id' => $transaction->id,
+            ], $user);
 
             return [
-                'standard' => $standard,
+                'standard' => $standard->refresh(),
                 'filled' => $filled,
                 'remaining_shortage' => max(0, $shortage - $filled),
                 'stock_remaining' => $transaction->balance_after,

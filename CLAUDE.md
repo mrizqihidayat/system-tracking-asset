@@ -40,6 +40,7 @@ Dokumen acuan:
   - **Aset**: hard delete hanya lewat `AssetService` setelah `delete-impact` + `confirm_code`, menghapus data turunan (pinjaman, riwayat, file, kode lama) dalam satu transaksi.
   - **Barang habis pakai**: hard delete hanya jika transaksinya saldo awal saja (kasus salah input); selain itu ditolak 422 dan staf mencatat Penghapusan agar stok menjadi 0.
 - Setiap perubahan jumlah stok wajib lewat `ConsumableService::record()` (tabel `stock_transactions`), sehingga jumlah stok selalu sama dengan hasil transaksi.
+- Setiap perubahan jumlah Ada barang habis pakai ruangan wajib lewat `RoomStockService::record()` (tabel `room_stock_transactions`), sehingga Ada selalu sama dengan hasil transaksi ruangan + barang.
 - Jangan hardcode URL/host; gunakan env (`APP_URL`, `FRONTEND_URL`, `QR_BASE_URL`).
 
 ## Konvensi
