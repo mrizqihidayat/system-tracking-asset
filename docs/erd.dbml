@@ -80,7 +80,7 @@ Table departments {
 Table buildings {
   id bigint [pk, increment]
   name varchar(100) [not null, unique]
-  slug varchar(120) [not null, unique, note: 'URL frontend, otomatis dari nama, tidak berubah']
+  slug varchar(120) [not null, unique, note: 'URL frontend, otomatis dari nama, ikut berubah saat nama diganti']
   created_at timestamp
   updated_at timestamp
 }
@@ -89,7 +89,7 @@ Table rooms {
   id bigint [pk, increment]
   building_id bigint [not null, ref: > buildings.id]
   name varchar(100) [not null]
-  slug varchar(120) [not null, note: 'URL frontend, unik per gedung, tidak berubah']
+  slug varchar(120) [not null, note: 'URL frontend, unik per gedung, ikut berubah saat nama diganti']
   is_storage boolean [not null, default: false, note: 'gudang / tempat penyimpanan: boleh menjadi lokasi simpan stok, tidak masuk hitungan kesiapan']
   last_checked_at timestamp
   last_checked_by bigint [ref: > users.id]

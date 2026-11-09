@@ -336,7 +336,7 @@ flowchart TD
 
     C -- Tambah / Ubah --> T1[Input nama; jenis aset juga kategori wajib dan kode singkat: saat tambah kosong = otomatis, saat ubah hanya berlaku untuk aset baru] --> T2{Data valid?}
     T2 -- Tidak --> T3[Tampilkan pesan, mis. kode pernah dipakai jenis lain, kategori wajib dipilih] --> T1
-    T2 -- Ya --> T4[(Simpan; slug gedung & ruangan tidak berubah)] --> B
+    T2 -- Ya --> T4[(Simpan; slug gedung & ruangan ikut nama baru)] --> B
 
     C -- Hapus --> H1[(Ambil pemakaian data)] --> H2{Masih dipakai?}
     H2 -- Ya --> H3[Popup rincian pemakaian, tanpa tombol hapus] --> B

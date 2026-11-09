@@ -6,8 +6,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 /**
- * Slug untuk URL halaman frontend: dibuat sekali dari nama saat data dibuat dan tidak
- * berubah saat nama diganti. Bentrok diberi angka (gudang-2). Kolom slug tidak fillable.
+ * Slug untuk URL halaman frontend: dibuat dari nama saat data dibuat dan dibuat ulang saat
+ * nama diganti (tautan lama tidak berlaku lagi). Bentrok diberi angka (gudang-2). Kolom slug tidak fillable.
  */
 trait HasSlug
 {
@@ -15,6 +15,12 @@ trait HasSlug
     {
         static::creating(function (self $model) {
             $model->slug = $model->uniqueSlug();
+        });
+
+        static::updating(function (self $model) {
+            if ($model->isDirty('name')) {
+                $model->slug = $model->uniqueSlug();
+            }
         });
     }
 
@@ -39,7 +45,13 @@ trait HasSlug
         $base = Str::slug((string) $this->name) ?: $this->slugFallback();
         $slug = $base;
 
-        for ($suffix = 2; $this->slugScope(static::query())->where('slug', $slug)->exists(); $suffix++) {
+        // Data sendiri dikecualikan: ganti nama yang slug-nya sama (mis. hanya beda huruf besar) tidak diberi angka.
+        $taken = fn (string $candidate) => $this->slugScope(static::query())
+            ->when($this->exists, fn (Builder $query) => $query->whereKeyNot($this->getKey()))
+            ->where('slug', $candidate)
+            ->exists();
+
+        for ($suffix = 2; $taken($slug); $suffix++) {
             $slug = "{$base}-{$suffix}";
         }
 

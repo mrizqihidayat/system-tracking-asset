@@ -273,13 +273,22 @@ class MasterDataTest extends TestCase
         $this->assertSame('gudang', Room::factory()->create(['name' => 'Gudang'])->slug);
     }
 
-    public function test_slug_does_not_change_on_rename_and_cannot_be_mass_assigned(): void
+    public function test_slug_follows_rename_and_cannot_be_mass_assigned(): void
     {
         $building = Building::factory()->create(['name' => 'Gedung IHS', 'slug' => 'custom']);
         $this->assertSame('gedung-ihs', $building->slug);
 
         $building->update(['name' => 'Gedung IHS Baru', 'slug' => 'lain']);
-        $this->assertSame('gedung-ihs', $building->fresh()->slug);
+        $this->assertSame('gedung-ihs-baru', $building->fresh()->slug);
+
+        // Nama berubah tanpa mengubah slug-nya: slug tetap, tidak diberi angka.
+        $building->update(['name' => 'GEDUNG IHS BARU']);
+        $this->assertSame('gedung-ihs-baru', $building->fresh()->slug);
+
+        // Ubah kolom lain: slug tidak dibuat ulang walau ada data lain yang kini bernama sama.
+        $other = Building::factory()->create(['name' => 'Gedung X']);
+        $other->update(['updated_at' => now()->addMinute()]);
+        $this->assertSame('gedung-x', $other->fresh()->slug);
 
         $this->postJson('/api/buildings', ['name' => 'Millennials Hub', 'slug' => 'hub'])
             ->assertCreated()
@@ -452,18 +461,23 @@ class MasterDataTest extends TestCase
         $this->assertModelMissing($building);
     }
 
-    public function test_room_update_keeps_slug_and_name_is_unique_per_building(): void
+    public function test_room_rename_updates_slug_and_name_is_unique_per_building(): void
     {
         $building = Building::factory()->create();
         $room = Room::factory()->create(['building_id' => $building->id, 'name' => 'Ruang A']);
         Room::factory()->create(['building_id' => $building->id, 'name' => 'Ruang B']);
-        $slug = $room->slug;
+        Room::factory()->create(['name' => 'Ruang C']);
 
         $this->putJson("/api/rooms/{$room->id}", ['name' => 'ruang b'])->assertUnprocessable();
+        // Ruang C di gedung lain tidak bentrok: slug unik per gedung.
         $this->putJson("/api/rooms/{$room->id}", ['name' => 'Ruang C'])
             ->assertOk()
             ->assertJsonPath('data.name', 'Ruang C')
-            ->assertJsonPath('data.slug', $slug);
+            ->assertJsonPath('data.slug', 'ruang-c');
+        // "Ruang B!" lolos validasi nama, tapi slug-nya bentrok dengan Ruang B → diberi angka.
+        $this->putJson("/api/rooms/{$room->id}", ['name' => 'Ruang B!'])
+            ->assertOk()
+            ->assertJsonPath('data.slug', 'ruang-b-2');
     }
 
     public function test_room_in_use_cannot_be_deleted(): void
