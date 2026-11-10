@@ -46,7 +46,7 @@ export default function Modal({ open, title, onClose, children, footer, size = '
           <button
             onClick={onClose}
             aria-label="Tutup"
-            className="-mr-2 flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            className="-mr-2 flex h-10 w-10 lg:h-9 lg:w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
           >
             <X size={18} />
           </button>

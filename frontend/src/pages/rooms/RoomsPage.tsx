@@ -32,13 +32,13 @@ const resultColor = { Sesuai: 'green', Kurang: 'red', 'Belum dicek': 'amber' } a
 const stockColor = { Aman: 'green', Menipis: 'amber', Habis: 'red' } as const
 
 const chip = (active: boolean) =>
-  `inline-flex min-h-8 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-[13px] font-semibold transition-colors ${
+  `inline-flex min-h-10 lg:min-h-8 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-[13px] font-semibold transition-colors ${
     active ? 'border-brand-800 bg-brand-800 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
   }`
 
 /** Tombol ikon kecil di kolom Aksi (Ubah / Hapus). */
 const iconButton =
-  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900'
+  'flex h-10 w-10 lg:h-8 lg:w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900'
 
 // HP: chip digeser horizontal; sm ke atas: membungkus.
 const chipRow = '-mx-4 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0'
@@ -62,16 +62,16 @@ const CENTER = 'text-center'
  * nama (sisa ruang) | Standar | Jumlah | Selisih | Hasil | Kondisi/Aksi | ikon. Hanya tabel desktop.
  */
 const COL = {
-  standard: `${CENTER} md:w-24`,
-  quantity: `${CENTER} md:w-36`,
-  difference: `${CENTER} md:w-24`,
-  result: `${CENTER} md:w-32`,
-  extra: `${CENTER} md:w-48`,
-  icons: 'md:w-36 whitespace-nowrap text-right',
+  standard: `${CENTER} lg:w-24`,
+  quantity: `${CENTER} lg:w-36`,
+  difference: `${CENTER} lg:w-24`,
+  result: `${CENTER} lg:w-32`,
+  extra: `${CENTER} lg:w-48`,
+  icons: 'lg:w-36 whitespace-nowrap text-right',
 }
 
 /** Tombol sekunder kecil di judul bagian. */
-const compactButton = 'min-h-8! px-3! text-xs!'
+const compactButton = 'min-h-10! lg:min-h-8! px-3! text-xs!'
 
 const MAX_ASSET_CODES = 5
 const NOT_COUNTED_LABELS = { Dipinjam: 'sedang dipinjam', Perbaikan: 'dalam perbaikan', Hilang: 'hilang' } as const
@@ -109,7 +109,7 @@ function ConditionSummary({ group }: { group: RoomAssetGroup }) {
   if (group.assets.length === 1) return <ConditionBadge condition={group.assets[0].condition} />
 
   return (
-    <span className="flex flex-wrap gap-1 md:justify-center">
+    <span className="flex flex-wrap gap-1 lg:justify-center">
       {(Object.entries(group.conditions) as [Condition, number][]).map(([condition, count]) => (
         <span
           key={condition}
@@ -346,7 +346,7 @@ export default function RoomsPage() {
       header: '',
       className: COL.icons,
       cell: (g) => (
-        <div className="flex items-center gap-1 md:justify-end">
+        <div className="flex items-center gap-1 lg:justify-end">
           <button
             type="button"
             className={iconButton}
@@ -400,7 +400,7 @@ export default function RoomsPage() {
           <span className={`tabular-nums ${s.checked_at ? '' : 'text-slate-500'}`}>{s.recorded_quantity}</span>
           <button
             type="button"
-            className="block text-xs font-semibold text-brand-700 hover:underline md:mx-auto"
+            className="tap block text-xs font-semibold text-brand-700 hover:underline lg:mx-auto"
             onClick={() => setAdjusting(s)}
           >
             Catat perubahan
@@ -415,12 +415,12 @@ export default function RoomsPage() {
       cell: (s) => (
         <div className="space-y-1">
           {s.can_fill_from_stock && (
-            <Button variant="secondary" className="min-h-8! px-3! text-xs!" onClick={() => setFilling(s)}>
+            <Button variant="secondary" className="min-h-10! lg:min-h-8! px-3! text-xs!" onClick={() => setFilling(s)}>
               Isi dari stok
             </Button>
           )}
           {s.can_request && roomId && (
-            <Link to={requestUrl(roomId, s)} className="block text-xs font-semibold text-brand-700 hover:underline">Ajukan permintaan</Link>
+            <Link to={requestUrl(roomId, s)} className="tap block text-xs font-semibold text-brand-700 hover:underline">Ajukan permintaan</Link>
           )}
         </div>
       ),
@@ -429,7 +429,7 @@ export default function RoomsPage() {
       header: '',
       className: COL.icons,
       cell: (s) => (
-        <div className="flex items-center gap-1 md:justify-end">
+        <div className="flex items-center gap-1 lg:justify-end">
           <button
             type="button"
             className={iconButton}

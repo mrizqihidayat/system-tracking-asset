@@ -235,7 +235,7 @@ export default function AssetDetailPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <Link to="/daftar-aset" className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+          <Link to="/daftar-aset" className="tap inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
             <ArrowLeft size={14} /> Daftar Aset
           </Link>
           <div className="mt-2 flex flex-wrap items-center gap-2">

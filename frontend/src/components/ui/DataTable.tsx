@@ -3,9 +3,9 @@ import type { ReactNode } from 'react'
 import type { PaginationMeta } from '../../types/api'
 import { ListSkeletonItems, LoadingLabel, TableSkeletonRows } from './Skeleton'
 
-/** Tombol halaman: ikon saja, kecil, tanpa bingkai. */
+/** Tombol halaman: ikon saja, kecil, tanpa bingkai (40 px di HP/tablet agar mudah disentuh). */
 const PAGE_BUTTON =
-  'flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:pointer-events-none disabled:text-slate-300'
+  'flex h-10 w-10 lg:h-8 lg:w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:pointer-events-none disabled:text-slate-300'
 
 export interface Column<T> {
   header: string
@@ -16,7 +16,7 @@ export interface Column<T> {
   /** Isi judul kolom di tabel lebar (mis. kotak centang pilih semua); `header` tetap dipakai di kartu HP. */
   headerContent?: ReactNode
   /**
-   * Tampilan di layar sempit (< md), tempat tabel menjadi daftar kartu:
+   * Tampilan di layar sempit (< lg), tempat tabel menjadi daftar kartu (tablet: 2 kolom):
    * `title` = baris judul kartu (kiri atas), `badge` = pojok kanan atas,
    * `hidden` = tidak ditampilkan, kosong = baris "label: nilai".
    */
@@ -85,7 +85,7 @@ export default function DataTable<T>({
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white" aria-busy={skeleton || fetching || undefined}>
       {skeleton && <LoadingLabel />}
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden overflow-x-auto lg:block">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
             <tr>
@@ -132,14 +132,18 @@ export default function DataTable<T>({
         </table>
       </div>
 
-      <ul className={`divide-y divide-slate-100 md:hidden ${dim}`}>
+      {/* HP: satu kolom; tablet (md–lg): grid 2 kolom dengan garis pemisah antar kartu. */}
+      <ul className={`divide-slate-100 lg:hidden ${skeleton || empty ? 'divide-y' : 'max-md:divide-y md:grid md:grid-cols-2'} ${dim}`}>
         {skeleton ? (
           <ListSkeletonItems />
         ) : empty ? (
           <li className="px-4 py-10 text-center text-sm text-slate-500">{empty}</li>
         ) : (
           rows.map((row) => (
-            <li key={rowKey(row)} className="space-y-2.5 px-4 py-3.5 text-sm">
+            <li
+              key={rowKey(row)}
+              className="space-y-2.5 px-4 py-3.5 text-sm md:border-t md:border-slate-100 md:odd:border-r md:nth-[-n+2]:border-t-0"
+            >
               {(titleCols.length > 0 || badgeCols.length > 0) && (
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">

@@ -73,7 +73,7 @@ export default function AppLayout() {
         <div className="flex items-center justify-between pb-6">
           <Brand />
           <button
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#d3e2ee] hover:bg-white/10 lg:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-[#d3e2ee] hover:bg-white/10 lg:hidden"
             onClick={() => setOpen(false)}
             aria-label="Tutup menu"
           >

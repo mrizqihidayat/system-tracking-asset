@@ -114,7 +114,7 @@ export default function ConsumablesPage() {
           <span className="whitespace-nowrap font-semibold tabular-nums">
             {c.quantity} <span className="text-xs font-normal text-slate-500">{c.unit}</span>
           </span>
-          <button type="button" className="block whitespace-nowrap text-xs font-semibold text-brand-700 hover:underline md:mx-auto" onClick={() => setModal({ kind: 'transaction', item: c })}>
+          <button type="button" className="tap block whitespace-nowrap text-xs font-semibold text-brand-700 hover:underline lg:mx-auto" onClick={() => setModal({ kind: 'transaction', item: c })}>
             Catat transaksi
           </button>
         </>
@@ -130,11 +130,11 @@ export default function ConsumablesPage() {
         <>
           {c.provider_department?.name ?? '-'}
           {c.provider_department && !c.provider_department.is_internal && (c.open_request ? (
-            <Link to={openRequestUrl(c.open_request.id)} className="block whitespace-nowrap text-xs text-slate-500 hover:text-brand-700 hover:underline">
+            <Link to={openRequestUrl(c.open_request.id)} className="tap block whitespace-nowrap text-xs text-slate-500 hover:text-brand-700 hover:underline">
               Diajukan · {formatDate(c.open_request.created_at)}
             </Link>
           ) : c.status !== 'Aman' && (
-            <Link to={requestUrl(c)} className="block whitespace-nowrap text-xs font-semibold text-brand-700 hover:underline">
+            <Link to={requestUrl(c)} className="tap block whitespace-nowrap text-xs font-semibold text-brand-700 hover:underline">
               Ajukan permintaan
             </Link>
           ))}

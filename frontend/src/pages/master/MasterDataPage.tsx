@@ -44,8 +44,8 @@ interface Data {
 function RowActions({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) {
   return (
     <div className="flex shrink-0 gap-3 text-sm">
-      {onEdit && <button className="font-semibold text-brand-700 hover:underline" onClick={onEdit}>Ubah</button>}
-      {onDelete && <button className="font-semibold text-bad-700 hover:underline" onClick={onDelete}>Hapus</button>}
+      {onEdit && <button className="tap font-semibold text-brand-700 hover:underline" onClick={onEdit}>Ubah</button>}
+      {onDelete && <button className="tap font-semibold text-bad-700 hover:underline" onClick={onDelete}>Hapus</button>}
     </div>
   )
 }

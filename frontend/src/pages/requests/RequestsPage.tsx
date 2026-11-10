@@ -361,7 +361,7 @@ export default function RequestsPage() {
                       </div>
                       <Button
                         variant="secondary"
-                        className="min-h-8! shrink-0 px-3! text-xs!"
+                        className="min-h-10! lg:min-h-8! shrink-0 px-3! text-xs!"
                         onClick={() =>
                           setModal({
                             kind: 'request',

@@ -39,7 +39,7 @@ const assetCell = (l: Loan) =>
   l.asset ? (
     <span className="flex min-w-0 items-center gap-2">
       <AssetCode code={l.asset.code} />
-      <Link to={`/daftar-aset/${l.asset.id}`} className="truncate font-medium hover:text-brand-700 hover:underline">{l.asset.name}</Link>
+      <Link to={`/daftar-aset/${l.asset.id}`} className="tap min-w-0 font-medium hover:text-brand-700 hover:underline lg:truncate">{l.asset.name}</Link>
     </span>
   ) : '-'
 
@@ -51,7 +51,7 @@ const borrowerLine = (l: Loan) => (
   </span>
 )
 
-const compactButton = 'min-h-8! px-3! text-[13px]!'
+const compactButton = 'min-h-10! lg:min-h-8! px-3! text-[13px]!'
 
 export default function LoanPage() {
   const queryClient = useQueryClient()
@@ -118,14 +118,14 @@ export default function LoanPage() {
       header: 'Aksi',
       className: 'text-right',
       cell: (l) => (
-        <div className="flex items-center gap-1 md:justify-end">
-          <Button variant="secondary" className={`flex-1 md:flex-none ${compactButton}`} onClick={() => setModal({ kind: 'return', loan: l })}>
+        <div className="flex items-center gap-1 lg:justify-end">
+          <Button variant="secondary" className={`flex-1 lg:flex-none ${compactButton}`} onClick={() => setModal({ kind: 'return', loan: l })}>
             Terima kembali
           </Button>
           <DropdownMenu
             label="Aksi lainnya"
             trigger={<EllipsisVertical size={16} />}
-            triggerClassName="min-h-8! px-2!"
+            triggerClassName="min-h-10! px-3! lg:min-h-8! lg:px-2!"
             items={[{ label: 'Batalkan', danger: true, onClick: () => setModal({ kind: 'cancel', loan: l }) }]}
           />
         </div>
@@ -150,7 +150,7 @@ export default function LoanPage() {
       header: 'Status',
       mobile: 'badge',
       cell: (l) => (
-        <div className="flex flex-col items-end gap-1 md:flex-row md:flex-wrap md:items-center">
+        <div className="flex flex-col items-end gap-1 lg:flex-row lg:flex-wrap lg:items-center">
           <Badge color={statusColor[l.status]}>{l.status}</Badge>
           {l.status === 'Dikembalikan' && l.return_condition && l.return_condition !== 'Baik' && (
             <ConditionBadge condition={l.return_condition} />

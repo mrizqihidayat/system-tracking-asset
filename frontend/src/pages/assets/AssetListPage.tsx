@@ -216,16 +216,16 @@ export default function AssetListPage() {
 
       {/* Tabel lebar: pilih semua lewat kotak centang di judul kolom; baris ini hanya muncul saat ada pilihan.
           HP (kartu, tanpa judul kolom): tautan pilih semua tetap tampil. */}
-      <div className={`${selected.size > 0 ? 'flex' : 'flex md:hidden'} flex-wrap items-center gap-x-4 gap-y-1 text-sm`}>
+      <div className={`${selected.size > 0 ? 'flex' : 'flex lg:hidden'} flex-wrap items-center gap-x-4 gap-y-1 text-sm`}>
         <button
-          className="font-semibold text-brand-700 hover:underline disabled:text-slate-500 disabled:no-underline md:hidden"
+          className="font-semibold text-brand-700 hover:underline disabled:text-slate-500 disabled:no-underline tap lg:hidden"
           disabled={rows.length === 0}
           onClick={togglePage}
         >
           {allOnPage ? 'Batal pilih halaman ini' : 'Pilih semua di halaman ini'}
         </button>
         {selected.size > 0 && (
-          <button className="font-semibold text-brand-700 hover:underline" onClick={() => setSelected(new Set())}>
+          <button className="tap font-semibold text-brand-700 hover:underline" onClick={() => setSelected(new Set())}>
             Kosongkan pilihan ({selected.size})
           </button>
         )}

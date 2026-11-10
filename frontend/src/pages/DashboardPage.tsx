@@ -180,7 +180,7 @@ export default function DashboardPage() {
             <Muted className="px-5 pb-5">Tidak ada peminjaman yang jatuh tempo.</Muted>
           ) : (
             <>
-              <table className="hidden w-full text-left text-sm md:table">
+              <table className="hidden w-full text-left text-sm lg:table">
                 <thead className="border-y border-slate-100 bg-slate-50 text-xs text-slate-500">
                   <tr>
                     <th className="px-5 py-2.5 font-semibold">Kode</th>
@@ -205,7 +205,7 @@ export default function DashboardPage() {
                   ))}
                 </tbody>
               </table>
-              <ul className="divide-y divide-slate-100 border-t border-slate-100 md:hidden">
+              <ul className="divide-y divide-slate-100 border-t border-slate-100 lg:hidden">
                 {panels.loans_due.map((l) => (
                   <li key={l.id} className="space-y-1 px-5 py-3 text-sm">
                     <div className="flex items-start justify-between gap-3">
@@ -271,10 +271,10 @@ export default function DashboardPage() {
                       {complete} lengkap · {incomplete} kurang · {b.rooms_count} ruangan
                     </p>
                     {incomplete > 0 && (
-                      <ul className="space-y-1 pt-1 text-sm">
+                      <ul className="pt-1 text-sm lg:space-y-1">
                         {b.incomplete_rooms.map((r) => (
-                          <li key={r.id} className="flex items-center justify-between gap-3">
-                            <Link to={`/kelengkapan-ruangan/${b.slug}/${r.slug}`} className="min-w-0 truncate text-brand-700 hover:underline">
+                          <li key={r.id} className="flex min-h-10 items-center justify-between gap-3 lg:min-h-0">
+                            <Link to={`/kelengkapan-ruangan/${b.slug}/${r.slug}`} className="tap min-w-0 truncate text-brand-700 hover:underline">
                               {r.name}
                             </Link>
                             <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-bad-700">
@@ -322,7 +322,7 @@ export default function DashboardPage() {
               <ul className="divide-y divide-slate-100 border-t border-slate-100">
                 {panels.assets_need_service.map((a) => (
                   <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
-                    <Link to={`/daftar-aset/${a.id}`} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 hover:text-brand-700">
+                    <Link to={`/daftar-aset/${a.id}`} className="tap flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 hover:text-brand-700">
                       <AssetCode code={a.code} />
                       <span>{a.name}</span>
                     </Link>

@@ -51,7 +51,7 @@ export function TableSkeleton({ columns = 5, rows = 5 }: { columns?: number; row
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white" aria-busy="true">
       <LoadingLabel />
-      <table className="hidden w-full md:table">
+      <table className="hidden w-full lg:table">
         <thead className="border-b border-slate-200 bg-slate-50">
           <tr>
             {Array.from({ length: columns }, (_, c) => (
@@ -63,7 +63,7 @@ export function TableSkeleton({ columns = 5, rows = 5 }: { columns?: number; row
           <TableSkeletonRows columns={columns} rows={rows} />
         </tbody>
       </table>
-      <ul className="divide-y divide-slate-100 md:hidden">
+      <ul className="divide-y divide-slate-100 lg:hidden">
         <ListSkeletonItems rows={Math.min(rows, 4)} />
       </ul>
     </div>

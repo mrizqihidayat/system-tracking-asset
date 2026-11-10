@@ -22,7 +22,7 @@ function Info({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-0.5 truncate text-sm">{children}</dd>
+      <dd className="mt-0.5 text-sm lg:truncate">{children}</dd>
     </div>
   )
 }
@@ -75,7 +75,7 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
             <p className="flex min-w-0 items-center gap-2">
               {loan.asset && <AssetCode code={loan.asset.code} className="bg-white!" />}
-              <span className="truncate font-semibold">{loan.asset?.name}</span>
+              <span className="min-w-0 font-semibold lg:truncate">{loan.asset?.name}</span>
             </p>
             <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-slate-200 pt-2.5">
               <Info label="Peminjam">

@@ -81,3 +81,15 @@
     scrollbar-color: var(--color-slate-300) transparent;
   }
 }
+
+/* Tombol/tautan bergaya teks: area sentuh minimal 40 px di HP & tablet (< lg) tanpa mengubah tampilan. */
+@media (width < 64rem) {
+  .tap {
+    position: relative;
+  }
+  .tap::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc((100% - 40px) / 2));
+  }
+}
