@@ -120,7 +120,7 @@ export default function LoanPage() {
   // Pemesanan: Serahkan saat barang benar-benar diserahkan; status aset tetap sampai itu.
   const plannedColumns: Column<Loan>[] = [
     { header: 'Aset', mobile: 'title', cell: assetCell },
-    { header: 'Peminjam & departemen', cell: borrowerLine },
+    { header: 'Peminjam', cell: borrowerLine },
     { header: 'Tgl. rencana', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.borrow_date)}</span> },
     { header: 'Rencana kembali', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.due_date)}</span> },
     { header: 'Jadwal', mobile: 'badge', cell: (l) => <Schedule loan={l} /> },
@@ -146,7 +146,7 @@ export default function LoanPage() {
   const activeColumns: Column<Loan>[] = [
     { header: 'Aset', mobile: 'title', cell: assetCell },
     {
-      header: 'Peminjam & departemen',
+      header: 'Peminjam',
       cell: borrowerLine,
     },
     // Pemesanan yang sudah diserahkan: tanggal penyerahan sebenarnya.
