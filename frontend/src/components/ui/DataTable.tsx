@@ -48,6 +48,8 @@ interface Props<T> {
   /** Urutan aktif: `kunci` naik, `-kunci` turun, kosong = bawaan. */
   sort?: string
   onSortChange?: (sort: string) => void
+  /** Isi kartu khusus HP (< sm). Bila diisi, kartu dari kolom hanya tampil mulai sm (tablet). */
+  phoneCard?: (row: T) => ReactNode
 }
 
 /** Klik berulang: naik → turun → urutan bawaan. */
@@ -83,7 +85,7 @@ function CardFooter({ cells }: { cells: ReactNode[] }) {
 
 export default function DataTable<T>({
   columns, rows, rowKey, loading, fetching, emptyText = 'Belum ada data.', meta, unit = 'data', onPageChange,
-  sort, onSortChange, dense, fixedHeight,
+  sort, onSortChange, dense, fixedHeight, phoneCard,
 }: Props<T>) {
   const headPad = dense ? 'py-2' : 'py-2.5'
   const cellPad = dense ? 'py-2' : 'py-3'
@@ -157,46 +159,58 @@ export default function DataTable<T>({
         ) : empty ? (
           <li className="px-4 py-10 text-center text-sm text-slate-500">{empty}</li>
         ) : (
-          rows.map((row) => (
-            <li
-              key={rowKey(row)}
-              className="space-y-2.5 px-4 py-3.5 text-sm md:border-t md:border-slate-100 md:odd:border-r md:nth-[-n+2]:border-t-0"
-            >
-              {(titleCols.length > 0 || badgeCols.length > 0) && (
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
-                    {titleCols.map((c, i) => <div key={i}>{c.cell(row)}</div>)}
+          rows.map((row) => {
+            const body = (
+              <>
+                {(titleCols.length > 0 || badgeCols.length > 0) && (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      {titleCols.map((c, i) => <div key={i}>{c.cell(row)}</div>)}
+                    </div>
+                    {badgeCols.length > 0 && (
+                      <div className="flex shrink-0 items-center gap-2">
+                        {badgeCols.map((c, i) => <div key={i}>{c.cell(row)}</div>)}
+                      </div>
+                    )}
                   </div>
-                  {badgeCols.length > 0 && (
-                    <div className="flex shrink-0 items-center gap-2">
-                      {badgeCols.map((c, i) => <div key={i}>{c.cell(row)}</div>)}
-                    </div>
-                  )}
-                </div>
-              )}
-              {statCols.length > 0 && (
-                <dl className="flex flex-wrap gap-x-6 gap-y-2">
-                  {statCols.map((c, i) => (
-                    <div key={i} className="min-w-0">
-                      <dt className="text-xs text-slate-500">{c.header}</dt>
-                      <dd className="mt-0.5">{c.cell(row)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-              {detailCols.length > 0 && (
-                <dl className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] gap-x-3 gap-y-1.5">
-                  {detailCols.map((c, i) => (
-                    <div key={i} className="contents">
-                      {c.header && <dt className="text-slate-500">{c.header}</dt>}
-                      <dd className={`min-w-0 ${c.header ? '' : 'col-span-2'}`}>{c.cell(row)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-              {footerCols.length > 0 && <CardFooter cells={footerCols.map((c) => c.cell(row))} />}
-            </li>
-          ))
+                )}
+                {statCols.length > 0 && (
+                  <dl className="flex flex-wrap gap-x-6 gap-y-2">
+                    {statCols.map((c, i) => (
+                      <div key={i} className="min-w-0">
+                        <dt className="text-xs text-slate-500">{c.header}</dt>
+                        <dd className="mt-0.5">{c.cell(row)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {detailCols.length > 0 && (
+                  <dl className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] gap-x-3 gap-y-1.5">
+                    {detailCols.map((c, i) => (
+                      <div key={i} className="contents">
+                        {c.header && <dt className="text-slate-500">{c.header}</dt>}
+                        <dd className={`min-w-0 ${c.header ? '' : 'col-span-2'}`}>{c.cell(row)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {footerCols.length > 0 && <CardFooter cells={footerCols.map((c) => c.cell(row))} />}
+              </>
+            )
+            return (
+              <li
+                key={rowKey(row)}
+                className={`${phoneCard ? '' : 'space-y-2.5'} px-4 py-3.5 text-sm md:border-t md:border-slate-100 md:odd:border-r md:nth-[-n+2]:border-t-0`}
+              >
+                {phoneCard ? (
+                  <>
+                    <div className="sm:hidden">{phoneCard(row)}</div>
+                    <div className="space-y-2.5 max-sm:hidden">{body}</div>
+                  </>
+                ) : body}
+              </li>
+            )
+          })
         )}
       </ul>
 

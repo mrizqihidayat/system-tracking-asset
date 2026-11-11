@@ -1,4 +1,4 @@
-import { Clock, EllipsisVertical, History, Pencil, Plus, Trash2, TriangleAlert, Warehouse } from 'lucide-react'
+import { ChevronDown, Clock, EllipsisVertical, History, Pencil, Plus, Trash2, TriangleAlert, Warehouse } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
@@ -6,9 +6,11 @@ import ExportButton from '../../components/ExportButton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { Badge, ConditionBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { buttonClass } from '../../components/ui/button-class'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu from '../../components/ui/DropdownMenu'
 import { PageHeader } from '../../components/ui/Page'
+import Select from '../../components/ui/Select'
 import { LoadingLabel, Skeleton, TableSkeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
@@ -49,6 +51,52 @@ const selectorLabel = 'shrink-0 text-xs font-medium text-slate-500 sm:w-16 sm:pt
 
 /** Tombol menu ⋮ di kartu HP/tablet (pengganti ikon aksi tabel desktop). */
 const cardMenuTrigger = 'px-3!'
+
+/** Tombol ikon "+" 40 px di HP (pilih gedung/ruangan, judul bagian). */
+const phoneIconButton = 'w-10 px-0!'
+/** Tombol judul bagian: teks di tablet/desktop, ikon "+" 40 px di HP. */
+const sectionAddButton = 'max-sm:w-10 max-sm:px-0!'
+
+/** Lencana Hasil di kartu HP: "Kurang N" bila ada kekurangan. */
+function ResultBadge({ result, shortage }: { result: keyof typeof resultColor; shortage: number }) {
+  return <Badge color={resultColor[result]}>{result === 'Kurang' && shortage > 0 ? `Kurang ${shortage}` : result}</Badge>
+}
+
+/** Kondisi ringkas untuk kartu HP: satu aset → "Baik"; banyak → "2 Baik, 1 Rusak Ringan". */
+const conditionText = (g: RoomAssetGroup) =>
+  g.assets.length === 0
+    ? ''
+    : g.assets.length === 1
+      ? g.assets[0].condition
+      : (Object.entries(g.conditions) as [Condition, number][]).map(([condition, count]) => `${count} ${condition}`).join(', ')
+
+/**
+ * Kartu HP (< sm): baris 1 nama + lencana + menu ⋮, baris berikutnya ringkasan, lalu tombol aksi.
+ * Lencana & ⋮ dinaikkan sedikit agar sejajar dengan baris nama (tombol ⋮ setinggi 40 px).
+ */
+function PhoneCard({ title, badge, menu, children, actions }: {
+  title: string
+  badge?: ReactNode
+  menu: ReactNode
+  children: ReactNode
+  actions?: ReactNode
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="font-medium">{title}</p>
+          {children}
+        </div>
+        <div className="-mt-2.5 flex shrink-0 items-center gap-2">
+          {badge}
+          {menu}
+        </div>
+      </div>
+      {actions}
+    </div>
+  )
+}
 
 /** Form permintaan terisi barang, penyedia, ruangan, dan jumlah (bawaan = kekurangan). */
 const requestUrl = (roomId: number, s: RoomConsumable, quantity = s.shortage) => {
@@ -95,7 +143,7 @@ function AssetCodes({ group }: { group: RoomAssetGroup }) {
         : shown.map((a, i) => (
             <span key={a.id}>
               {i > 0 && ', '}
-              <Link to={`/daftar-aset/${a.id}`} className="hover:text-brand-700 hover:underline">{a.code}</Link>
+              <Link to={`/daftar-aset/${a.id}`} className="tap hover:text-brand-700 hover:underline">{a.code}</Link>
             </span>
           ))}
       {hidden.length > 0 && <span title={hidden.map((a) => a.code).join(', ')}> +{hidden.length}</span>}
@@ -325,6 +373,70 @@ export default function RoomsPage() {
     }
   }
 
+  // Menu ⋮ kartu HP & tablet (pengganti ikon aksi tabel desktop).
+  const assetMenu = (g: RoomAssetGroup) => (
+    <DropdownMenu
+      label={`Aksi ${g.asset_type.name}`}
+      trigger={<EllipsisVertical size={16} />}
+      triggerClassName={cardMenuTrigger}
+      items={[
+        { label: 'Atur standar', onClick: () => setStandardTarget({ kind: 'asset', group: g }) },
+        ...(g.standard_id !== null ? [{ label: 'Hapus standar', danger: true, onClick: () => setRemovingAsset(g) }] : []),
+      ]}
+    />
+  )
+  const consumableMenu = (s: RoomConsumable) => (
+    <DropdownMenu
+      label={`Aksi ${s.item_name}`}
+      trigger={<EllipsisVertical size={16} />}
+      triggerClassName={cardMenuTrigger}
+      items={[
+        { label: 'Kartu ruangan', onClick: () => setCard(s) },
+        { label: 'Ubah', onClick: () => setStandardTarget({ kind: 'consumable', row: s }) },
+        { label: 'Hapus', danger: true, onClick: () => setRemoving(s) },
+      ]}
+    />
+  )
+
+  // Kartu HP (< sm). Standar 0 → "{Ada} unit"; Selisih tidak tampil terpisah, lencana menunjukkan "Kurang N".
+  const assetPhoneCard = (g: RoomAssetGroup) => {
+    const amount = g.standard_quantity > 0 ? `${g.present_quantity} dari ${g.standard_quantity}` : `${g.present_quantity} unit`
+    const condition = conditionText(g)
+    return (
+      <PhoneCard
+        title={g.asset_type.name}
+        badge={g.result && <ResultBadge result={g.result} shortage={Math.max(0, g.standard_quantity - g.present_quantity)} />}
+        menu={assetMenu(g)}
+      >
+        <AssetCodes group={g} />
+        <p className="tabular-nums">{condition ? `${amount} · ${condition}` : amount}</p>
+      </PhoneCard>
+    )
+  }
+  // Aksi utama: Isi dari stok, atau Ajukan permintaan bila stok habis (backend tidak pernah mengizinkan keduanya).
+  const consumablePhoneCard = (s: RoomConsumable) => (
+    <PhoneCard
+      title={s.item_name}
+      badge={<ResultBadge result={s.result} shortage={s.shortage ?? 0} />}
+      menu={consumableMenu(s)}
+      actions={
+        <div className="flex flex-wrap gap-2">
+          {s.can_fill_from_stock ? (
+            <Button variant="secondary" className="flex-1" onClick={() => setFilling(s)}>Isi dari stok</Button>
+          ) : s.can_request && roomId ? (
+            <Link to={requestUrl(roomId, s)} className={buttonClass('secondary', 'flex-1')}>Ajukan permintaan</Link>
+          ) : null}
+          <Button variant="secondary" className="flex-1" onClick={() => setAdjusting(s)}>Ubah jumlah</Button>
+        </div>
+      }
+    >
+      <p className="text-xs text-slate-500">
+        Stok {s.consumable.quantity} {s.consumable.unit} · {s.consumable.provider_department?.name ?? '-'}
+      </p>
+      <p className="tabular-nums">{s.recorded_quantity} dari {s.standard_quantity}</p>
+    </PhoneCard>
+  )
+
   const assetColumns: Column<RoomAssetGroup>[] = [
     {
       header: 'Jenis aset',
@@ -346,23 +458,8 @@ export default function RoomsPage() {
       cell: (g) => (g.result ? <Badge color={resultColor[g.result]}>{g.result}</Badge> : <span className="text-slate-500">—</span>),
     },
     { ...conditionColumn, className: COL.extra, mobile: 'stat' },
-    // Kartu HP/tablet: ikon diganti menu ⋮ di samping lencana Hasil.
-    {
-      header: '',
-      mobile: 'badge',
-      cardOnly: true,
-      cell: (g) => (
-        <DropdownMenu
-          label={`Aksi ${g.asset_type.name}`}
-          trigger={<EllipsisVertical size={16} />}
-          triggerClassName={cardMenuTrigger}
-          items={[
-            { label: 'Atur standar', onClick: () => setStandardTarget({ kind: 'asset', group: g }) },
-            ...(g.standard_id !== null ? [{ label: 'Hapus standar', danger: true, onClick: () => setRemovingAsset(g) }] : []),
-          ]}
-        />
-      ),
-    },
+    // Kartu tablet: ikon diganti menu ⋮ di samping lencana Hasil.
+    { header: '', mobile: 'badge', cardOnly: true, cell: assetMenu },
     {
       header: '',
       className: COL.icons,
@@ -449,24 +546,8 @@ export default function RoomsPage() {
         </div>
       )),
     },
-    // Kartu HP/tablet: ikon diganti menu ⋮ di samping lencana Hasil.
-    {
-      header: '',
-      mobile: 'badge',
-      cardOnly: true,
-      cell: (s) => (
-        <DropdownMenu
-          label={`Aksi ${s.item_name}`}
-          trigger={<EllipsisVertical size={16} />}
-          triggerClassName={cardMenuTrigger}
-          items={[
-            { label: 'Kartu ruangan', onClick: () => setCard(s) },
-            { label: 'Ubah', onClick: () => setStandardTarget({ kind: 'consumable', row: s }) },
-            { label: 'Hapus', danger: true, onClick: () => setRemoving(s) },
-          ]}
-        />
-      ),
-    },
+    // Kartu tablet: ikon diganti menu ⋮ di samping lencana Hasil.
+    { header: '', mobile: 'badge', cardOnly: true, cell: consumableMenu },
     {
       header: '',
       className: COL.icons,
@@ -537,7 +618,7 @@ export default function RoomsPage() {
         }
       />
 
-      <section className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-4">
+      <section className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-4 max-sm:hidden">
         <div className={selectorRow}>
           <p className={selectorLabel}>Gedung</p>
           <div className={chipRow}>
@@ -577,14 +658,65 @@ export default function RoomsPage() {
         )}
       </section>
 
+      {/* HP: dropdown gedung & ruangan menggantikan deretan chip (daftar pilihan z-50, di atas header sticky). */}
+      <section className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2.5 rounded-xl border border-slate-200 bg-white p-4 sm:hidden">
+        <span className="text-xs font-medium text-slate-500">Gedung</span>
+        <Select aria-label="Gedung" value={building?.id ?? ''} onChange={(e) => {
+          const b = buildings.find((x) => x.id === Number(e.target.value))
+          if (b) navigate(b.rooms[0] ? `${BASE}/${b.slug}/${b.rooms[0].slug}` : `${BASE}/${b.slug}`)
+        }}>
+          <option value="">{buildings.length ? 'Pilih gedung' : 'Belum ada gedung'}</option>
+          {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </Select>
+        <Button variant="secondary" className={phoneIconButton} onClick={() => setModal('building')} aria-label="Tambah gedung">
+          <Plus size={18} />
+        </Button>
+        {building && (
+          <>
+            <span className="text-xs font-medium text-slate-500">Ruangan</span>
+            <Select aria-label="Ruangan" value={roomId ?? ''} onChange={(e) => {
+              const r = building.rooms.find((x) => x.id === Number(e.target.value))
+              if (r) navigate(`${BASE}/${building.slug}/${r.slug}`)
+            }}>
+              <option value="">{building.rooms.length ? 'Pilih ruangan' : 'Belum ada ruangan'}</option>
+              {building.rooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {/* Format "−N" sama dengan chip tablet/desktop; teks pendek agar tidak terpotong di kolom HP. */}
+                  {r.is_storage ? `${r.name} (gudang)` : r.shortage_items > 0 ? `${r.name} (−${r.shortage_items})` : r.name}
+                </option>
+              ))}
+            </Select>
+            <Button variant="secondary" className={phoneIconButton} onClick={() => setModal('room')} aria-label="Tambah ruangan">
+              <Plus size={18} />
+            </Button>
+          </>
+        )}
+      </section>
+
       {room && !isStorage && shortages > 0 && (
-        <div role="alert" className="flex items-start gap-3 rounded-xl border border-warn-700/40 bg-warn-50 px-4 py-3 text-sm text-warn-700">
-          <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden />
-          <p>
-            <b>{room.name} kurang {shortages} item.</b>
-            {consumableRows.some((s) => s.result === 'Kurang') && ' Barang habis pakai dapat diambil dari stok, atau ajukan permintaan jika stok habis.'}
-          </p>
-        </div>
+        <>
+          <div role="alert" className="flex items-start gap-3 rounded-xl border border-warn-700/40 bg-warn-50 px-4 py-3 text-sm text-warn-700 max-sm:hidden">
+            <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden />
+            <p>
+              <b>{room.name} kurang {shortages} item.</b>
+              {consumableRows.some((s) => s.result === 'Kurang') && ' Barang habis pakai dapat diambil dari stok, atau ajukan permintaan jika stok habis.'}
+            </p>
+          </div>
+          {/* HP: satu baris, penjelasan lengkap saat diketuk. */}
+          <div role="alert" className="sm:hidden">
+            <details className="group rounded-xl border border-warn-700/40 bg-warn-50 text-sm text-warn-700">
+              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-4 py-2 font-semibold [&::-webkit-details-marker]:hidden">
+                <TriangleAlert size={18} className="shrink-0" aria-hidden />
+                Kurang {shortages} item
+                <ChevronDown size={16} className="ml-auto shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <p className="px-4 pb-3">
+                <b>{room.name} kurang {shortages} item.</b>
+                {consumableRows.some((s) => s.result === 'Kurang') && ' Barang habis pakai dapat diambil dari stok, atau ajukan permintaan jika stok habis.'}
+              </p>
+            </details>
+          </div>
+        </>
       )}
 
       {room && isStorage && <StorageRoomView checklist={checklist} loading={!checklistReady} />}
@@ -595,13 +727,15 @@ export default function RoomsPage() {
             <SectionHeader
               title="Aset di ruangan"
               action={
-                <Button variant="secondary" className={compactButton} onClick={() => setStandardTarget({ kind: 'asset', group: null })}>
-                  <Plus size={14} /> Tambah standar jenis
+                <Button variant="secondary" className={`${compactButton} ${sectionAddButton}`} aria-label="Tambah standar jenis"
+                  onClick={() => setStandardTarget({ kind: 'asset', group: null })}>
+                  <Plus size={14} className="max-sm:size-4.5" /> <span className="max-sm:hidden">Tambah standar jenis</span>
                 </Button>
               }
             />
             <DataTable
               dense
+              phoneCard={assetPhoneCard}
               columns={assetColumns}
               rows={assetRows}
               rowKey={(g) => g.asset_type.id}
@@ -614,13 +748,15 @@ export default function RoomsPage() {
             <SectionHeader
               title="Barang habis pakai"
               action={
-                <Button variant="secondary" className={compactButton} onClick={() => setStandardTarget({ kind: 'consumable', row: null })}>
-                  <Plus size={14} /> Tambah barang
+                <Button variant="secondary" className={`${compactButton} ${sectionAddButton}`} aria-label="Tambah barang"
+                  onClick={() => setStandardTarget({ kind: 'consumable', row: null })}>
+                  <Plus size={14} className="max-sm:size-4.5" /> <span className="max-sm:hidden">Tambah barang</span>
                 </Button>
               }
             />
             <DataTable
               dense
+              phoneCard={consumablePhoneCard}
               columns={consumableColumns}
               rows={consumableRows}
               rowKey={(s) => s.id}
