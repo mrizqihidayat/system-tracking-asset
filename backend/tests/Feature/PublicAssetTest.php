@@ -69,6 +69,7 @@ class PublicAssetTest extends TestCase
             'next_service_date' => '2026-12-01',
             'finance_code' => 'FIN-001',
             'room_standard' => ['is_standard' => false, 'item_name' => null],
+            'upcoming_booking' => null,
             'actions' => ['pinjam', 'pindah_lokasi', 'catat_kerusakan', 'catat_kehilangan', 'catat_tidak_layak_pakai'],
         ]]);
 

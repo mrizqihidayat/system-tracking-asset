@@ -111,6 +111,13 @@ export default function AssetActionPanel({ asset, actions, matchedBy, initialAct
               {asset.active_loan.borrower_name}, {asset.active_loan.borrower_unit} · kembali {formatDate(asset.active_loan.due_date)}
             </Row>
           )}
+          {asset.upcoming_booking && (
+            <Row label="Dipesan">
+              Dipesan untuk {formatDate(asset.upcoming_booking.borrow_date)} · {asset.upcoming_booking.borrower_name},{' '}
+              {asset.upcoming_booking.borrower_unit}
+              {asset.upcoming_booking.is_unhanded && ' (belum diserahkan)'}
+            </Row>
+          )}
         </dl>
         {available.length > 0 && (
           <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">

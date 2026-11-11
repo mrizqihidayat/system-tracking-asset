@@ -225,6 +225,33 @@ export default function DashboardPage() {
           )}
         </Panel>
 
+        <Panel title="Jadwal penyerahan hari ini" link={{ to: '/peminjaman', label: 'Lihat pemesanan' }} flush>
+          {!panels ? (
+            <ListSkeleton />
+          ) : panels.handovers_today.length === 0 ? (
+            <Muted className="px-5 pb-5">Tidak ada jadwal penyerahan hari ini.</Muted>
+          ) : (
+            <ul className="divide-y divide-slate-100 border-t border-slate-100">
+              {panels.handovers_today.map((l) => (
+                <li key={l.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      {l.asset && <AssetCode code={l.asset.code} />}
+                      <span className="font-medium">{l.asset?.name}</span>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      {l.borrower_name} · {l.borrower_unit} · kembali {formatDate(l.due_date)}
+                    </span>
+                  </span>
+                  {l.is_unhanded
+                    ? <Badge color="red">{`Belum diserahkan · ${formatDate(l.borrow_date)}`}</Badge>
+                    : <Badge color="amber">Hari ini</Badge>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
         <Panel title="Permintaan ke departemen lain" link={{ to: '/permintaan', label: 'Kelola' }} flush>
           {!panels ? (
             <ListSkeleton />

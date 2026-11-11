@@ -1,6 +1,7 @@
 import type { Condition, Room, Status } from './asset'
 
-export type LoanStatus = 'Dipinjam' | 'Dikembalikan' | 'Dibatalkan' | 'Hilang'
+/** Direncanakan = pemesanan (tanggal pinjam di masa depan), aset tetap Tersedia sampai diserahkan. */
+export type LoanStatus = 'Direncanakan' | 'Dipinjam' | 'Dikembalikan' | 'Dibatalkan' | 'Hilang'
 
 export interface Loan {
   id: number
@@ -11,7 +12,11 @@ export interface Loan {
   destination_room: Room | null
   destination_note: string | null
   borrow_date: string
+  /** Tanggal barang benar-benar diserahkan (pemesanan yang sudah diserahkan). */
+  handover_date: string | null
   due_date: string
+  /** Direncanakan dan tanggal rencana sudah lewat. */
+  is_unhanded: boolean
   is_overdue: boolean
   is_due_today: boolean
   condition_out: Condition

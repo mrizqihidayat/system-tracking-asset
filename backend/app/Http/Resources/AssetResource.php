@@ -62,6 +62,15 @@ class AssetResource extends JsonResource
                 'due_date' => $this->activeLoan->due_date->toDateString(),
                 'is_overdue' => $this->activeLoan->due_date->lt(today()),
             ] : null),
+            // Pemesanan terdekat: "Dipesan untuk {tanggal}" (T31).
+            'upcoming_booking' => $this->whenLoaded('upcomingBooking', fn () => $this->upcomingBooking ? [
+                'id' => $this->upcomingBooking->id,
+                'borrower_name' => $this->upcomingBooking->borrower_name,
+                'borrower_unit' => $this->upcomingBooking->borrower_unit,
+                'borrow_date' => $this->upcomingBooking->borrow_date->toDateString(),
+                'due_date' => $this->upcomingBooking->due_date->toDateString(),
+                'is_unhanded' => $this->upcomingBooking->isUnhanded(),
+            ] : null),
             'previous_codes' => $this->whenLoaded('codeHistories', fn () => $this->codeHistories->map(fn (AssetCodeHistory $history) => [
                 'code' => $history->code,
                 'replaced_at' => $history->replaced_at->toIso8601String(),

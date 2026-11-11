@@ -4,6 +4,7 @@ import { FormField, Input } from '../../components/ui/FormField'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
+import { formatDate } from '../../lib/format'
 import type { Asset } from '../../types/asset'
 import AssetPicker, { type PickedAsset } from './AssetPicker'
 
@@ -32,6 +33,8 @@ export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Prop
   const [asset, setAsset] = useState<PickedAsset | null>(null)
   const [loadingAsset, setLoadingAsset] = useState(!!initialAssetId)
   const [form, setForm] = useState(emptyForm)
+  // Tanggal pinjam setelah hari ini → pemesanan (Direncanakan). Format YYYY-MM-DD bisa dibandingkan sebagai teks.
+  const planned = form.borrow_date > today()
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -76,7 +79,7 @@ export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Prop
         due_date: form.due_date,
         approval_number: form.approval_number.trim() || null,
       })
-      toast.success(`Peminjaman ${asset.code} tersimpan.`)
+      toast.success(planned ? `Pemesanan ${asset.code} untuk ${formatDate(form.borrow_date)} tersimpan.` : `Peminjaman ${asset.code} tersimpan.`)
       onSaved()
     } catch (error) {
       const fields = fieldErrors(error)
@@ -96,7 +99,7 @@ export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Prop
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Batal</Button>
-          <Button type="submit" form="loan-form" loading={saving}>Simpan peminjaman</Button>
+          <Button type="submit" form="loan-form" loading={saving}>{planned ? 'Simpan pemesanan' : 'Simpan peminjaman'}</Button>
         </>
       }
     >
@@ -110,7 +113,7 @@ export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Prop
         {loadingAsset ? (
           <p role="status" className="text-sm text-slate-500">Memuat aset…</p>
         ) : (
-          <AssetPicker asset={asset} onPick={setAsset} error={errors.asset_id} />
+          <AssetPicker asset={asset} onPick={setAsset} error={errors.asset_id} planned={planned} />
         )}
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -138,7 +141,10 @@ export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Prop
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Tanggal pinjam" error={errors.borrow_date}>
-            <Input type="date" value={form.borrow_date} max={today()} onChange={(e) => set('borrow_date', e.target.value)} error={errors.borrow_date} />
+            <Input type="date" value={form.borrow_date} onChange={(e) => set('borrow_date', e.target.value)} error={errors.borrow_date} />
+            {planned && !errors.borrow_date && (
+              <span className="block text-xs text-slate-500">Setelah hari ini: dicatat sebagai Direncanakan, aset tetap Tersedia sampai diserahkan.</span>
+            )}
           </FormField>
           <FormField label="Rencana kembali" required error={errors.due_date}>
             <Input type="date" value={form.due_date} min={form.borrow_date || undefined} onChange={(e) => set('due_date', e.target.value)} error={errors.due_date} />

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AssetCondition;
 use App\Enums\LoanStatus;
 use App\Support\Search;
+use Carbon\CarbonInterface;
 use Database\Factories\LoanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['asset_id', 'borrower_name', 'borrower_unit', 'purpose', 'destination_room_id', 'destination_note', 'borrow_date', 'due_date', 'condition_out', 'approval_number', 'approval_date', 'borrowed_by', 'status', 'return_date', 'return_condition', 'return_room_id', 'received_by', 'cancel_reason', 'note'])]
+#[Fillable(['asset_id', 'borrower_name', 'borrower_unit', 'purpose', 'destination_room_id', 'destination_note', 'borrow_date', 'handover_date', 'due_date', 'condition_out', 'approval_number', 'approval_date', 'borrowed_by', 'status', 'return_date', 'return_condition', 'return_room_id', 'received_by', 'cancel_reason', 'note'])]
 class Loan extends Model
 {
     /** @use HasFactory<LoanFactory> */
@@ -34,6 +35,7 @@ class Loan extends Model
     {
         return [
             'borrow_date' => 'date',
+            'handover_date' => 'date',
             'due_date' => 'date',
             'approval_date' => 'date',
             'return_date' => 'datetime',
@@ -100,6 +102,29 @@ class Loan extends Model
     }
 
     /**
+     * Belum diserahkan = Direncanakan dan tanggal rencana sudah lewat (tetap Direncanakan, T31).
+     */
+    public function isUnhanded(): bool
+    {
+        return $this->status === LoanStatus::Direncanakan && $this->borrow_date->lt(today());
+    }
+
+    /**
+     * Periode pemakaian aset untuk cek bentrok (tanggal, inklusif). Dipinjam mulai tanggal penyerahan
+     * (jika ada) dan, bila terlambat, dianggap berlanjut sampai hari ini karena barang belum kembali.
+     *
+     * @return array{0: CarbonInterface, 1: CarbonInterface}
+     */
+    public function occupiedPeriod(): array
+    {
+        if ($this->status === LoanStatus::Dipinjam) {
+            return [$this->handover_date ?? $this->borrow_date, $this->due_date->max(today())];
+        }
+
+        return [$this->borrow_date, $this->due_date];
+    }
+
+    /**
      * Jatuh tempo hari ini = Dipinjam dan rencana kembali = hari ini.
      */
     public function isDueToday(): bool
@@ -135,16 +160,20 @@ class Loan extends Model
     }
 
     /**
-     * Urutan daftar: aktif dulu (tempo terdekat), lalu terbaru.
+     * Urutan daftar: Direncanakan (tanggal rencana terdekat), lalu aktif (tempo terdekat), lalu terbaru.
      *
      * @param  Builder<Loan>  $query
      */
     #[Scope]
     protected function listOrder(Builder $query): void
     {
+        $planned = LoanStatus::Direncanakan->value;
+        $active = LoanStatus::Dipinjam->value;
+
         $query
-            ->orderByRaw('case when status = ? then 0 else 1 end', [LoanStatus::Dipinjam->value])
-            ->orderByRaw('case when status = ? then due_date end asc', [LoanStatus::Dipinjam->value])
+            ->orderByRaw('case when status = ? then 0 when status = ? then 1 else 2 end', [$planned, $active])
+            ->orderByRaw('case when status = ? then borrow_date end asc', [$planned])
+            ->orderByRaw('case when status = ? then due_date end asc', [$active])
             ->orderByDesc('borrow_date')
             ->orderByDesc('id');
     }
@@ -164,6 +193,17 @@ class Loan extends Model
     protected function overdue(Builder $query): void
     {
         $query->where('status', LoanStatus::Dipinjam->value)->whereDate('due_date', '<', today());
+    }
+
+    /**
+     * Jadwal penyerahan: Direncanakan bertanggal hari ini atau sudah lewat (Belum diserahkan).
+     *
+     * @param  Builder<Loan>  $query
+     */
+    #[Scope]
+    protected function handoverDue(Builder $query): void
+    {
+        $query->where('status', LoanStatus::Direncanakan->value)->whereDate('borrow_date', '<=', today());
     }
 
     /**

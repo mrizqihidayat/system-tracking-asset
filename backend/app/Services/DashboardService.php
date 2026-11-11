@@ -86,6 +86,7 @@ class DashboardService
     {
         return $this->remember('panels', fn () => [
             'loans_due' => LoanResource::collection($this->loansDue())->resolve($request),
+            'handovers_today' => LoanResource::collection($this->handoversToday())->resolve($request),
             'recent_requests' => SupplyRequestResource::collection($this->recentRequests())->resolve($request),
             'assets_need_service' => $this->assetsNeedService(),
             'low_stock' => ConsumableResource::collection($this->lowStock())->resolve($request),
@@ -211,6 +212,22 @@ class DashboardService
             ->whereDate('due_date', '<=', today())
             ->with(['asset', 'destinationRoom.building'])
             ->orderBy('due_date')
+            ->orderBy('id')
+            ->limit(self::PANEL_LIMIT)
+            ->get();
+    }
+
+    /**
+     * Jadwal penyerahan: pemesanan bertanggal hari ini + yang sudah lewat (Belum diserahkan), terlama dulu.
+     *
+     * @return Collection<int, Loan>
+     */
+    private function handoversToday(): Collection
+    {
+        return Loan::query()
+            ->handoverDue()
+            ->with(['asset', 'destinationRoom.building'])
+            ->orderBy('borrow_date')
             ->orderBy('id')
             ->limit(self::PANEL_LIMIT)
             ->get();

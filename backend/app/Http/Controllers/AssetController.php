@@ -35,6 +35,7 @@ class AssetController extends Controller
         'sourceDepartment',
         'room.building',
         'activeLoan.destinationRoom.building',
+        'upcomingBooking',
         'latestLoan',
     ];
 

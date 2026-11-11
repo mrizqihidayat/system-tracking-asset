@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\PaginatesList;
 use App\Http\Requests\CancelLoanRequest;
+use App\Http\Requests\HandOverLoanRequest;
 use App\Http\Requests\IndexLoanRequest;
 use App\Http\Requests\ReturnLoanRequest;
 use App\Http\Requests\StoreLoanRequest;
@@ -57,6 +58,16 @@ class LoanController extends Controller
         $loan = $request->isLost()
             ? $this->loans->markLost($loan, $data['return_date'] ?? null, $data['note'], $request->user())
             : $this->loans->giveBack($loan, $data, $request->user());
+
+        return LoanResource::make($loan->load($this->relations()));
+    }
+
+    /**
+     * Serahkan pemesanan Direncanakan → Dipinjam (T31).
+     */
+    public function handOver(HandOverLoanRequest $request, Loan $loan): LoanResource
+    {
+        $loan = $this->loans->handOver($loan, $request->validated('handover_date'), $request->user());
 
         return LoanResource::make($loan->load($this->relations()));
     }

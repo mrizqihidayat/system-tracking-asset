@@ -14,6 +14,7 @@ class AssetScanController extends Controller
         'sourceDepartment',
         'room.building',
         'activeLoan.destinationRoom.building',
+        'upcomingBooking',
         'latestLoan',
         'codeHistories',
     ];

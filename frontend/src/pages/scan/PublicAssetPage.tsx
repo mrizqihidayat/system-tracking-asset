@@ -27,6 +27,8 @@ interface PublicAsset {
   next_service_date: string | null
   finance_code: string | null
   room_standard: { is_standard: boolean; item_name: string | null }
+  /** Pemesanan terdekat, tanpa data peminjam. */
+  upcoming_booking: { borrow_date: string } | null
   actions: string[]
 }
 
@@ -102,6 +104,9 @@ export default function PublicAssetPage() {
                     ? `Dipinjam · ${loc.room ? `${loc.room}, ${loc.building}` : (loc.note ?? '')}`
                     : `${asset.room}, ${asset.building}`}
                 </Row>
+                {asset.upcoming_booking && (
+                  <Row label="Pemesanan">Dipesan untuk {formatDate(asset.upcoming_booking.borrow_date)}</Row>
+                )}
                 <Row label="Penanggung jawab">{asset.pic_name}</Row>
                 <Row label="Tanggal perolehan">{asset.acquisition_date ? formatDate(asset.acquisition_date) : null}</Row>
                 <Row label="Servis berikutnya">{asset.next_service_date ? formatDate(asset.next_service_date) : null}</Row>

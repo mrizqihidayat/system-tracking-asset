@@ -25,6 +25,8 @@ export interface DashboardReadiness {
 
 export interface DashboardPanels {
   loans_due: Loan[]
+  /** Pemesanan bertanggal hari ini + yang sudah lewat (Belum diserahkan). */
+  handovers_today: Loan[]
   recent_requests: SupplyRequest[]
   assets_need_service: {
     id: number

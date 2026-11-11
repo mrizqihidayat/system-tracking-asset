@@ -29,6 +29,7 @@ Enum event_type {
 }
 
 Enum loan_status {
+  Direncanakan [note: 'pemesanan: tanggal pinjam di masa depan, aset tetap Tersedia (T31)']
   Dipinjam
   Dikembalikan
   Dibatalkan
@@ -201,9 +202,10 @@ Table loans {
   purpose varchar(255) [not null, note: 'keperluan/kegiatan']
   destination_room_id bigint [ref: > rooms.id]
   destination_note varchar(255) [note: 'lokasi tujuan di luar daftar ruangan']
-  borrow_date date [not null]
+  borrow_date date [not null, note: 'tanggal pinjam; untuk pemesanan = tanggal rencana (tidak berubah saat Serahkan)']
+  handover_date date [note: 'tanggal penyerahan sebenarnya saat Serahkan pemesanan (T31)']
   due_date date [not null]
-  condition_out asset_condition [not null, note: 'otomatis dari kondisi aset saat dipinjam']
+  condition_out asset_condition [not null, note: 'otomatis dari kondisi aset saat dipinjam / diserahkan']
   approval_number varchar(100) [note: 'no. / tanggal approval, satu kolom teks bebas di form']
   approval_date date [note: 'data lama & API; form tidak lagi mengisi']
   borrowed_by bigint [not null, ref: > users.id, note: 'staf pencatat']
@@ -222,7 +224,7 @@ Table loans {
   created_at timestamp
   updated_at timestamp
 
-  Note: 'Maksimal satu loan berstatus Dipinjam per aset (partial unique index)'
+  Note: 'Maksimal satu loan berstatus Dipinjam per aset (partial unique index). Periode Direncanakan/Dipinjam per aset tidak boleh tumpang tindih (dicek di LoanService di bawah lock aset).'
 }
 
 Table request_catalog {

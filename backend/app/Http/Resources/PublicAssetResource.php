@@ -50,6 +50,10 @@ class PublicAssetResource extends JsonResource
                 'is_standard' => $standard !== null,
                 'item_name' => $standard?->item_name,
             ],
+            // "Dipesan untuk {tanggal}" tanpa data peminjam (T31).
+            'upcoming_booking' => $this->upcomingBooking ? [
+                'borrow_date' => $this->upcomingBooking->borrow_date->toDateString(),
+            ] : null,
             'actions' => $this->status->allowedActions(),
         ];
     }

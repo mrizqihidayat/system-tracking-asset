@@ -80,7 +80,7 @@ class DashboardTest extends TestCase
         $data = $this->dashboard();
 
         $this->assertSame(['total_assets', 'active_loans', 'needs_repair', 'incomplete_rooms', 'needs_service', 'low_stock'], array_keys($data['cards']));
-        $this->assertSame(['room_readiness', 'loans_due', 'recent_requests', 'assets_need_service', 'low_stock'], array_keys($data['panels']));
+        $this->assertSame(['room_readiness', 'loans_due', 'handovers_today', 'recent_requests', 'assets_need_service', 'low_stock'], array_keys($data['panels']));
         $this->assertSame(['total' => 0, 'owned_by_shd' => 0, 'from_other_units' => 0, 'not_feasible' => 0], $data['cards']['total_assets']);
         $this->assertSame(1, $data['cards']['incomplete_rooms']['total_rooms']);
         $this->assertSame(0, $data['cards']['incomplete_rooms']['incomplete']);

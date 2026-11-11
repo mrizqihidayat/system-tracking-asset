@@ -207,6 +207,19 @@ class Asset extends Model
     }
 
     /**
+     * Pemesanan Direncanakan terdekat (tanggal rencana paling awal, termasuk yang Belum diserahkan), T31.
+     *
+     * @return HasOne<Loan, $this>
+     */
+    public function upcomingBooking(): HasOne
+    {
+        return $this->hasOne(Loan::class)->ofMany(
+            ['borrow_date' => 'min', 'id' => 'min'],
+            fn ($query) => $query->where('status', LoanStatus::Direncanakan->value),
+        );
+    }
+
+    /**
      * Kolom Daftar Aset dalam satu query (subselect, bukan eager load): setiap query tambahan berarti
      * satu perjalanan lagi ke database.
      *

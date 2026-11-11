@@ -95,6 +95,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/loans', [LoanController::class, 'store']);
     Route::get('/loans/{loan}', [LoanController::class, 'show'])->whereNumber('loan');
     Route::patch('/loans/{loan}/return', [LoanController::class, 'giveBack'])->whereNumber('loan');
+    Route::patch('/loans/{loan}/hand-over', [LoanController::class, 'handOver'])->whereNumber('loan');
     Route::patch('/loans/{loan}/cancel', [LoanController::class, 'cancel'])->whereNumber('loan');
 
     // Kelengkapan ruangan (SPEC §8); standar diisi manual per ruangan (tanpa salin)

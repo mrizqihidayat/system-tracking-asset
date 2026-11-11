@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, EllipsisVertical, FileText, ImageOff, Pencil, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarClock, ChevronDown, ChevronRight, EllipsisVertical, FileText, ImageOff, Pencil, TriangleAlert } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -269,6 +269,18 @@ export default function AssetDetailPage() {
           <p>
             Hilang saat dipinjam oleh <b>{asset.lost_during_loan.borrower_name}</b>, {asset.lost_during_loan.borrower_unit},{' '}
             {formatDate(asset.lost_during_loan.date)}.
+          </p>
+        </div>
+      )}
+
+      {asset.upcoming_booking && (
+        <div className="flex items-start gap-3 rounded-xl bg-info-50 px-4 py-3 text-sm text-info-700">
+          <CalendarClock size={18} className="mt-0.5 shrink-0" aria-hidden />
+          <p>
+            <b>Dipesan untuk {formatDate(asset.upcoming_booking.borrow_date)}</b> oleh {asset.upcoming_booking.borrower_name},{' '}
+            {asset.upcoming_booking.borrower_unit} (rencana kembali {formatDate(asset.upcoming_booking.due_date)})
+            {asset.upcoming_booking.is_unhanded && ' · belum diserahkan'}.{' '}
+            <Link to="/peminjaman" className="font-semibold underline">Lihat pemesanan</Link>
           </p>
         </div>
       )}

@@ -11,7 +11,7 @@ import { useAnchoredPanel } from '../../components/ui/useAnchoredPanel'
 import { api, errorMessage } from '../../lib/api'
 import { Scanner } from '../../lib/qr-scanner'
 import type { Paginated } from '../../types/api'
-import type { Asset, AssetListItem } from '../../types/asset'
+import type { Asset, AssetListItem, Status } from '../../types/asset'
 import { useScanLookup } from '../scan/useScanLookup'
 
 /** Saran memakai baris daftar, Enter/Scan memakai data lengkap; form hanya butuh field bersama ini. */
@@ -21,6 +21,7 @@ interface Props {
   asset: PickedAsset | null
   onPick: (asset: PickedAsset | null) => void
   error?: string
+  planned?: boolean
 }
 
 const MIN_CHARS = 2
@@ -29,8 +30,14 @@ const PAGE_SIZE = 100
 /** Tinggi satu saran (kode + nama + lokasi), untuk menilai apakah daftar muat di bawah kolom. */
 const OPTION_HEIGHT = 60
 
-/** "Aset dipinjam": ketik kode (saran aset Tersedia muncul di bawahnya) atau scan QR; hanya aset yang boleh dipinjam yang diterima. */
-export default function AssetPicker({ asset, onPick, error }: Props) {
+/** Status aset yang boleh dipesan untuk tanggal mendatang (dicek ulang backend; saat Serahkan aset wajib Tersedia). */
+const BOOKABLE: readonly Status[] = ['Tersedia', 'Dipinjam', 'Perbaikan']
+
+/**
+ * "Aset dipinjam": ketik kode (saran aset Tersedia muncul di bawahnya) atau scan QR; hanya aset yang boleh dipinjam yang diterima.
+ * `planned` (tanggal pinjam di masa depan): aset Dipinjam/Perbaikan juga boleh dipilih untuk pemesanan.
+ */
+export default function AssetPicker({ asset, onPick, error, planned = false }: Props) {
   const toast = useToast()
   const { lookup, loading } = useScanLookup()
   const [text, setText] = useState('')
@@ -52,10 +59,10 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
         const items: AssetListItem[] = []
         for (let page = 1, lastPage = 1; page <= lastPage; page++) {
           const res = await api.get<Paginated<AssetListItem>>('/assets', {
-            params: { search: query, status: 'Tersedia', per_page: PAGE_SIZE, page },
+            params: { search: query, status: planned ? undefined : 'Tersedia', per_page: PAGE_SIZE, page },
             signal: controller.signal,
           })
-          items.push(...res.data.data)
+          items.push(...(planned ? res.data.data.filter((a) => BOOKABLE.includes(a.status)) : res.data.data))
           lastPage = res.data.meta.last_page
         }
         setSuggestions({ query, items })
@@ -68,7 +75,7 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
       controller.abort()
       clearTimeout(t)
     }
-  }, [query])
+  }, [query, planned])
 
   const items = query.length >= MIN_CHARS && suggestions?.query === query ? suggestions.items : []
   const showList = open && query.length >= MIN_CHARS && suggestions?.query === query
@@ -91,8 +98,8 @@ export default function AssetPicker({ asset, onPick, error }: Props) {
     if (!raw.trim() || loading) return
     try {
       const result = await lookup(raw)
-      if (!result.actions.includes('pinjam')) {
-        toast.error(`${result.asset.code} berstatus ${result.asset.status}, tidak dapat dipinjam.`)
+      if (planned ? !BOOKABLE.includes(result.asset.status) : !result.actions.includes('pinjam')) {
+        toast.error(`${result.asset.code} berstatus ${result.asset.status}, tidak dapat ${planned ? 'dipesan' : 'dipinjam'}.`)
         return
       }
       pick(result.asset)

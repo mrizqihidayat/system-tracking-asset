@@ -72,6 +72,7 @@ class LoanTest extends TestCase
             'store' => ['POST', '/api/loans'],
             'show' => ['GET', '/api/loans/1'],
             'return' => ['PATCH', '/api/loans/1/return'],
+            'hand-over' => ['PATCH', '/api/loans/1/hand-over'],
             'cancel' => ['PATCH', '/api/loans/1/cancel'],
         ];
     }
@@ -134,12 +135,6 @@ class LoanTest extends TestCase
     public function test_borrow_date_rules(): void
     {
         $asset = $this->asset();
-
-        $this->postJson('/api/loans', $this->borrowPayload($asset, ['borrow_date' => today()->addDay()->toDateString(), 'due_date' => today()->addDays(2)->toDateString()]))
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['borrow_date' => 'Tanggal pinjam tidak boleh di masa depan.']);
-
-        $this->assertSame(AssetStatus::Tersedia, $asset->fresh()->status);
 
         $this->postJson('/api/loans', $this->borrowPayload($asset, ['borrow_date' => today()->subDays(2)->toDateString(), 'due_date' => today()->subDays(3)->toDateString()]))
             ->assertUnprocessable()
@@ -416,7 +411,7 @@ class LoanTest extends TestCase
 
         $this->patchJson("/api/loans/{$loan->id}/cancel", ['cancel_reason' => 'Batal lagi'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['loan' => 'Transaksi tidak berstatus Dipinjam.']);
+            ->assertJsonValidationErrors(['loan' => 'Transaksi tidak berstatus Dipinjam atau Direncanakan.']);
     }
 
     public function test_show_and_missing_loan(): void

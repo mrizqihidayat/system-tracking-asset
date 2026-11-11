@@ -19,12 +19,21 @@ import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
 import type { Loan, LoanStatus } from '../../types/loan'
 import CancelLoanModal from './CancelLoanModal'
+import HandOverModal from './HandOverModal'
 import LoanFormModal from './LoanFormModal'
 import ReturnLoanModal from './ReturnLoanModal'
 
-type ModalState = { kind: 'return' | 'cancel'; loan: Loan } | { kind: 'borrow' } | null
+type ModalState = { kind: 'return' | 'cancel' | 'handover'; loan: Loan } | { kind: 'borrow' } | null
 
-const statusColor = { Dipinjam: 'blue', Dikembalikan: 'green', Dibatalkan: 'slate', Hilang: 'red' } as const
+const statusColor = { Direncanakan: 'amber', Dipinjam: 'blue', Dikembalikan: 'green', Dibatalkan: 'slate', Hilang: 'red' } as const
+
+/** Jadwal pemesanan: "Belum diserahkan" (tanggal lewat) / "Hari ini" / "N hari lagi" dari tanggal rencana. */
+function Schedule({ loan }: { loan: Loan }) {
+  if (loan.is_unhanded) return <Badge color="red">Belum diserahkan</Badge>
+  const days = Math.round((new Date(`${loan.borrow_date}T00:00:00`).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000)
+  if (days <= 0) return <Badge color="amber">Hari ini</Badge>
+  return <span className="whitespace-nowrap text-slate-600">{days} hari lagi</span>
+}
 
 /** "Hari ini" / "N hari lagi" / "Terlambat N hari" dari rencana kembali. */
 function Tempo({ loan }: { loan: Loan }) {
@@ -60,11 +69,13 @@ export default function LoanPage() {
   const returnLoanId = params.get('return_loan_id')
   const borrowAssetId = params.get('asset_id')
   const [modal, setModal] = useState<ModalState>(null)
+  const plannedList = useListParams(listConfigs.plannedLoans)
   const activeList = useListParams(listConfigs.activeLoans)
   const historyList = useListParams(listConfigs.loanHistory)
+  const planned = useLoans(plannedList.params)
   const active = useLoans(activeList.params)
   const history = useLoans(historyList.params)
-  useErrorToast(active.error, history.error)
+  useErrorToast(planned.error, active.error, history.error)
 
   const status = historyList.get('status')
   const search = historyList.searchText
@@ -106,13 +117,40 @@ export default function LoanPage() {
   // sampai popup ditutup atau disimpan, lalu dihapus tanpa menambah riwayat browser (closeModal).
   const borrowOpen = modal?.kind === 'borrow' || !!borrowAssetId
 
+  // Pemesanan: Serahkan saat barang benar-benar diserahkan; status aset tetap sampai itu.
+  const plannedColumns: Column<Loan>[] = [
+    { header: 'Aset', mobile: 'title', cell: assetCell },
+    { header: 'Peminjam & departemen', cell: borrowerLine },
+    { header: 'Tgl. rencana', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.borrow_date)}</span> },
+    { header: 'Rencana kembali', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.due_date)}</span> },
+    { header: 'Jadwal', mobile: 'badge', cell: (l) => <Schedule loan={l} /> },
+    {
+      header: 'Aksi',
+      className: 'text-right',
+      cell: (l) => (
+        <div className="flex items-center gap-1 lg:justify-end">
+          <Button variant="secondary" className={`flex-1 lg:flex-none ${compactButton}`} onClick={() => setModal({ kind: 'handover', loan: l })}>
+            Serahkan
+          </Button>
+          <DropdownMenu
+            label="Aksi lainnya"
+            trigger={<EllipsisVertical size={16} />}
+            triggerClassName="min-h-10! px-3! lg:min-h-8! lg:px-2!"
+            items={[{ label: 'Batalkan', danger: true, onClick: () => setModal({ kind: 'cancel', loan: l }) }]}
+          />
+        </div>
+      ),
+    },
+  ]
+
   const activeColumns: Column<Loan>[] = [
     { header: 'Aset', mobile: 'title', cell: assetCell },
     {
       header: 'Peminjam & departemen',
       cell: borrowerLine,
     },
-    { header: 'Tgl. pinjam', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.borrow_date)}</span> },
+    // Pemesanan yang sudah diserahkan: tanggal penyerahan sebenarnya.
+    { header: 'Tgl. pinjam', cell: (l) => <span className="whitespace-nowrap">{formatDate(l.handover_date ?? l.borrow_date)}</span> },
     { header: 'Tempo', mobile: 'badge', cell: (l) => <Tempo loan={l} /> },
     {
       header: 'Aksi',
@@ -152,6 +190,7 @@ export default function LoanPage() {
       cell: (l) => (
         <div className="flex flex-col items-end gap-1 lg:flex-row lg:flex-wrap lg:items-center">
           <Badge color={statusColor[l.status]}>{l.status}</Badge>
+          {l.is_unhanded && <Badge color="red">Belum diserahkan</Badge>}
           {l.status === 'Dikembalikan' && l.return_condition && l.return_condition !== 'Baik' && (
             <ConditionBadge condition={l.return_condition} />
           )}
@@ -176,6 +215,28 @@ export default function LoanPage() {
       />
 
       {returnLoanId && <p role="status" className="text-sm text-slate-500">Memuat peminjaman…</p>}
+
+      {/* Disembunyikan bila tidak ada pemesanan. */}
+      {(planned.isPending || (planned.data?.meta.total ?? 0) > 0) && (
+        <section className="space-y-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-semibold">Direncanakan</h2>
+            <span className="text-sm text-slate-500">{planned.data?.meta.total ?? 0} pemesanan</span>
+          </div>
+          <DataTable
+            columns={plannedColumns}
+            rows={planned.data?.data ?? []}
+            rowKey={(l) => l.id}
+            loading={planned.isPending}
+            fetching={planned.isPlaceholderData}
+            emptyText="Tidak ada pemesanan."
+            meta={planned.data?.meta}
+            unit="pemesanan"
+            onPageChange={plannedList.setPage}
+            dense
+          />
+        </section>
+      )}
 
       <section className="space-y-2">
         <div className="flex items-baseline justify-between gap-3">
@@ -211,6 +272,7 @@ export default function LoanPage() {
           </div>
           <Select clearable className="sm:w-auto" value={status} onChange={(e) => historyList.setFilter('status', e.target.value as LoanStatus | '')} aria-label="Status">
             <option value="">Semua status</option>
+            <option>Direncanakan</option>
             <option>Dipinjam</option>
             <option>Dikembalikan</option>
             <option>Dibatalkan</option>
@@ -236,6 +298,7 @@ export default function LoanPage() {
       {borrowOpen && <LoanFormModal key={borrowAssetId ?? 'baru'} initialAssetId={borrowAssetId} onClose={closeModal} onSaved={done} />}
       {modal?.kind === 'return' && <ReturnLoanModal loan={modal.loan} onClose={closeModal} onDone={done} />}
       {modal?.kind === 'cancel' && <CancelLoanModal loan={modal.loan} onClose={closeModal} onDone={done} />}
+      {modal?.kind === 'handover' && <HandOverModal loan={modal.loan} onClose={closeModal} onDone={done} />}
     </div>
   )
 }

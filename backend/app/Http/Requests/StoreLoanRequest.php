@@ -14,7 +14,8 @@ class StoreLoanRequest extends FormRequest
 
     /**
      * Kondisi keluar tidak diinput (otomatis dari kondisi aset). Tanggal pinjam boleh lampau
-     * (pencatatan terlambat), tidak boleh di masa depan; batas "sebelum aset terdaftar" di LoanService.
+     * (pencatatan terlambat) atau masa depan (pemesanan → Direncanakan, T31); batas "sebelum aset terdaftar"
+     * dan cek bentrok di LoanService.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -27,7 +28,7 @@ class StoreLoanRequest extends FormRequest
             'purpose' => ['required', 'string', 'max:255'],
             'destination_room_id' => ['nullable', 'integer', 'exists:rooms,id'],
             'destination_note' => ['nullable', 'string', 'max:255'],
-            'borrow_date' => ['nullable', 'date', 'before_or_equal:today'],
+            'borrow_date' => ['nullable', 'date'],
             'due_date' => ['required', 'date', 'after_or_equal:'.($this->input('borrow_date') ?: 'today')],
             'approval_number' => ['nullable', 'string', 'max:100'],
             'approval_date' => ['nullable', 'date'],
@@ -41,7 +42,6 @@ class StoreLoanRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'borrow_date.before_or_equal' => 'Tanggal pinjam tidak boleh di masa depan.',
             'due_date.after_or_equal' => 'Rencana kembali tidak boleh sebelum tanggal pinjam.',
             'condition_out.prohibited' => 'Kondisi saat keluar diisi otomatis dari kondisi aset.',
         ];

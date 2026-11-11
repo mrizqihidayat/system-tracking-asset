@@ -138,15 +138,28 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Tabel Sedang dipinjam + tempo, Riwayat + filter; tombol + Catat peminjaman]
+    A([Mulai]) --> B[Tabel Direncanakan + jadwal, Sedang dipinjam + tempo, Riwayat + filter; tombol + Catat peminjaman]
     B --> C{Pilih proses}
     C -- Catat peminjaman --> P1[Popup form: aset terisi dari detail / scan, atau ketik kode / scan kamera]
-    P1 --> P2{Aset ada & Tersedia?}
-    P2 -- Tidak --> P3[Pesan aset tidak dapat dipinjam] --> P1
-    P2 -- Ya --> P4[Input peminjam, departemen, keperluan, lokasi tujuan teks bebas, tgl pinjam default hari ini, rencana kembali, no. approval; kondisi keluar otomatis]
-    P4 --> P5{Tgl pinjam tidak di masa depan & tidak sebelum aset terdaftar; rencana kembali >= tgl pinjam?}
+    P1 --> P4[Input peminjam, departemen, keperluan, lokasi tujuan teks bebas, tgl pinjam default hari ini, rencana kembali, no. approval; kondisi keluar otomatis]
+    P4 --> P5{Tgl pinjam tidak sebelum aset terdaftar; rencana kembali >= tgl pinjam?}
     P5 -- Tidak --> P4
-    P5 -- Ya --> P6[(Transaksi Dipinjam, status aset Dipinjam, riwayat Dipinjam)] --> B
+    P5 -- Ya --> P7{Tgl pinjam > hari ini?}
+    P7 -- Ya, pemesanan --> Q1{Aset bukan Hilang / Tidak Layak Pakai?}
+    P7 -- Tidak --> P2{Aset Tersedia?}
+    P2 -- Tidak --> P3[Pesan aset tidak dapat dipinjam / dipesan] --> P1
+    Q1 -- Tidak --> P3
+    P2 -- Ya --> P8{Periode bentrok dengan Direncanakan / Dipinjam lain?}
+    Q1 -- Ya --> P9{Periode bentrok dengan Direncanakan / Dipinjam lain?}
+    P8 -- Ya --> P10[422: sebut peminjam & periode yang bentrok] --> P4
+    P9 -- Ya --> P10
+    P8 -- Tidak --> P6[(Transaksi Dipinjam, status aset Dipinjam, riwayat Dipinjam)] --> B
+    P9 -- Tidak --> Q2[(Transaksi Direncanakan; status aset & kelengkapan ruangan tidak berubah; tanpa riwayat aset)] --> B
+    C -- Serahkan pemesanan --> S1[Modal: tanggal penyerahan default hari ini, tidak di masa depan, boleh sebelum / setelah tgl rencana]
+    S1 --> S2{Aset Tersedia & periode penyerahan s.d. rencana kembali tidak bentrok?}
+    S2 -- Tidak --> S3[Pesan alasan; tetap Direncanakan] --> B
+    S2 -- Ya --> S4[(Transaksi Dipinjam + tanggal penyerahan, kondisi keluar diperbarui, status aset Dipinjam, riwayat Dipinjam)] --> B
+    C -- Batalkan pemesanan --> Q3[Alasan wajib] --> Q4[(Transaksi Dibatalkan; status aset tidak berubah, tanpa riwayat aset)] --> B
     C -- Terima kembali --> R1[Modal terima kembali]
     R1 --> R1a{Hasil}
     R1a -- Hilang saat dipinjam --> H1[Tanggal & catatan wajib] --> H2[(Transaksi Hilang, status aset Hilang, riwayat Lapor Hilang pihak = peminjam)] --> B
@@ -259,3 +272,5 @@ flowchart TD
     H2 -- Tidak --> H4[Konfirmasi] --> H5[(Hapus permanen)] --> B
     C -- Pindah menu --> Z([Selesai])
 ```
+
+

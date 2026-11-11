@@ -8,6 +8,7 @@ export const listConfigs = {
   assets: {
     filters: ['category_id', 'building_id', 'room_id', 'status'],
   },
+  plannedLoans: { prefix: 'rencana_', perPage: 10, fixed: { status: 'Direncanakan' } },
   activeLoans: { prefix: 'aktif_', perPage: 10, fixed: { status: 'Dipinjam' } },
   loanHistory: { filters: ['status'], perPage: 10 },
   consumables: { filters: ['status', 'building_id', 'room_id'], perPage: 20 },

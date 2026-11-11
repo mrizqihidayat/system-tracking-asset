@@ -51,6 +51,16 @@ export interface ActiveLoan {
   is_overdue: boolean
 }
 
+/** Pemesanan Direncanakan terdekat: "Dipesan untuk {tanggal}". */
+export interface UpcomingBooking {
+  id: number
+  borrower_name: string
+  borrower_unit: string
+  borrow_date: string
+  due_date: string
+  is_unhanded: boolean
+}
+
 export interface Asset {
   id: number
   code: string
@@ -65,6 +75,7 @@ export interface Asset {
   room?: Room
   current_location?: { on_loan: boolean; room: Room | null; note: string | null }
   active_loan?: ActiveLoan | null
+  upcoming_booking?: UpcomingBooking | null
   room_standard?: { is_standard: boolean; item_name: string | null; quantity: number | null }
   previous_codes?: { code: string; replaced_at: string }[]
   pic_name: string | null

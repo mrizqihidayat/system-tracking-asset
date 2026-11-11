@@ -17,7 +17,7 @@ class PublicAssetController extends Controller
         $asset = preg_match('/\A[A-Za-z0-9]{'.Asset::PUBLIC_TOKEN_LENGTH.'}\z/', $token) === 1
             ? Asset::query()
                 ->where('public_token', $token)
-                ->with(['assetType.category', 'sourceDepartment', 'room.building', 'activeLoan.destinationRoom.building'])
+                ->with(['assetType.category', 'sourceDepartment', 'room.building', 'activeLoan.destinationRoom.building', 'upcomingBooking'])
                 ->first()
             : null;
 

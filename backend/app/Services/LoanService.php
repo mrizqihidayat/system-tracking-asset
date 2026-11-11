@@ -24,7 +24,10 @@ class LoanService
     public function __construct(private AssetEventService $events) {}
 
     /**
-     * Pinjam: aset harus Tersedia (bukan Perbaikan/Hilang/Tidak Layak Pakai); kondisi keluar = kondisi aset saat ini (tidak diinput staf).
+     * Pinjam atau pesan. Tanggal pinjam > hari ini → Direncanakan (aset tidak berubah, tanpa riwayat aset;
+     * boleh untuk aset Tersedia/Dipinjam/Perbaikan). Hari ini/lampau → Dipinjam (aset harus Tersedia).
+     * Periode [tanggal pinjam, rencana kembali] tidak boleh bentrok dengan transaksi Direncanakan/Dipinjam lain.
+     * Kondisi keluar = kondisi aset saat ini (tidak diinput staf; diperbarui saat Serahkan).
      *
      * @param  array<string, mixed>  $data  data tervalidasi StoreLoanRequest
      */
@@ -33,12 +36,16 @@ class LoanService
         return DB::transaction(function () use ($data, $actor) {
             $asset = Asset::query()->whereKey($data['asset_id'])->lockForUpdate()->firstOrFail();
             $borrowDate = Carbon::parse($data['borrow_date'] ?? today())->startOfDay();
+            $dueDate = Carbon::parse($data['due_date'])->startOfDay();
+            $planned = $borrowDate->gt(today());
 
-            $this->ensureBorrowable($asset);
+            $planned ? $this->ensurePlannable($asset) : $this->ensureBorrowable($asset);
 
             if ($borrowDate->lt($asset->created_at->copy()->startOfDay())) {
                 throw ValidationException::withMessages(['borrow_date' => 'Tanggal pinjam tidak boleh sebelum aset terdaftar.']);
             }
+
+            $this->ensureNoConflict($asset, $borrowDate, $dueDate, 'borrow_date');
 
             try {
                 $loan = Loan::create([
@@ -46,25 +53,73 @@ class LoanService
                     'borrow_date' => $borrowDate,
                     'condition_out' => $asset->condition,
                     'borrowed_by' => $actor->id,
-                    'status' => LoanStatus::Dipinjam,
+                    'status' => $planned ? LoanStatus::Direncanakan : LoanStatus::Dipinjam,
                 ]);
             } catch (UniqueConstraintViolationException) {
                 throw ValidationException::withMessages(['asset_id' => 'Aset sedang dipinjam.']);
             }
 
-            $asset->update(['status' => AssetStatus::Dipinjam]);
-
-            $this->events->record($asset, EventType::Dipinjam, $actor, [
-                'event_date' => $this->eventDate($borrowDate),
-                'party' => $loan->borrower_name,
-                'condition' => $asset->condition,
-                'loan_id' => $loan->id,
-                'to_room_id' => $loan->destination_room_id,
-                'note' => $loan->purpose,
-            ]);
+            if (! $planned) {
+                $this->startLoan($asset, $loan, $borrowDate, $actor);
+            }
 
             return $loan;
         });
+    }
+
+    /**
+     * Serahkan pemesanan: dicatat saat barang benar-benar diserahkan (boleh sebelum/pada/setelah tanggal rencana).
+     * Aset harus Tersedia; periode [tanggal penyerahan, rencana kembali] dicek ulang terhadap bentrok.
+     */
+    public function handOver(Loan $loan, ?string $handoverDate, User $actor): Loan
+    {
+        return DB::transaction(function () use ($loan, $handoverDate, $actor) {
+            [$loan, $asset] = $this->lockWithStatus($loan, LoanStatus::Direncanakan, 'Transaksi tidak berstatus Direncanakan.');
+            $date = Carbon::parse($handoverDate ?? today())->startOfDay();
+
+            $this->ensureBorrowable($asset);
+
+            if ($date->lt($asset->created_at->copy()->startOfDay())) {
+                throw ValidationException::withMessages(['handover_date' => 'Tanggal penyerahan tidak boleh sebelum aset terdaftar.']);
+            }
+
+            if ($date->gt($loan->due_date)) {
+                throw ValidationException::withMessages(['handover_date' => 'Tanggal penyerahan tidak boleh setelah rencana kembali.']);
+            }
+
+            $this->ensureNoConflict($asset, $date, $loan->due_date, 'handover_date', $loan->id);
+
+            try {
+                $loan->update([
+                    'status' => LoanStatus::Dipinjam,
+                    'handover_date' => $date,
+                    'condition_out' => $asset->condition,
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                throw ValidationException::withMessages(['loan' => 'Aset sedang dipinjam.']);
+            }
+
+            $this->startLoan($asset, $loan, $date, $actor);
+
+            return $loan;
+        });
+    }
+
+    /**
+     * Status aset → Dipinjam + riwayat "Dipinjam" (pihak = peminjam, bertanggal pinjam/penyerahan).
+     */
+    private function startLoan(Asset $asset, Loan $loan, CarbonInterface $date, User $actor): void
+    {
+        $asset->update(['status' => AssetStatus::Dipinjam]);
+
+        $this->events->record($asset, EventType::Dipinjam, $actor, [
+            'event_date' => $this->eventDate($date),
+            'party' => $loan->borrower_name,
+            'condition' => $asset->condition,
+            'loan_id' => $loan->id,
+            'to_room_id' => $loan->destination_room_id,
+            'note' => $loan->purpose,
+        ]);
     }
 
     /**
@@ -162,12 +217,23 @@ class LoanService
     }
 
     /**
-     * Batalkan: hanya transaksi Dipinjam; status aset mengikuti kondisi aset saat ini (A6).
+     * Batalkan transaksi Dipinjam (status aset mengikuti kondisi aset saat ini, A6, + riwayat "Dibatalkan")
+     * atau pemesanan Direncanakan (alasan wajib, aset tidak berubah, tanpa riwayat aset).
      */
     public function cancel(Loan $loan, string $reason, User $actor): Loan
     {
         return DB::transaction(function () use ($loan, $reason, $actor) {
-            [$loan, $asset] = $this->lockActive($loan);
+            $message = 'Transaksi tidak berstatus Dipinjam atau Direncanakan.';
+            $status = Loan::query()->whereKey($loan->getKey())->lockForUpdate()->value('status');
+
+            if ($status === LoanStatus::Direncanakan) {
+                [$loan] = $this->lockWithStatus($loan, LoanStatus::Direncanakan, $message);
+                $loan->update(['status' => LoanStatus::Dibatalkan, 'cancel_reason' => $reason]);
+
+                return $loan;
+            }
+
+            [$loan, $asset] = $this->lockWithStatus($loan, LoanStatus::Dipinjam, $message);
 
             $loan->update(['status' => LoanStatus::Dibatalkan, 'cancel_reason' => $reason]);
             $asset->update(['status' => $asset->condition->resolveStatus()]);
@@ -199,16 +265,66 @@ class LoanService
     }
 
     /**
+     * Pemesanan masa depan: aset Hilang/Tidak Layak Pakai ditolak; Dipinjam/Perbaikan boleh (dicek lagi saat Serahkan).
+     */
+    private function ensurePlannable(Asset $asset): void
+    {
+        if (in_array($asset->status, [AssetStatus::Hilang, AssetStatus::TidakLayakPakai], true)) {
+            throw ValidationException::withMessages(['asset_id' => "Aset berstatus {$asset->status->value}, tidak bisa dipesan."]);
+        }
+    }
+
+    /**
+     * Periode [start, end] (tanggal, inklusif) tidak boleh tumpang tindih dengan transaksi Direncanakan/Dipinjam lain
+     * pada aset yang sama. Dipanggil setelah baris aset dikunci, sehingga pemesanan bersamaan berurutan.
+     */
+    private function ensureNoConflict(Asset $asset, CarbonInterface $start, CarbonInterface $end, string $field, ?int $exceptLoanId = null): void
+    {
+        $conflict = Loan::query()
+            ->where('asset_id', $asset->id)
+            ->whereIn('status', LoanStatus::occupying())
+            ->when($exceptLoanId, fn ($query) => $query->whereKeyNot($exceptLoanId))
+            ->orderBy('borrow_date')
+            ->get()
+            ->first(function (Loan $other) use ($start, $end) {
+                [$otherStart, $otherEnd] = $other->occupiedPeriod();
+
+                return $otherStart->lte($end) && $otherEnd->gte($start);
+            });
+
+        if ($conflict === null) {
+            return;
+        }
+
+        [$from, $to] = $conflict->occupiedPeriod();
+        $label = $conflict->status === LoanStatus::Direncanakan ? 'pemesanan' : 'peminjaman aktif';
+
+        throw ValidationException::withMessages([
+            $field => "Bentrok dengan {$label} {$conflict->borrower_name} ({$from->format('d/m/Y')}–{$to->format('d/m/Y')}).",
+        ]);
+    }
+
+    /**
      * Kunci transaksi & asetnya; transaksi harus masih Dipinjam.
      *
      * @return array{0: Loan, 1: Asset}
      */
     private function lockActive(Loan $loan): array
     {
+        return $this->lockWithStatus($loan, LoanStatus::Dipinjam, 'Transaksi tidak berstatus Dipinjam.');
+    }
+
+    /**
+     * Kunci transaksi & asetnya; transaksi harus berstatus $status.
+     *
+     * @return array{0: Loan, 1: Asset}
+     */
+    private function lockWithStatus(Loan $loan, LoanStatus $status, string $message): array
+    {
         $loan = Loan::query()->whereKey($loan->getKey())->lockForUpdate()->firstOrFail();
 
-        if ($loan->status !== LoanStatus::Dipinjam) {
-            throw ValidationException::withMessages(['loan' => 'Transaksi tidak berstatus Dipinjam.']);
+        if ($loan->status !== $status) {
+            throw ValidationException::withMessages(['loan' => $message]);
         }
 
         $asset = Asset::query()->whereKey($loan->asset_id)->lockForUpdate()->firstOrFail();

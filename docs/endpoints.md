@@ -2,11 +2,11 @@
 
 Daftar seluruh endpoint backend dan pemakaiannya di frontend web. Parameter dan bentuk respons ada di `docs/SPEC.md` §14.
 
-Disusun pada 4 November 2026 (diperbarui 6 November 2026, T26x) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
+Disusun pada 4 November 2026 (diperbarui 11 November 2026, T31) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
 
 ## Ringkasan
 
-- **93 endpoint API:** 91 dipakai frontend web, 2 tidak dipakai.
+- **94 endpoint API:** 92 dipakai frontend web, 2 tidak dipakai.
 - **6 route non-API:** tidak ada yang dipakai frontend.
 - **Alamat:** semua endpoint API berawalan `/api`. Frontend web mengambil alamat API dari `VITE_API_URL`.
 - **Akses "Token":** wajib header `Authorization: Bearer {token}` dari `POST /api/login`. Tanpa token sah dijawab 401.
@@ -25,11 +25,11 @@ Disusun pada 4 November 2026 (diperbarui 6 November 2026, T26x) dari `php artisa
 | Data master: kategori stok | 5 | 5 | 0 |
 | Lookup | 2 | 1 | 1 |
 | Aset | 20 | 20 | 0 |
-| Peminjaman | 5 | 5 | 0 |
+| Peminjaman | 6 | 6 | 0 |
 | Kelengkapan ruangan | 7 | 7 | 0 |
 | Permintaan ke departemen lain | 11 | 11 | 0 |
 | Stok habis pakai | 8 | 8 | 0 |
-| **Total** | **93** | **91** | **2** |
+| **Total** | **94** | **92** | **2** |
 
 ## Endpoint API yang tidak dipakai frontend
 
@@ -194,10 +194,11 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
 | GET | `/api/loans` | Daftar peminjaman, filter dan pencarian | Token | Ya: Peminjaman (`lib/queries/lists.ts`) |
-| POST | `/api/loans` | Catat peminjaman | Token | Ya: Form pinjam (`pages/loans/LoanForm.tsx`) |
+| POST | `/api/loans` | Catat peminjaman; tanggal pinjam di masa depan menjadi pemesanan `Direncanakan` | Token | Ya: Form pinjam (`pages/loans/LoanFormModal.tsx`) |
 | GET | `/api/loans/{id}` | Detail satu peminjaman | Token | Ya: Terima kembali dari hasil scan (`pages/loans/LoanPage.tsx`) |
 | PATCH | `/api/loans/{id}/return` | Terima kembali, atau hilang saat dipinjam | Token | Ya: Popup terima kembali (`pages/loans/ReturnLoanModal.tsx`) |
-| PATCH | `/api/loans/{id}/cancel` | Batalkan peminjaman | Token | Ya: Popup batal (`pages/loans/CancelLoanModal.tsx`) |
+| PATCH | `/api/loans/{id}/hand-over` | Serahkan pemesanan `Direncanakan` (aset menjadi Dipinjam) | Token | Ya: Popup serahkan (`pages/loans/HandOverModal.tsx`) |
+| PATCH | `/api/loans/{id}/cancel` | Batalkan peminjaman atau pemesanan | Token | Ya: Popup batal (`pages/loans/CancelLoanModal.tsx`) |
 
 ### Kelengkapan ruangan
 
