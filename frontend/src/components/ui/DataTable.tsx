@@ -18,9 +18,12 @@ export interface Column<T> {
   /**
    * Tampilan di layar sempit (< lg), tempat tabel menjadi daftar kartu (tablet: 2 kolom):
    * `title` = baris judul kartu (kiri atas), `badge` = pojok kanan atas,
-   * `hidden` = tidak ditampilkan, kosong = baris "label: nilai".
+   * `stat` = strip ringkas (label kecil di atas nilai, berjajar), `footer` = baris bawah tanpa label
+   * (tidak tampil bila sel `null`), `hidden` = tidak ditampilkan, kosong = baris "label: nilai".
    */
-  mobile?: 'title' | 'badge' | 'hidden'
+  mobile?: 'title' | 'badge' | 'stat' | 'footer' | 'hidden'
+  /** Hanya di kartu (< lg), bukan kolom tabel lebar (mis. menu ⋮ pengganti ikon aksi). */
+  cardOnly?: boolean
   /** Kunci sort server (lihat SPEC "Daftar (umum)"); kolom jadi bisa diklik bila tabel punya onSortChange. */
   sortKey?: string
 }
@@ -66,6 +69,18 @@ function SortHeader({ label, sortKey, sort, onSortChange }: { label: string; sor
   )
 }
 
+/** Baris bawah kartu (kolom `mobile: 'footer'`): sel kosong dilewati, tidak dirender bila semuanya kosong. */
+function CardFooter({ cells }: { cells: ReactNode[] }) {
+  const shown = cells.filter((c) => c !== null && c !== undefined && c !== false)
+  if (shown.length === 0) return null
+  // relative: tombol di sini digambar di atas area sentuh `.tap` dari baris di atasnya.
+  return (
+    <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2">
+      {shown.map((c, i) => <div key={i}>{c}</div>)}
+    </div>
+  )
+}
+
 export default function DataTable<T>({
   columns, rows, rowKey, loading, fetching, emptyText = 'Belum ada data.', meta, unit = 'data', onPageChange,
   sort, onSortChange, dense, fixedHeight,
@@ -77,8 +92,11 @@ export default function DataTable<T>({
   const fillerCount = fixedHeight && meta && rows.length > 0 ? Math.max(0, meta.per_page - rows.length) : 0
   const skeleton = loading && rows.length === 0
   const empty = !skeleton && rows.length === 0 ? emptyText : null
+  const tableColumns = columns.filter((c) => !c.cardOnly)
   const titleCols = columns.filter((c) => c.mobile === 'title')
   const badgeCols = columns.filter((c) => c.mobile === 'badge')
+  const statCols = columns.filter((c) => c.mobile === 'stat')
+  const footerCols = columns.filter((c) => c.mobile === 'footer')
   const detailCols = columns.filter((c) => !c.mobile)
   const dim = fetching ? 'opacity-60 transition-opacity' : 'transition-opacity'
 
@@ -89,7 +107,7 @@ export default function DataTable<T>({
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
             <tr>
-              {columns.map((c, i) => {
+              {tableColumns.map((c, i) => {
                 const direction = c.sortKey && sort === c.sortKey ? 'ascending' : c.sortKey && sort === `-${c.sortKey}` ? 'descending' : undefined
                 return (
                   <th
@@ -109,21 +127,21 @@ export default function DataTable<T>({
           </thead>
           <tbody className={`divide-y divide-slate-100 ${dim}`}>
             {skeleton ? (
-              <TableSkeletonRows columns={columns.length} />
+              <TableSkeletonRows columns={tableColumns.length} />
             ) : empty ? (
-              <tr><td colSpan={columns.length} className="px-4 py-10 text-center text-slate-500">{empty}</td></tr>
+              <tr><td colSpan={tableColumns.length} className="px-4 py-10 text-center text-slate-500">{empty}</td></tr>
             ) : (
               <>
                 {rows.map((row) => (
                   <tr key={rowKey(row)} className={`transition-colors hover:bg-slate-50 ${rowHeight}`}>
-                    {columns.map((c, i) => (
+                    {tableColumns.map((c, i) => (
                       <td key={`${c.header}-${i}`} className={`px-4 ${cellPad} align-middle ${c.className ?? ''}`}>{c.cell(row)}</td>
                     ))}
                   </tr>
                 ))}
                 {Array.from({ length: fillerCount }, (_, i) => (
                   <tr key={`filler-${i}`} className={rowHeight} aria-hidden>
-                    <td colSpan={columns.length} />
+                    <td colSpan={tableColumns.length} />
                   </tr>
                 ))}
               </>
@@ -156,6 +174,16 @@ export default function DataTable<T>({
                   )}
                 </div>
               )}
+              {statCols.length > 0 && (
+                <dl className="flex flex-wrap gap-x-6 gap-y-2">
+                  {statCols.map((c, i) => (
+                    <div key={i} className="min-w-0">
+                      <dt className="text-xs text-slate-500">{c.header}</dt>
+                      <dd className="mt-0.5">{c.cell(row)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
               {detailCols.length > 0 && (
                 <dl className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] gap-x-3 gap-y-1.5">
                   {detailCols.map((c, i) => (
@@ -166,6 +194,7 @@ export default function DataTable<T>({
                   ))}
                 </dl>
               )}
+              {footerCols.length > 0 && <CardFooter cells={footerCols.map((c) => c.cell(row))} />}
             </li>
           ))
         )}

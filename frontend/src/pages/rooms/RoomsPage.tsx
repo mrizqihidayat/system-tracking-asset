@@ -1,4 +1,4 @@
-import { Clock, History, Pencil, Plus, Trash2, TriangleAlert, Warehouse } from 'lucide-react'
+import { Clock, EllipsisVertical, History, Pencil, Plus, Trash2, TriangleAlert, Warehouse } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
@@ -7,6 +7,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { Badge, ConditionBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import DataTable, { type Column } from '../../components/ui/DataTable'
+import DropdownMenu from '../../components/ui/DropdownMenu'
 import { PageHeader } from '../../components/ui/Page'
 import { LoadingLabel, Skeleton, TableSkeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
@@ -42,9 +43,12 @@ const iconButton =
 
 // HP: chip digeser horizontal; sm ke atas: membungkus.
 const chipRow = '-mx-4 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0'
-// Label di kiri sebaris dengan chip (sm ke atas), di atas chip pada HP.
+// Label di kiri sebaris dengan chip (desktop); HP/tablet: label hanya untuk pembaca layar.
 const selectorRow = 'flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3'
-const selectorLabel = 'shrink-0 text-xs font-medium text-slate-500 sm:w-16 sm:pt-2'
+const selectorLabel = 'shrink-0 text-xs font-medium text-slate-500 sm:w-16 sm:pt-2 max-lg:sr-only'
+
+/** Tombol menu ⋮ di kartu HP/tablet (pengganti ikon aksi tabel desktop). */
+const cardMenuTrigger = 'px-3!'
 
 /** Form permintaan terisi barang, penyedia, ruangan, dan jumlah (bawaan = kekurangan). */
 const requestUrl = (roomId: number, s: RoomConsumable, quantity = s.shortage) => {
@@ -332,19 +336,37 @@ export default function RoomsPage() {
         </>
       ),
     },
-    { header: 'Standar', className: COL.standard, cell: (g) => <span className="tabular-nums">{g.standard_quantity}</span> },
+    { header: 'Standar', className: COL.standard, mobile: 'stat', cell: (g) => <span className="tabular-nums">{g.standard_quantity}</span> },
     // Jumlah = aset yang dihitung Ada (tanpa Dipinjam/Perbaikan/Hilang; keterangannya di bawah nama jenis).
-    { header: 'Jumlah', className: COL.quantity, cell: (g) => <span className="tabular-nums">{g.present_quantity}</span> },
-    { header: 'Selisih', className: COL.difference, cell: (g) => differenceCell(g.difference) },
+    { header: 'Jumlah', className: COL.quantity, mobile: 'stat', cell: (g) => <span className="tabular-nums">{g.present_quantity}</span> },
+    { header: 'Selisih', className: COL.difference, mobile: 'stat', cell: (g) => differenceCell(g.difference) },
     {
       header: 'Hasil', className: COL.result,
       mobile: 'badge',
       cell: (g) => (g.result ? <Badge color={resultColor[g.result]}>{g.result}</Badge> : <span className="text-slate-500">—</span>),
     },
-    { ...conditionColumn, className: COL.extra },
+    { ...conditionColumn, className: COL.extra, mobile: 'stat' },
+    // Kartu HP/tablet: ikon diganti menu ⋮ di samping lencana Hasil.
+    {
+      header: '',
+      mobile: 'badge',
+      cardOnly: true,
+      cell: (g) => (
+        <DropdownMenu
+          label={`Aksi ${g.asset_type.name}`}
+          trigger={<EllipsisVertical size={16} />}
+          triggerClassName={cardMenuTrigger}
+          items={[
+            { label: 'Atur standar', onClick: () => setStandardTarget({ kind: 'asset', group: g }) },
+            ...(g.standard_id !== null ? [{ label: 'Hapus standar', danger: true, onClick: () => setRemovingAsset(g) }] : []),
+          ]}
+        />
+      ),
+    },
     {
       header: '',
       className: COL.icons,
+      mobile: 'hidden',
       cell: (g) => (
         <div className="flex items-center gap-1 lg:justify-end">
           <button
@@ -391,9 +413,9 @@ export default function RoomsPage() {
         </>
       ),
     },
-    { header: 'Standar', className: COL.standard, cell: (s) => <span className="tabular-nums">{s.standard_quantity}</span> },
+    { header: 'Standar', className: COL.standard, mobile: 'stat', cell: (s) => <span className="tabular-nums">{s.standard_quantity}</span> },
     {
-      header: 'Jumlah', className: COL.quantity,
+      header: 'Jumlah', className: COL.quantity, mobile: 'stat',
       // Saldo catatan; Belum dicek tetap tampil angkanya (Hasil = Belum dicek). Perubahan lewat popup.
       cell: (s) => (
         <div>
@@ -408,12 +430,14 @@ export default function RoomsPage() {
         </div>
       ),
     },
-    { header: 'Selisih', className: COL.difference, cell: (s) => differenceCell(s.difference) },
+    { header: 'Selisih', className: COL.difference, mobile: 'stat', cell: (s) => differenceCell(s.difference) },
     { header: 'Hasil', className: COL.result, mobile: 'badge', cell: (s) => <Badge color={resultColor[s.result]}>{s.result}</Badge> },
     {
       header: 'Aksi', className: COL.extra,
-      cell: (s) => (
-        <div className="space-y-1">
+      // Kartu: baris bawah tanpa label, tidak tampil bila tidak ada aksi; tombol & tautan sebaris (< lg).
+      mobile: 'footer',
+      cell: (s) => (!s.can_fill_from_stock && !(s.can_request && roomId) ? null : (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 lg:block lg:space-y-1">
           {s.can_fill_from_stock && (
             <Button variant="secondary" className="min-h-10! lg:min-h-8! px-3! text-xs!" onClick={() => setFilling(s)}>
               Isi dari stok
@@ -423,11 +447,30 @@ export default function RoomsPage() {
             <Link to={requestUrl(roomId, s)} className="tap block text-xs font-semibold text-brand-700 hover:underline">Ajukan permintaan</Link>
           )}
         </div>
+      )),
+    },
+    // Kartu HP/tablet: ikon diganti menu ⋮ di samping lencana Hasil.
+    {
+      header: '',
+      mobile: 'badge',
+      cardOnly: true,
+      cell: (s) => (
+        <DropdownMenu
+          label={`Aksi ${s.item_name}`}
+          trigger={<EllipsisVertical size={16} />}
+          triggerClassName={cardMenuTrigger}
+          items={[
+            { label: 'Kartu ruangan', onClick: () => setCard(s) },
+            { label: 'Ubah', onClick: () => setStandardTarget({ kind: 'consumable', row: s }) },
+            { label: 'Hapus', danger: true, onClick: () => setRemoving(s) },
+          ]}
+        />
       ),
     },
     {
       header: '',
       className: COL.icons,
+      mobile: 'hidden',
       cell: (s) => (
         <div className="flex items-center gap-1 lg:justify-end">
           <button
