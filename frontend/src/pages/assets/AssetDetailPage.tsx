@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight, CalendarClock, ChevronDown, ChevronRight, Ellips
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { AssetCode, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
+import { AssetCode, ConditionBadge, ConditionDot, LoanStatusBadge, StatusBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { buttonClass } from '../../components/ui/button-class'
 import { Panel } from '../../components/ui/Page'
@@ -16,15 +16,19 @@ import { openInNewTab } from '../../lib/blob'
 import { formatDate, formatDateTime, formatSize } from '../../lib/format'
 import { invalidate } from '../../lib/queries/invalidate'
 import { queryKeys } from '../../lib/queries/keys'
-import { useAssetDetail, useAssetEvents, useAssetFiles } from '../../lib/queries/lists'
+import { useAssetDetail, useAssetEvents, useAssetFiles, useLoans } from '../../lib/queries/lists'
 import { useBlobUrl } from '../../lib/useBlobUrl'
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { AssetEvent, AssetFile, FileType, Room } from '../../types/asset'
+import type { Loan } from '../../types/loan'
 import DeleteAssetModal from './modals/DeleteAssetModal'
 import FoundModal from './modals/FoundModal'
 import MoveLocationModal from './modals/MoveLocationModal'
 import ReportModal, { type ReportMode } from './modals/ReportModal'
 import ServiceModal from './modals/ServiceModal'
+
+/** Baris per halaman di Riwayat peminjaman detail aset. */
+const LOAN_PAGE_SIZE = 5
 
 const roomLabel = (room?: Room | null) => (room ? `${room.name}, ${room.building?.name ?? ''}` : '-')
 
@@ -141,7 +145,9 @@ export default function AssetDetailPage() {
   const detail = useAssetDetail(id)
   const filesQuery = useAssetFiles(id ?? '')
   const eventsQuery = useAssetEvents(id ?? '')
-  useErrorToast(filesQuery.error, eventsQuery.error)
+  const [loanPage, setLoanPage] = useState(1)
+  const loansQuery = useLoans({ asset_id: id ?? '', per_page: LOAN_PAGE_SIZE, page: loanPage })
+  useErrorToast(filesQuery.error, eventsQuery.error, loansQuery.error)
 
   // Aset tidak ada / gagal dimuat → kembali ke daftar (perilaku sebelumnya).
   useEffect(() => {
@@ -218,6 +224,51 @@ export default function AssetDetailPage() {
     { header: 'Pihak', cell: (e) => e.party ?? '-' },
     { header: 'Kondisi', cell: (e) => e.condition ?? '-' },
     { header: 'Dicatat oleh', cell: (e) => e.recorded_by?.name ?? '-' },
+  ]
+
+  // Riwayat peminjaman aset ini (GET /loans?asset_id=): satu lencana status, kondisi kembali bertitik.
+  const loanColumns: Column<Loan>[] = [
+    {
+      header: 'Peminjam',
+      mobile: 'title',
+      cell: (l) => (
+        <>
+          <span className="font-medium">{l.borrower_name}</span>
+          <span className="text-slate-500"> · {l.borrower_unit}</span>
+          <span className="block text-xs text-slate-500">{l.purpose}</span>
+        </>
+      ),
+    },
+    {
+      header: 'Periode',
+      cell: (l) => (
+        <span className="whitespace-nowrap tabular-nums">
+          {formatDate(l.handover_date ?? l.borrow_date)} → {formatDate(l.due_date)}
+        </span>
+      ),
+    },
+    {
+      header: 'Kembali',
+      cell: (l) =>
+        l.status === 'Dikembalikan' ? (
+          <span className="flex flex-col gap-1">
+            <span className="whitespace-nowrap">{formatDate(l.return_date)}</span>
+            {l.return_condition && l.return_condition !== 'Baik' && <ConditionDot condition={l.return_condition} />}
+          </span>
+        ) : (
+          <span className="text-slate-500">-</span>
+        ),
+    },
+    {
+      header: 'Status',
+      mobile: 'badge',
+      cell: (l) => (
+        <span className="flex flex-col items-end gap-1 lg:items-start">
+          <LoanStatusBadge status={l.status} />
+          {l.is_unhanded && <span className="whitespace-nowrap text-xs font-medium text-bad-700">Belum diserahkan</span>}
+        </span>
+      ),
+    },
   ]
 
   const docRow = (label: string, file?: AssetFile) => (
@@ -355,6 +406,22 @@ export default function AssetDetailPage() {
           )}
         </Panel>
       </div>
+
+      <section className="space-y-2">
+        <h2 className="font-semibold">Riwayat peminjaman</h2>
+        <DataTable
+          columns={loanColumns}
+          rows={loansQuery.data?.data ?? []}
+          rowKey={(l) => l.id}
+          loading={loansQuery.isPending}
+          fetching={loansQuery.isPlaceholderData}
+          emptyText="Aset ini belum pernah dipinjam."
+          meta={loansQuery.data?.meta}
+          unit="peminjaman"
+          onPageChange={setLoanPage}
+          dense
+        />
+      </section>
 
       <section className="space-y-2">
         <h2 className="font-semibold">Riwayat aset</h2>

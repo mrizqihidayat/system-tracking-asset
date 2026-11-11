@@ -1,4 +1,5 @@
 import type { Condition, Status } from '../../types/asset'
+import type { LoanStatus } from '../../types/loan'
 
 const tone = {
   green: 'bg-ok-50 text-ok-700',
@@ -35,6 +36,30 @@ export const StatusBadge = ({ status }: { status: Status }) => <Badge color={sta
 /** `label` opsional mengganti teks (mis. "3 Baik"), warna tetap mengikuti kondisi. */
 export const ConditionBadge = ({ condition, label }: { condition: Condition; label?: string }) => (
   <Badge color={conditionColor[condition]}>{label ?? condition}</Badge>
+)
+
+const loanStatusColor: Record<LoanStatus, BadgeColor> = {
+  Direncanakan: 'amber',
+  Dipinjam: 'blue',
+  Dikembalikan: 'green',
+  Dibatalkan: 'slate',
+  Hilang: 'red',
+}
+
+export const LoanStatusBadge = ({ status }: { status: LoanStatus }) => <Badge color={loanStatusColor[status]}>{status}</Badge>
+
+const conditionDot: Record<Condition, string> = {
+  Baik: 'bg-ok-700',
+  'Rusak Ringan': 'bg-warn-700',
+  'Rusak Berat': 'bg-bad-700',
+}
+
+/** Kondisi sebagai teks kecil bertitik warna (bukan lencana kedua; satu lencana per baris). */
+export const ConditionDot = ({ condition }: { condition: Condition }) => (
+  <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-600">
+    <span className={`size-2 shrink-0 rounded-full ${conditionDot[condition]}`} aria-hidden />
+    {condition}
+  </span>
 )
 
 /** Kode aset sebagai label pelat mono; tidak pernah patah baris. */
