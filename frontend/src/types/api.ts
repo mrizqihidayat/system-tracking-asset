@@ -13,4 +13,6 @@ export interface Paginated<T> {
 export interface ApiErrorBody {
   message?: string
   errors?: Record<string, string[]>
+  /** Kode mesin, mis. `password_change_required` (403). */
+  code?: string
 }

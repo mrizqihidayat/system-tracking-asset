@@ -12,15 +12,17 @@ import { useAssetTypes, useBuildings, useCategories, useConsumableCategories, us
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { AssetType, Building, Category, Department, Room } from '../../types/asset'
 import type { ConsumableCategory } from '../../types/supply'
+import AccountsTab from './AccountsTab'
 import { MasterDeleteModal, MasterFormModal, type MasterTarget } from './MasterModals'
 
-type Tab = 'gedung' | 'departemen' | 'jenis' | 'kategori-stok'
+type Tab = 'gedung' | 'departemen' | 'jenis' | 'kategori-stok' | 'akun'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'gedung', label: 'Gedung & Ruangan' },
   { key: 'departemen', label: 'Departemen' },
   { key: 'jenis', label: 'Kategori & Jenis aset' },
   { key: 'kategori-stok', label: 'Kategori stok' },
+  { key: 'akun', label: 'Akun' },
 ]
 
 type FormState = {
@@ -257,11 +259,13 @@ export default function MasterDataPage() {
     )
   }
 
+  if (tab === 'akun') body = <AccountsTab />
+
   return (
     <div className="max-w-4xl space-y-5">
       <PageHeader
         title="Data Master"
-        description="Ganti nama atau hapus gedung, ruangan, departemen, kategori & jenis aset, dan kategori stok. Kode dan kategori jenis aset diubah di sini. Data yang masih dipakai tidak bisa dihapus."
+        description="Ganti nama atau hapus gedung, ruangan, departemen, kategori & jenis aset, dan kategori stok, serta kelola akun. Kode dan kategori jenis aset diubah di sini. Data yang masih dipakai tidak bisa dihapus."
       />
 
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">

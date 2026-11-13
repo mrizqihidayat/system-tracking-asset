@@ -3,11 +3,20 @@ import { queryClient } from './query-client'
 const TOKEN_KEY = 'asset_token'
 const USER_KEY = 'asset_user'
 
+/** Akun staf (T33): `api` = pegawai SHD (login NIK), `manual` = akun bersama (login username). */
 export interface AuthUser {
   id: number
   name: string
-  username: string
+  nik: string | null
+  username: string | null
+  department: string | null
+  source: 'api' | 'manual'
+  must_change_password: boolean
 }
+
+/** NIK untuk akun pegawai, username untuk akun bersama. */
+export const loginId = (user: Pick<AuthUser, 'source' | 'nik' | 'username'>) =>
+  (user.source === 'api' ? user.nik : user.username) ?? ''
 
 // Sesi sudah dipastikan valid di server selama halaman ini terbuka (login baru / GET /user berhasil).
 let verified = false

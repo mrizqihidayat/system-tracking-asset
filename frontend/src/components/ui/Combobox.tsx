@@ -10,7 +10,10 @@ interface Props {
   onChange: (value: string) => void
   /** Dipanggil saat saran dipilih; `id` kosong untuk entri baru yang diketik. */
   onSelect?: (option: { id: string | number | null; label: string }) => void
-  options: { id: string | number; label: string }[]
+  /** `description`: keterangan kecil di bawah label (mis. departemen · jabatan). */
+  options: { id: string | number; label: string; description?: string }[]
+  /** false: pilihan sudah disaring server (mis. saran pegawai), tampilkan apa adanya. */
+  filter?: boolean
   placeholder?: string
   /** Izinkan menambah nama baru yang tidak ada di saran (tampil "Tambah '…'"). */
   allowCreate?: boolean
@@ -24,7 +27,7 @@ interface Props {
 
 /** Kolom ketik-untuk-mencari; daftar pilihannya sama dengan Select. */
 export default function Combobox({
-  value, onChange, onSelect, options, placeholder, allowCreate, createLabel, isExisting, error, disabled,
+  value, onChange, onSelect, options, placeholder, allowCreate, createLabel, isExisting, error, disabled, filter = true,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
@@ -35,7 +38,7 @@ export default function Combobox({
   const query = value.trim().toLowerCase()
   const exact = options.some((o) => o.label.toLowerCase() === query)
   // Kolom berisi pilihan yang sudah tepat: tampilkan semua pilihan, bukan hanya yang cocok.
-  const filtered = exact ? options : options.filter((o) => o.label.toLowerCase().includes(query))
+  const filtered = exact || !filter ? options : options.filter((o) => o.label.toLowerCase().includes(query))
   const canCreate = !!allowCreate && query !== '' && !exact && !isExisting?.(value.trim())
   const count = filtered.length + (canCreate ? 1 : 0)
 
@@ -130,7 +133,10 @@ export default function Combobox({
                 onClick={() => pick(o.id, o.label)}
                 className={`flex items-center justify-between gap-2 ${dropdownOptionClass(i === active, selected)}`}
               >
-                <span className="min-w-0">{o.label}</span>
+                <span className="min-w-0">
+                  {o.label}
+                  {o.description && <span className="block text-xs text-slate-500">{o.description}</span>}
+                </span>
                 {selected && <Check size={16} className="shrink-0" aria-hidden />}
               </li>
             )

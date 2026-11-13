@@ -10,11 +10,16 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // Akun bersama contoh (password hanya untuk demo). Akun pegawai SHD tidak di-seed:
+        // dibuat otomatis saat login pertama dengan NIK dari database/data/employees.json (T33).
         User::updateOrCreate(
             ['username' => 'staf1'],
             [
                 'name' => 'Staf SHD',
+                'department' => 'SHD',
+                'source' => User::SOURCE_MANUAL,
                 'password' => Hash::make('inalum2026'),
+                'must_change_password' => false,
             ]
         );
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ReportType;
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetEventController;
 use App\Http\Controllers\AssetFileController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\ConsumableCategoryController;
 use App\Http\Controllers\ConsumableController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LookupController;
 use App\Http\Controllers\PublicAssetController;
@@ -34,6 +36,19 @@ Route::get('/public/assets/{token}', [PublicAssetController::class, 'show'])->mi
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
+    Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:password');
+});
+
+// Endpoint di bawah ditolak 403 selama akun wajib ganti password (SPEC §15).
+Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
+    // Direktori pegawai & akun (T33, SPEC §15)
+    Route::get('/employees', [EmployeeController::class, 'index']);
+    Route::get('/accounts', [AccountController::class, 'index']);
+    Route::post('/accounts', [AccountController::class, 'store']);
+    Route::put('/accounts/{account}/password', [AccountController::class, 'updatePassword'])->whereNumber('account')->withTrashed();
+    Route::post('/accounts/{account}/reset', [AccountController::class, 'reset'])->whereNumber('account')->withTrashed();
+    Route::post('/accounts/{account}/restore', [AccountController::class, 'restore'])->whereNumber('account')->withTrashed();
+    Route::delete('/accounts/{account}', [AccountController::class, 'destroy'])->whereNumber('account')->withTrashed();
 
     // Dashboard per kelompok widget (SPEC §11), masing-masing di-cache
     Route::get('/dashboard/cards', [DashboardController::class, 'cards']);

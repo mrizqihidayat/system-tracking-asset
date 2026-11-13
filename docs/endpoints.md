@@ -2,19 +2,21 @@
 
 Daftar seluruh endpoint backend dan pemakaiannya di frontend web. Parameter dan bentuk respons ada di `docs/SPEC.md` §14.
 
-Disusun pada 4 November 2026 (diperbarui 11 November 2026, T31) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
+Disusun pada 4 November 2026 (diperbarui 13 November 2026, T33) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
 
 ## Ringkasan
 
-- **94 endpoint API:** 92 dipakai frontend web, 2 tidak dipakai.
+- **102 endpoint API:** 100 dipakai frontend web, 2 tidak dipakai.
 - **6 route non-API:** tidak ada yang dipakai frontend.
 - **Alamat:** semua endpoint API berawalan `/api`. Frontend web mengambil alamat API dari `VITE_API_URL`.
 - **Akses "Token":** wajib header `Authorization: Bearer {token}` dari `POST /api/login`. Tanpa token sah dijawab 401.
+- **Wajib ganti password (T33):** selama akun wajib ganti password, semua endpoint ber-token selain `GET /api/user`, `PUT /api/user/password`, dan `POST /api/logout` dijawab 403 `code: password_change_required`.
 - **Format:** semua respons error berbentuk JSON. Path file di kolom "Dipakai frontend" relatif terhadap `frontend/src/`.
 
 | Modul | Total | Dipakai | Tidak dipakai |
 |---|---|---|---|
-| Autentikasi | 3 | 3 | 0 |
+| Autentikasi | 4 | 4 | 0 |
+| Akun & direktori pegawai | 7 | 7 | 0 |
 | Halaman publik QR | 1 | 1 | 0 |
 | Dashboard | 3 | 3 | 0 |
 | Laporan | 1 | 1 | 0 |
@@ -29,7 +31,7 @@ Disusun pada 4 November 2026 (diperbarui 11 November 2026, T31) dari `php artisa
 | Kelengkapan ruangan | 7 | 7 | 0 |
 | Permintaan ke departemen lain | 11 | 11 | 0 |
 | Stok habis pakai | 8 | 8 | 0 |
-| **Total** | **94** | **92** | **2** |
+| **Total** | **102** | **100** | **2** |
 
 ## Endpoint API yang tidak dipakai frontend
 
@@ -50,6 +52,7 @@ Melewati batas dijawab 429 dengan pesan Bahasa Indonesia dan header `Retry-After
 |---|---|---|
 | `POST /api/login` | 5/menit | Kombinasi username + IP |
 | `POST /api/login` | 20/menit | IP |
+| `PUT /api/user/password` | 10/menit | Pengguna |
 | `GET /api/public/assets/{token}` | 30/menit | IP |
 | `GET /api/reports/{type}` | 10/menit | Pengguna |
 | `GET /api/assets/{id}/label`, `POST /api/assets/labels` | 20/menit, jatah bersama | Pengguna |
@@ -61,7 +64,10 @@ Di balik reverse proxy, batas per IP hanya benar jika `TRUSTED_PROXIES` diisi. T
 
 | Input | Aturan | Jika dilanggar |
 |---|---|---|
-| `username` pada login | Teks UTF-8 tanpa karakter NUL, maks. 50 karakter | 422 |
+| `username` pada login (isian NIK / Username; angka saja = NIK) | Teks UTF-8 tanpa karakter NUL, maks. 50 karakter | 422 |
+| `search` pada `/api/employees` | Wajib, 2–100 karakter | 422 |
+| Password baru (`/api/user/password`, `/api/accounts`) | 8–72 karakter, dikonfirmasi, tidak sama dengan NIK/username atau tanggal lahir (akun pegawai) | 422 |
+| `username` akun bersama | Huruf kecil, angka, titik, garis bawah, strip; minimal satu huruf; 3–50 karakter; unik | 422 |
 | `{token}` halaman publik | Tepat 12 karakter huruf dan angka | 404, tanpa query ke database |
 | `search` pada `/api/lookups/*` | Teks, maks. 100 karakter | 422 |
 | `quantity`, `min_quantity`, `standard_quantity`, `actual_quantity` | Maks. 2147483647 | 422 |
@@ -78,7 +84,20 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 |---|---|---|---|---|
 | POST | `/api/login` | Login, mengembalikan token dan data akun | Publik, maks. 5/menit per username + IP dan 20/menit per IP | Ya: Halaman Login (`pages/LoginPage.tsx`) |
 | POST | `/api/logout` | Logout, mencabut token yang dipakai | Token | Ya: Tombol Keluar (`components/layout/AppLayout.tsx`) |
-| GET | `/api/user` | Data akun yang sedang login | Token | Ya: Pemeriksaan sesi (`components/RequireAuth.tsx`) |
+| GET | `/api/user` | Data akun yang sedang login | Token (juga saat wajib ganti password) | Ya: Pemeriksaan sesi (`components/RequireAuth.tsx`) |
+| PUT | `/api/user/password` | Ganti password sendiri; token lain dicabut | Token (juga saat wajib ganti password), maks. 10/menit per pengguna | Ya: Halaman Ganti password (`pages/ChangePasswordPage.tsx`) |
+
+### Akun & direktori pegawai
+
+| Method | Endpoint | Fungsi | Akses | Dipakai frontend |
+|---|---|---|---|---|
+| GET | `/api/employees` | Saran pegawai (maks. 10): nik, nama, departemen, jabatan | Token | Ya: Nama peminjam & PIC (`components/EmployeeCombobox.tsx`) |
+| GET | `/api/accounts` | Daftar akun, termasuk nonaktif | Token | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
+| POST | `/api/accounts` | Tambah akun bersama | Token | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
+| PUT | `/api/accounts/{id}/password` | Ubah password akun bersama | Token | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
+| POST | `/api/accounts/{id}/reset` | Reset akun pegawai SHD (wajib ganti, login pakai tanggal lahir) | Token | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
+| DELETE | `/api/accounts/{id}` | Nonaktifkan akun (soft delete), bukan akun sendiri | Token | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
+| POST | `/api/accounts/{id}/restore` | Aktifkan kembali akun | Token | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
 
 ### Halaman publik QR
 

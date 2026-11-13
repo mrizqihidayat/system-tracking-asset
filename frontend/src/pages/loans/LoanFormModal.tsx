@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import EmployeeCombobox from '../../components/EmployeeCombobox'
 import Button from '../../components/ui/Button'
 import { FormField, Input } from '../../components/ui/FormField'
 import Modal from '../../components/ui/Modal'
@@ -118,7 +119,13 @@ export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Prop
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Nama peminjam" required error={errors.borrower_name}>
-            <Input value={form.borrower_name} onChange={(e) => set('borrower_name', e.target.value)} error={errors.borrower_name} maxLength={150} />
+            {/* Saran pegawai: memilih mengisi Departemen otomatis; nama di luar direktori tetap boleh diketik. */}
+            <EmployeeCombobox
+              value={form.borrower_name}
+              onChange={(name) => set('borrower_name', name)}
+              onPick={(employee) => set('borrower_unit', employee.department)}
+              error={errors.borrower_name}
+            />
           </FormField>
           <FormField label="Departemen" required error={errors.borrower_unit}>
             <Input value={form.borrower_unit} onChange={(e) => set('borrower_unit', e.target.value)} error={errors.borrower_unit} maxLength={100} />

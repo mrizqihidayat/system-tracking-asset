@@ -1,10 +1,10 @@
-import { Eye, EyeOff } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import bgInalum from '../assets/bg_inalum.webp'
 import logo from '../assets/logo.png'
 import Button from '../components/ui/Button'
 import { FormField, Input } from '../components/ui/FormField'
+import PasswordInput from '../components/ui/PasswordInput'
 import { api, errorMessage, fieldErrors } from '../lib/api'
 import { getToken, setSession, type AuthUser } from '../lib/auth'
 import { safeNext } from '../lib/safe-next'
@@ -14,7 +14,6 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -31,7 +30,8 @@ export default function LoginPage() {
     try {
       const res = await api.post<{ token: string; user: AuthUser }>('/login', { username, password })
       setSession(res.data.token, res.data.user)
-      navigate(next, { replace: true })
+      // Akun pegawai SHD saat login pertama / setelah reset: wajib ganti password dulu (SPEC §15).
+      navigate(res.data.user.must_change_password ? `/ganti-password?next=${encodeURIComponent(next)}` : next, { replace: true })
     } catch (error) {
       setErrors(fieldErrors(error))
       setMessage(errorMessage(error))
@@ -65,29 +65,12 @@ export default function LoginPage() {
               {message}
             </div>
           )}
-          <FormField label="Username" error={errors.username}>
+          <FormField label="NIK / Username" error={errors.username}>
             <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus required />
+            <span className="block text-xs text-slate-500">Pegawai SHD memakai NIK. Login pertama: password = tanggal lahir (DDMMYYYY).</span>
           </FormField>
           <FormField label="Password" error={errors.password}>
-            <div className="relative">
-              <Input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-                className="pr-10 [&::-ms-reveal]:hidden"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-                aria-pressed={showPassword}
-                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-slate-700"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
           </FormField>
           <Button type="submit" loading={loading} className="w-full">Masuk</Button>
         </form>

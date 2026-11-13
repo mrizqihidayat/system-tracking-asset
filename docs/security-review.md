@@ -15,10 +15,10 @@
 | Tinggi | 1 | 1 | 0 |
 | Sedang | 6 | 4 | 2 |
 | Rendah | 14 | 4 | 10 |
-| Info | 6 | 4 | 2 |
-| **Total** | **27** | **13** | **14** |
+| Info | 7 | 5 | 2 |
+| **Total** | **28** | **14** | **14** |
 
-Audit menghasilkan 26 temuan; S27 ditambahkan saat T26p. S20 terhitung diperbaiki walau sebagian: dependensi production sudah bersih, sisanya hanya dependensi dev.
+Audit menghasilkan 26 temuan; S27 ditambahkan saat T26p, S28 saat T33. S20 terhitung diperbaiki walau sebagian: dependensi production sudah bersih, sisanya hanya dependensi dev.
 
 **Kesimpulan:** kode aplikasi cukup kuat. Uji injeksi, XSS, mass assignment, otorisasi, dan upload berbahaya tidak menembus apa pun. Risiko terbesar justru ada pada akun default (S01) dan konfigurasi deploy. Setelah T26p, S02 dan S06 sudah diperbaiki; S01, S03, S04, S05, dan S07 masih terbuka. Temuan S01 **naik menjadi Kritis jika repo GitHub bersifat publik**; visibilitas repo belum dicek karena di luar batas uji lokal.
 
@@ -71,13 +71,23 @@ Semua perbaikan ada di commit `c162e59` (T26p). Bukti di tabel ini berasal dari 
 
 Selama seluruh uji ulang, `laravel.log` tidak terbentuk, artinya tidak ada error 500.
 
+### Pembaruan T33 (13 November 2026)
+
+T33 menambah akun per pegawai SHD (login NIK), akun bersama, dan ganti password. Bukti berupa feature test (`EmployeeLoginTest`, `AccountTest`), bukan uji ulang manual seperti di atas.
+
+| ID | Perubahan | Status |
+|---|---|---|
+| S01 | Sudah ada fitur ganti password sendiri (`PUT /api/user/password`) dan akun per pegawai SHD yang wajib ganti password saat login pertama. Akun pegawai tidak ditulis di seeder; password login pertama = tanggal lahir dari direktori pegawai dan tidak disimpan. **Masih terbuka:** seeder tetap membuat akun bersama `staf1` dengan password demo tertulis di repo, dan `updateOrCreate` mengembalikan password itu setiap seeder dijalankan | Terbuka, sebagian ditangani |
+| S19 | Log `security` kini juga mencatat alasan login gagal, ganti password, dan perubahan akun (tambah, ubah password, reset, nonaktifkan, aktifkan). Pegawai SHD punya akun sendiri, jadi pelakunya jelas selama tidak memakai akun bersama (lihat S28). Tanggal lahir dan data pribadi pegawai tidak dicatat (dijaga test) | Diperbaiki |
+| S28 | Temuan baru: akun bersama (keputusan pengguna) | Diterima sebagai keterbatasan |
+
 ## Tabel temuan
 
 Temuan diurutkan dari tingkat tertinggi. Nomor baris pada kolom "Lokasi" mengacu ke kode saat audit (commit `bbed525`), jadi temuan yang sudah diperbaiki bisa bergeser.
 
 | ID | Tingkat | Judul | Lokasi | Bukti singkat | Dampak | Rekomendasi | Dasar | Status |
 |---|---|---|---|---|---|---|---|---|
-| S01 | Tinggi | Akun default dengan kata sandi tertulis di repo, dan tidak ada cara menggantinya | `backend/database/seeders/DatabaseSeeder.php:13-17`, `backend/routes/api.php` | Username dan kata sandi yang dibaca dari seeder berhasil login (200). Kata sandi 10 karakter, pola umum, tanpa simbol. Tidak ada route ganti kata sandi. `updateOrCreate` mengembalikan kata sandi setiap seeder dijalankan. SPEC §2: akun dibuat lewat seeder | Siapa pun yang punya akses repo bisa login ke production dengan akses penuh, termasuk hapus permanen aset. **Kritis jika repo publik** | Buat akun lewat perintah artisan atau env tanpa nilai bawaan, tambah fitur ganti kata sandi, pisahkan data demo dari seeder production, ganti kata sandi jika sudah terlanjur dipakai, dan cek visibilitas repo | Uji + kode | Terbuka |
+| S01 | Tinggi | Akun default dengan kata sandi tertulis di repo, dan tidak ada cara menggantinya | `backend/database/seeders/DatabaseSeeder.php:13-17`, `backend/routes/api.php` | Username dan kata sandi yang dibaca dari seeder berhasil login (200). Kata sandi 10 karakter, pola umum, tanpa simbol. Tidak ada route ganti kata sandi. `updateOrCreate` mengembalikan kata sandi setiap seeder dijalankan. SPEC §2: akun dibuat lewat seeder | Siapa pun yang punya akses repo bisa login ke production dengan akses penuh, termasuk hapus permanen aset. **Kritis jika repo publik** | Buat akun lewat perintah artisan atau env tanpa nilai bawaan, tambah fitur ganti kata sandi, pisahkan data demo dari seeder production, ganti kata sandi jika sudah terlanjur dipakai, dan cek visibilitas repo | Uji + kode | Terbuka, sebagian ditangani T33 (ganti password & akun per pegawai sudah ada; akun demo seeder masih ada) |
 | S02 | Sedang | Templat env berisi nilai yang tidak aman untuk production | `backend/.env.example:2,4,18` | `APP_ENV=local`, `APP_DEBUG=true`, `LOG_LEVEL=debug`. Dengan debug nyala, respons 500 memuat teks SQL, path server, dan `trace`; dengan debug mati hanya "Server Error" | Tim deploy yang menyalin templat membocorkan struktur database dan path server, sekaligus mengaktifkan S12. TASKS juga mencatat toast error menampilkan SQL & host saat debug | Pakai nilai aman di templat atau beri komentar wajib, dan tulis di README deploy (T28) | Uji + kode | Diperbaiki (`c162e59`) |
 | S03 | Sedang | Header keamanan tidak ada | Semua respons backend, `frontend/index.html`, `backend/public/.htaccess` | CSP, `X-Frame-Options`, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, dan `Permissions-Policy` tidak ada di respons API, `/`, `/up`, maupun unduhan file. `index.html` tanpa meta CSP. `X-Powered-By: PHP/8.3.16` terlihat | Tanpa CSP, XSS di masa depan langsung bisa mencuri token (S04). Halaman bisa dibingkai (clickjacking) jika hosting juga tidak menambahkannya | Tambahkan di web server untuk frontend dan API (lihat Checklist), matikan `expose_php` | Uji + kode | Terbuka |
 | S04 | Sedang | Token login disimpan di `localStorage` | `frontend/src/lib/auth.ts:19,32` | Token terbaca JavaScript halaman (`tokenTerbacaJS: true`), tidak ada di cookie. Token berlaku 480 menit dengan akses penuh | Satu celah XSS, termasuk dari dependensi pihak ketiga, cukup untuk mencuri sesi. Saat ini tidak ditemukan XSS, jadi risikonya bergantung pada kondisi masa depan | Prioritaskan CSP (S03). Pertimbangkan cookie `HttpOnly` lewat mode SPA Sanctum jika frontend dan API satu domain induk | Uji langsung | Terbuka |
@@ -104,6 +114,7 @@ Temuan diurutkan dari tingkat tertinggi. Nomor baris pada kolom "Lokasi" mengacu
 | S24 | Info | Tidak ada rate limit pada endpoint ber-auth yang berat | `backend/routes/api.php:43,88`, upload file | Laporan, label PDF (120 aset), dan upload `Lainnya` tidak dibatasi jumlahnya | Akun yang bocor bisa membebani server atau mengisi disk | Tambah `throttle` pada laporan, label, dan upload | Baca kode | Diperbaiki (`c162e59`) |
 | S25 | Info | Halaman QR publik tidak meminta untuk tidak diindeks | `frontend/index.html`, `backend/public/robots.txt` | Tidak ada meta `robots`, dan `robots.txt` tidak membatasi apa pun | Tautan yang tersebar bisa muncul di mesin pencari | Tambah `noindex` di halaman publik | Uji + kode | Diperbaiki (`c162e59`) |
 | S26 | Info | RLS Supabase belum diverifikasi di database asli | `backend/database/migrations/2026_10_13_000015_enable_rls_on_all_tables.php` | Migration mengaktifkan RLS di semua tabel `public`, dan `asset_code_histories` punya perintah sendiri. Tidak dicek ke Supabase sesuai batas audit | Jika RLS tidak aktif, data bisa terbaca lewat API Supabase | Jalankan query verifikasi di Checklist | Baca kode | Terbuka |
+| S28 | Info | Akun bersama mengurangi akuntabilitas | `backend/app/Http/Controllers/AccountController.php`, kolom "Dicatat oleh" di riwayat aset, kartu stok, dan kartu ruangan | Akun bersama (`source` manual, mis. satu akun per departemen) dipakai beberapa orang dengan satu password. Riwayat dan log `security` mencatat akun itu, bukan orangnya | Saat ada salah catat atau penyalahgunaan, pelakunya tidak bisa dipastikan dari sistem. Password bersama juga cenderung disebar dan jarang diganti | Batasi jumlah akun bersama, ganti passwordnya berkala lewat Data Master > Akun, nonaktifkan saat tidak dipakai, dan utamakan akun pegawai SHD (login NIK) untuk kegiatan penting. Pertimbangkan SSO/Active Directory saat deploy | Kode | Diterima (keputusan pengguna T33) |
 
 ## Sudah aman
 
@@ -201,7 +212,8 @@ Hal berikut sudah diperiksa dan tidak bermasalah pada lingkungan uji.
 ## Checklist sebelum deploy
 
 ### Wajib sebelum go-live
-- [ ] **Akun (S01):** jangan menjalankan `DatabaseSeeder` apa adanya di production. Buat akun dengan kata sandi kuat di luar repo.
+- [ ] **Akun (S01):** jangan menjalankan `DatabaseSeeder` apa adanya di production (akun `staf1` dan data demo). Pegawai SHD login dengan NIK; akun bersama dibuat lewat Data Master > Akun dengan password kuat.
+- [ ] **Direktori pegawai (T33):** set `EMPLOYEE_DIRECTORY_DRIVER=http`, `EMPLOYEE_API_URL`, `EMPLOYEE_API_TOKEN`; sesuaikan `HttpEmployeeDirectory` dengan API asli. Jangan memakai driver `dummy` di production.
 - [ ] **Repo (S01):** pastikan repo GitHub privat. Jika pernah publik, anggap kata sandi seeder sudah bocor.
 - [ ] **Environment (S02):** salin `.env.example` yang kini sudah aman, buat `APP_KEY` baru, dan pastikan `APP_ENV=production`, `APP_DEBUG=false`, `LOG_LEVEL=warning`.
 - [ ] **Dependensi dev (S12):** `composer install --no-dev --optimize-autoloader`, lalu pastikan `POST /_boost/browser-logs` dijawab 404.

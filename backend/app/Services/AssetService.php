@@ -220,7 +220,7 @@ class AssetService
             DB::afterCommit(fn () => Log::channel('security')->info('asset.deleted', [
                 'asset_code' => $asset->code,
                 'user_id' => $actor->id,
-                'username' => $actor->username,
+                'username' => $actor->loginId(),
             ]));
         });
     }

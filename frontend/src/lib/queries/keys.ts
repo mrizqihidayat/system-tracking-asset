@@ -51,4 +51,9 @@ export const queryKeys = {
     requestCatalog: () => ['master', 'request-catalog'] as const,
     requestMethods: () => ['master', 'request-methods'] as const,
   },
+  accounts: {
+    all: ['accounts'] as const,
+  },
+  /** Saran pegawai dari direktori pegawai (T33), per teks pencarian. */
+  employees: (search: string) => ['employees', search.trim().toLowerCase()] as const,
 }

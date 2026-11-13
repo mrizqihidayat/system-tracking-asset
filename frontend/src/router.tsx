@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import AppLayout from './components/layout/AppLayout'
 import RequireAuth from './components/RequireAuth'
 import LoginPage from './pages/LoginPage'
+import ChangePasswordPage from './pages/ChangePasswordPage'
 import AssetDetailPage from './pages/assets/AssetDetailPage'
 import AssetFormPage from './pages/assets/AssetFormPage'
 import AssetListPage from './pages/assets/AssetListPage'
@@ -22,6 +23,15 @@ export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   // Halaman publik QR (SPEC §6): /aset/{public_token}, tanpa login.
   { path: '/aset/:token', element: <PublicAssetPage /> },
+  // Ganti password (SPEC §15): di luar layout karena juga dipakai saat akun wajib ganti password.
+  {
+    path: '/ganti-password',
+    element: (
+      <RequireAuth>
+        <ChangePasswordPage />
+      </RequireAuth>
+    ),
+  },
   {
     element: (
       <RequireAuth>

@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\AuthController;
 use App\Models\User;
+use App\Services\AuthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -41,8 +41,8 @@ class AuthTest extends TestCase
 
     public function test_wrong_credentials_return_401_without_leaking_which_field(): void
     {
-        $this->login('staf.shd', 'salah')->assertUnauthorized()->assertJsonPath('message', 'Username atau password salah');
-        $this->login('tidak.ada')->assertUnauthorized()->assertJsonPath('message', 'Username atau password salah');
+        $this->login('staf.shd', 'salah')->assertUnauthorized()->assertJsonPath('message', 'NIK/Username atau password salah');
+        $this->login('tidak.ada')->assertUnauthorized()->assertJsonPath('message', 'NIK/Username atau password salah');
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
@@ -176,14 +176,14 @@ class AuthTest extends TestCase
 
         $this->login('tidak.ada', 'rahasia')->assertUnauthorized();
 
-        Hash::shouldHaveReceived('check')->once()->with('rahasia', AuthController::DUMMY_PASSWORD_HASH);
+        Hash::shouldHaveReceived('check')->once()->with('rahasia', AuthService::DUMMY_PASSWORD_HASH);
     }
 
     public function test_dummy_hash_cost_matches_production_bcrypt_rounds(): void
     {
         preg_match('/^BCRYPT_ROUNDS=(\d+)/m', file_get_contents(base_path('.env.example')), $rounds);
 
-        $this->assertSame((int) $rounds[1], password_get_info(AuthController::DUMMY_PASSWORD_HASH)['options']['cost']);
+        $this->assertSame((int) $rounds[1], password_get_info(AuthService::DUMMY_PASSWORD_HASH)['options']['cost']);
     }
 
     public function test_login_is_limited_to_20_attempts_per_minute_per_ip_across_usernames(): void

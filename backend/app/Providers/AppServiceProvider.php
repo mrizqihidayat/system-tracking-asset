@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Observers\CacheInvalidationObserver;
+use App\Services\EmployeeDirectory\DummyEmployeeDirectory;
+use App\Services\EmployeeDirectory\EmployeeDirectory;
+use App\Services\EmployeeDirectory\HttpEmployeeDirectory;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -15,7 +18,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Direktori pegawai (T33): data fiktif saat demo, API INALUM saat deploy (EMPLOYEE_DIRECTORY_DRIVER).
+        $this->app->singleton(EmployeeDirectory::class, fn () => config('employees.driver') === 'http'
+            ? new HttpEmployeeDirectory((string) config('employees.api_url'), config('employees.api_token'), (int) config('employees.api_timeout'))
+            : new DummyEmployeeDirectory((string) config('employees.dummy_path')));
     }
 
     /**
@@ -47,6 +53,9 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(20)->by($request->ip())->response($tooMany),
             ];
         });
+
+        // Ganti password sendiri: maks. 10 per menit per akun.
+        RateLimiter::for('password', fn (Request $request) => Limit::perMinute(10)->by((string) $request->user()?->id));
 
         // Endpoint berat per pengguna (SPEC §14).
         foreach (['reports' => 10, 'labels' => 20, 'uploads' => 30] as $name => $perMinute) {

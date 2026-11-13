@@ -2,6 +2,7 @@ import { TriangleAlert } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import EmployeeCombobox from '../../components/EmployeeCombobox'
 import { AssetCode } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { buttonClass } from '../../components/ui/button-class'
@@ -329,7 +330,7 @@ export default function AssetFormPage() {
           />
         </FormField>
         <FormField label="Penanggung jawab (PIC)" error={errors.pic_name}>
-          <Input value={form.pic_name} onChange={(e) => set('pic_name', e.target.value)} error={errors.pic_name} maxLength={150} />
+          <EmployeeCombobox value={form.pic_name} onChange={(name) => set('pic_name', name)} error={errors.pic_name} />
         </FormField>
 
         <FormField label="Gedung (lokasi asal)" required>

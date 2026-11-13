@@ -23,6 +23,10 @@ api.interceptors.response.use(
         location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`)
       }
     }
+    // Akun wajib ganti password (SPEC §15): semua endpoint lain ditolak sampai password diganti.
+    if (error.response?.status === 403 && error.response.data?.code === 'password_change_required' && location.pathname !== '/ganti-password') {
+      location.assign(`/ganti-password?next=${encodeURIComponent(location.pathname + location.search)}`)
+    }
     return Promise.reject(error)
   },
 )
