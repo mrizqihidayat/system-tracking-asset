@@ -43,12 +43,15 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     // Direktori pegawai & akun (T33, SPEC §15)
     Route::get('/employees', [EmployeeController::class, 'index']);
-    Route::get('/accounts', [AccountController::class, 'index']);
-    Route::post('/accounts', [AccountController::class, 'store']);
-    Route::put('/accounts/{account}/password', [AccountController::class, 'updatePassword'])->whereNumber('account')->withTrashed();
-    Route::post('/accounts/{account}/reset', [AccountController::class, 'reset'])->whereNumber('account')->withTrashed();
-    Route::post('/accounts/{account}/restore', [AccountController::class, 'restore'])->whereNumber('account')->withTrashed();
-    Route::delete('/accounts/{account}', [AccountController::class, 'destroy'])->whereNumber('account')->withTrashed();
+    // Kelola akun: hanya akun pegawai SHD (akun bersama 403).
+    Route::middleware('employee.account')->group(function () {
+        Route::get('/accounts', [AccountController::class, 'index']);
+        Route::post('/accounts', [AccountController::class, 'store']);
+        Route::put('/accounts/{account}/password', [AccountController::class, 'updatePassword'])->whereNumber('account')->withTrashed();
+        Route::post('/accounts/{account}/reset', [AccountController::class, 'reset'])->whereNumber('account')->withTrashed();
+        Route::post('/accounts/{account}/restore', [AccountController::class, 'restore'])->whereNumber('account')->withTrashed();
+        Route::delete('/accounts/{account}', [AccountController::class, 'destroy'])->whereNumber('account')->withTrashed();
+    });
 
     // Dashboard per kelompok widget (SPEC §11), masing-masing di-cache
     Route::get('/dashboard/cards', [DashboardController::class, 'cards']);

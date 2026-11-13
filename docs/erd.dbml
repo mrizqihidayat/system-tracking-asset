@@ -68,7 +68,7 @@ Table users {
   username varchar(50) [unique, note: 'akun bersama (source manual), login username']
   department varchar(100) [note: 'akun api: dari direktori (departemen/divisi/grup); akun manual: nama dari master departments']
   source varchar(10) [not null, default: 'manual', note: 'api | manual (CHECK); api wajib nik, manual wajib username (CHECK)']
-  password varchar(255) [not null, note: 'akun api sebelum ganti password: hash acak, login memakai tanggal lahir dari direktori']
+  password varchar(255) [not null, note: 'akun api sebelum ganti password: hash acak, login memakai NIK sebagai password (T33 R1)']
   must_change_password boolean [not null, default: false]
   created_at timestamp
   updated_at timestamp

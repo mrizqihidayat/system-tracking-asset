@@ -12,6 +12,7 @@ import { useAssetTypes, useBuildings, useCategories, useConsumableCategories, us
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { AssetType, Building, Category, Department, Room } from '../../types/asset'
 import type { ConsumableCategory } from '../../types/supply'
+import { getUser } from '../../lib/auth'
 import AccountsTab from './AccountsTab'
 import { MasterDeleteModal, MasterFormModal, type MasterTarget } from './MasterModals'
 
@@ -79,7 +80,9 @@ function Group({ title, meta, open, onToggle, actions, children }: {
 export default function MasterDataPage() {
   const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
-  const tab = (TABS.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'gedung') as Tab
+  // Tab Akun hanya untuk akun pegawai SHD; akun bersama tidak melihatnya (API juga menolak 403).
+  const tabs = getUser()?.source === 'api' ? TABS : TABS.filter((t) => t.key !== 'akun')
+  const tab = (tabs.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'gedung') as Tab
   const queries = [useBuildings(), useRooms(), useDepartments(), useCategories(), useAssetTypes(), useConsumableCategories()] as const
   useErrorToast(...queries.map((q) => q.error))
   const [buildings, rooms, departments, categories, types, consumableCategories] = queries
@@ -269,7 +272,7 @@ export default function MasterDataPage() {
       />
 
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.key}
             role="tab"

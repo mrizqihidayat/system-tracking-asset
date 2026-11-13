@@ -12,7 +12,7 @@ import { safeNext } from '../lib/safe-next'
 
 /**
  * Ganti password sendiri (SPEC §15). Wajib untuk akun pegawai SHD saat login pertama / setelah reset:
- * password saat ini = tanggal lahir, dan halaman lain tertutup sampai password diganti.
+ * password saat ini = NIK, dan halaman lain tertutup sampai password diganti.
  */
 export default function ChangePasswordPage() {
   const navigate = useNavigate()
@@ -81,7 +81,7 @@ export default function ChangePasswordPage() {
           </div>
         )}
 
-        <FormField label={forced && isEmployee ? 'Tanggal lahir (DDMMYYYY)' : 'Password saat ini'} required error={errors.current_password}>
+        <FormField label={forced && isEmployee ? 'Password saat ini (NIK Anda)' : 'Password saat ini'} required error={errors.current_password}>
           <PasswordInput
             value={form.current_password}
             onChange={(e) => set('current_password', e.target.value)}
@@ -95,7 +95,7 @@ export default function ChangePasswordPage() {
           <PasswordInput value={form.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" error={errors.password} required />
           {!errors.password && (
             <span className="block text-xs text-slate-500">
-              Minimal {PASSWORD_MIN} karakter, tidak sama dengan {isEmployee ? 'NIK atau tanggal lahir' : 'username'}.
+              Minimal {PASSWORD_MIN} karakter, tidak sama dengan {isEmployee ? 'NIK' : 'username'}.
             </span>
           )}
         </FormField>

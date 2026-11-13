@@ -14,21 +14,18 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * Login NIK pegawai SHD dari direktori pegawai dummy (database/data/employees.json, data fiktif), T33.
+ * Login NIK pegawai SHD dari direktori pegawai dummy (database/data/employees.json, data fiktif), T33 R1:
+ * password login pertama / setelah reset = NIK, lalu wajib ganti password.
  */
 class EmployeeLoginTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** Pegawai SHD fiktif, lahir 1990-03-14. */
+    /** Pegawai SHD fiktif (lahir 1990-03-14 di data dummy; tanggal lahir tidak dipakai lagi). */
     private const SHD_NIK = '90100001';
 
-    private const SHD_BIRTH = '14031990';
-
-    /** Pegawai HRM (bukan SHD), lahir 1992-01-09. */
+    /** Pegawai HRM (bukan SHD). */
     private const OTHER_NIK = '90100004';
-
-    private const OTHER_BIRTH = '09011992';
 
     private const NEW_PASSWORD = 'Baru-Uji-2026';
 
@@ -57,6 +54,11 @@ class EmployeeLoginTest extends TestCase
         return $this->postJson('/api/login', ['username' => $id, 'password' => $password]);
     }
 
+    private function logged(): string
+    {
+        return implode('', array_map(file_get_contents(...), glob("{$this->logDir}/*.log") ?: []));
+    }
+
     private function directoryDown(): void
     {
         $this->app->instance(EmployeeDirectory::class, new class implements EmployeeDirectory
@@ -79,9 +81,9 @@ class EmployeeLoginTest extends TestCase
         return User::factory()->employee($nik)->create(['password' => self::NEW_PASSWORD]);
     }
 
-    public function test_first_login_with_birth_date_creates_api_account_that_must_change_password(): void
+    public function test_first_login_with_nik_creates_api_account_that_must_change_password(): void
     {
-        $response = $this->login(self::SHD_NIK, self::SHD_BIRTH)->assertOk()
+        $response = $this->login(self::SHD_NIK, self::SHD_NIK)->assertOk()
             ->assertJsonPath('user.nik', self::SHD_NIK)
             ->assertJsonPath('user.name', 'ANDI PRATAMA SIREGAR')
             ->assertJsonPath('user.department', 'SHD')
@@ -89,21 +91,22 @@ class EmployeeLoginTest extends TestCase
             ->assertJsonPath('user.must_change_password', true);
 
         $this->assertStringNotContainsString('1990-03-14', $response->getContent());
-        $this->assertStringNotContainsString(self::SHD_BIRTH, $response->getContent());
         $this->assertDatabaseHas('users', ['nik' => self::SHD_NIK, 'source' => 'api', 'must_change_password' => true]);
     }
 
-    public function test_wrong_birth_date_or_unknown_nik_is_rejected_without_creating_account(): void
+    public function test_wrong_password_birth_date_or_unknown_nik_is_rejected_without_creating_account(): void
     {
-        $this->login(self::SHD_NIK, '01011990')->assertUnauthorized()->assertJsonPath('message', AuthService::MSG_WRONG);
-        $this->login('99999999', self::SHD_BIRTH)->assertUnauthorized()->assertJsonPath('message', AuthService::MSG_WRONG);
+        $this->login(self::SHD_NIK, '12345678')->assertUnauthorized()->assertJsonPath('message', AuthService::MSG_WRONG);
+        // Tanggal lahir (DDMMYYYY) tidak lagi diterima.
+        $this->login(self::SHD_NIK, '14031990')->assertUnauthorized();
+        $this->login('99999999', '99999999')->assertUnauthorized()->assertJsonPath('message', AuthService::MSG_WRONG);
 
         $this->assertDatabaseCount('users', 0);
     }
 
     public function test_non_shd_employee_is_rejected_with_403(): void
     {
-        $this->login(self::OTHER_NIK, self::OTHER_BIRTH)->assertForbidden()->assertJsonPath('message', 'Hanya pegawai Departemen SHD');
+        $this->login(self::OTHER_NIK, self::OTHER_NIK)->assertForbidden()->assertJsonPath('message', 'Hanya pegawai Departemen SHD');
 
         $this->assertDatabaseCount('users', 0);
     }
@@ -118,14 +121,16 @@ class EmployeeLoginTest extends TestCase
 
     public function test_must_change_password_blocks_other_endpoints_until_changed(): void
     {
-        $token = $this->login(self::SHD_NIK, self::SHD_BIRTH)->json('token');
+        $token = $this->login(self::SHD_NIK, self::SHD_NIK)->json('token');
 
         $this->withToken($token)->getJson('/api/assets')->assertForbidden()->assertJsonPath('code', 'password_change_required');
         $this->withToken($token)->getJson('/api/employees?search=andi')->assertForbidden();
+        $this->withToken($token)->getJson('/api/accounts')->assertForbidden()->assertJsonPath('code', 'password_change_required');
         $this->withToken($token)->getJson('/api/user')->assertOk()->assertJsonPath('must_change_password', true);
 
+        // Password lama = NIK.
         $this->withToken($token)->putJson('/api/user/password', [
-            'current_password' => self::SHD_BIRTH,
+            'current_password' => self::SHD_NIK,
             'password' => self::NEW_PASSWORD,
             'password_confirmation' => self::NEW_PASSWORD,
         ])->assertOk()->assertJsonPath('must_change_password', false);
@@ -133,9 +138,9 @@ class EmployeeLoginTest extends TestCase
         $this->app['auth']->forgetGuards();
         $this->withToken($token)->getJson('/api/assets')->assertOk();
 
-        // Setelah ganti: password baru berlaku, tanggal lahir tidak lagi.
+        // Setelah ganti: password baru berlaku, NIK tidak lagi.
         $this->login(self::SHD_NIK, self::NEW_PASSWORD)->assertOk()->assertJsonPath('user.must_change_password', false);
-        $this->login(self::SHD_NIK, self::SHD_BIRTH)->assertUnauthorized();
+        $this->login(self::SHD_NIK, self::SHD_NIK)->assertUnauthorized();
     }
 
     public function test_new_password_rules(): void
@@ -143,7 +148,7 @@ class EmployeeLoginTest extends TestCase
         $user = User::factory()->employee(self::SHD_NIK)->create(['must_change_password' => true]);
         $this->actingAs($user);
 
-        $change = fn (string $password, ?string $confirmation = null, string $current = self::SHD_BIRTH) => $this->putJson('/api/user/password', [
+        $change = fn (string $password, ?string $confirmation = null, string $current = self::SHD_NIK) => $this->putJson('/api/user/password', [
             'current_password' => $current,
             'password' => $password,
             'password_confirmation' => $confirmation ?? $password,
@@ -151,11 +156,22 @@ class EmployeeLoginTest extends TestCase
 
         $change('Pendek1')->assertUnprocessable()->assertJsonValidationErrors('password');
         $change(self::SHD_NIK)->assertUnprocessable()->assertJsonPath('errors.password.0', 'Password tidak boleh sama dengan NIK.');
-        $change(self::SHD_BIRTH)->assertUnprocessable()->assertJsonPath('errors.password.0', 'Password tidak boleh sama dengan tanggal lahir.');
         $change(self::NEW_PASSWORD, 'Lain-Uji-2026')->assertUnprocessable()->assertJsonValidationErrors('password');
-        $change(self::NEW_PASSWORD, null, '01011990')->assertUnprocessable()->assertJsonPath('errors.current_password.0', 'Password saat ini salah.');
+        $change(self::NEW_PASSWORD, null, '14031990')->assertUnprocessable()->assertJsonPath('errors.current_password.0', 'Password saat ini salah.');
 
         $change(self::NEW_PASSWORD)->assertOk();
+    }
+
+    public function test_forced_change_does_not_need_directory(): void
+    {
+        $this->actingAs(User::factory()->employee(self::SHD_NIK)->create(['must_change_password' => true]));
+        $this->directoryDown();
+
+        $this->putJson('/api/user/password', [
+            'current_password' => self::SHD_NIK,
+            'password' => self::NEW_PASSWORD,
+            'password_confirmation' => self::NEW_PASSWORD,
+        ])->assertOk();
     }
 
     public function test_manual_account_password_cannot_equal_username(): void
@@ -193,7 +209,7 @@ class EmployeeLoginTest extends TestCase
 
         $this->login(self::SHD_NIK, self::NEW_PASSWORD)->assertForbidden()->assertJsonPath('message', AuthService::MSG_INACTIVE);
         // Tidak membuat akun baru untuk NIK yang sama.
-        $this->login(self::SHD_NIK, self::SHD_BIRTH)->assertUnauthorized();
+        $this->login(self::SHD_NIK, self::SHD_NIK)->assertUnauthorized();
         $this->assertSame(1, User::withTrashed()->count());
     }
 
@@ -204,8 +220,7 @@ class EmployeeLoginTest extends TestCase
 
         $this->login(self::SHD_NIK, self::NEW_PASSWORD)->assertOk();
 
-        $log = implode('', array_map(file_get_contents(...), glob("{$this->logDir}/*.log") ?: []));
-        $this->assertMatchesRegularExpression('/WARNING: login\.directory_unavailable .*"user_id":'.$user->id.'/', $log);
+        $this->assertMatchesRegularExpression('/WARNING: login\.directory_unavailable .*"user_id":'.$user->id.'/', $this->logged());
     }
 
     public function test_directory_down_rejects_first_login_and_reset_accounts_but_not_manual_accounts(): void
@@ -214,8 +229,8 @@ class EmployeeLoginTest extends TestCase
         User::factory()->create(['username' => 'bersama.shd', 'password' => 'Bersama-Uji-1']);
         $this->directoryDown();
 
-        $this->login(self::SHD_NIK, self::SHD_BIRTH)->assertStatus(503)->assertJsonPath('message', AuthService::MSG_DIRECTORY_DOWN);
-        $this->login('90100002', '02111988')->assertStatus(503);
+        $this->login(self::SHD_NIK, self::SHD_NIK)->assertStatus(503)->assertJsonPath('message', AuthService::MSG_DIRECTORY_DOWN);
+        $this->login('90100002', '90100002')->assertStatus(503);
         $this->login('bersama.shd', 'Bersama-Uji-1')->assertOk();
         $this->assertDatabaseMissing('users', ['nik' => self::SHD_NIK]);
     }
@@ -230,15 +245,16 @@ class EmployeeLoginTest extends TestCase
         $this->assertSame('SHD', $user->fresh()->department);
     }
 
-    public function test_birth_date_and_private_fields_never_reach_logs(): void
+    public function test_passwords_and_private_fields_never_reach_logs(): void
     {
-        $this->login(self::SHD_NIK, self::SHD_BIRTH)->assertOk();
-        $this->login(self::SHD_NIK, '01011990')->assertUnauthorized();
-        $this->login(self::OTHER_NIK, self::OTHER_BIRTH)->assertForbidden();
+        $this->login(self::SHD_NIK, self::SHD_NIK)->assertOk();
+        $this->login(self::SHD_NIK, 'Salah-Uji-1')->assertUnauthorized();
+        $this->login(self::OTHER_NIK, self::OTHER_NIK)->assertForbidden();
 
-        $log = implode('', array_map(file_get_contents(...), glob("{$this->logDir}/*.log") ?: []));
+        $log = $this->logged();
         $this->assertStringContainsString('"reason":"not_shd"', $log);
-        foreach ([self::SHD_BIRTH, '1990-03-14', '01011990', self::OTHER_BIRTH, 'contoh.invalid', 'Islam'] as $secret) {
+        $this->assertStringNotContainsString('"password"', $log);
+        foreach (['Salah-Uji-1', '1990-03-14', 'contoh.invalid', 'Islam'] as $secret) {
             $this->assertStringNotContainsString($secret, $log);
         }
     }

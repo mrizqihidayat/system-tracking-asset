@@ -16,8 +16,8 @@ use Laravel\Sanctum\PersonalAccessToken;
 /**
  * Login & password akun (T33, SPEC §15).
  * - Teks login berupa angka saja = NIK (akun pegawai SHD, source api); selain itu username (akun manual).
- * - Akun api dibuat otomatis saat login pertama. Selama must_change_password, password yang diterima
- *   adalah tanggal lahir DDMMYYYY dari API pegawai (tidak disimpan, tidak dicatat).
+ * - Akun api dibuat otomatis saat login pertama. Selama must_change_password (login pertama / setelah reset),
+ *   password yang diterima adalah NIK itu sendiri, lalu wajib ganti password (T33 R1).
  * - Status akun (nonaktif, bukan SHD) baru dicek setelah password benar agar tidak membocorkan data.
  */
 class AuthService
@@ -83,12 +83,12 @@ class AuthService
         if ($usesStoredPassword) {
             $valid = Hash::check($password, $user->password);
         } else {
-            // Login pertama / setelah reset: verifikasi tanggal lahir dari API.
+            // Login pertama / setelah reset: password = NIK; pegawai & departemen SHD tetap dicek ke API.
             if ($directoryDown) {
                 throw new LoginRejected(self::MSG_DIRECTORY_DOWN, 503, 'directory_unavailable');
             }
             Hash::check($password, self::DUMMY_PASSWORD_HASH);
-            $valid = $employee?->matchesBirthDate($password) ?? false;
+            $valid = $employee !== null && hash_equals($nik, $password);
         }
 
         if (! $valid) {
@@ -132,22 +132,18 @@ class AuthService
         ]);
     }
 
-    /**
-     * Password saat ini untuk Ganti password: tanggal lahir selama akun api wajib ganti, selain itu password tersimpan.
-     *
-     * @throws EmployeeDirectoryUnavailable
-     */
+    /** Password saat ini untuk Ganti password: NIK selama akun api wajib ganti, selain itu password tersimpan. */
     public function checkCurrentPassword(User $user, string $password): bool
     {
         if ($user->isApi() && $user->must_change_password) {
-            return $this->directory->findByNik((string) $user->nik)?->matchesBirthDate($password) ?? false;
+            return hash_equals((string) $user->nik, $password);
         }
 
         return Hash::check($password, $user->password);
     }
 
     /**
-     * Aturan password baru: minimal 8, terkonfirmasi, tidak sama dengan NIK/username atau tanggal lahir (akun api).
+     * Aturan password baru: minimal 8, terkonfirmasi, tidak sama dengan NIK/username (tanpa beda huruf besar/kecil).
      *
      * @return list<mixed>
      */
@@ -156,28 +152,12 @@ class AuthService
         return [
             'required', 'string', 'min:8', 'max:72', 'confirmed',
             function (string $attribute, mixed $value, Closure $fail) use ($user, $username): void {
-                $value = (string) $value;
                 $loginId = $user?->loginId() ?? (string) $username;
-                if ($loginId !== '' && mb_strtolower($value) === mb_strtolower($loginId)) {
+                if ($loginId !== '' && mb_strtolower((string) $value) === mb_strtolower($loginId)) {
                     $fail($user?->isApi() ? 'Password tidak boleh sama dengan NIK.' : 'Password tidak boleh sama dengan username.');
-
-                    return;
-                }
-                if ($user?->isApi() && $this->matchesBirthDate($user, $value)) {
-                    $fail('Password tidak boleh sama dengan tanggal lahir.');
                 }
             },
         ];
-    }
-
-    private function matchesBirthDate(User $user, string $value): bool
-    {
-        try {
-            return $this->directory->findByNik((string) $user->nik)?->matchesBirthDate($value) ?? false;
-        } catch (EmployeeDirectoryUnavailable) {
-            // Tidak bisa dicek saat API mati; aturan lain tetap berlaku.
-            return false;
-        }
     }
 
     /**

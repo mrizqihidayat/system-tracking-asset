@@ -11,9 +11,8 @@ export interface Account extends AuthUser {
   created_at: string | null
 }
 
-/** Saran pegawai: hanya data yang boleh tampil (SPEC §15). */
+/** Saran pegawai: hanya nama, departemen, jabatan (SPEC §15); NIK tidak dikirim. */
 export interface Employee {
-  nik: string
   name: string
   department: string
   position: string

@@ -17,6 +17,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Data Master > Akun (T33, SPEC §15). Akun pegawai SHD dibuat otomatis saat login pertama;
  * di sini hanya akun bersama yang bisa ditambah. Nonaktifkan = soft delete, bisa diaktifkan kembali.
+ * Hanya untuk akun pegawai SHD (middleware employee.account).
  */
 class AccountController extends Controller
 {
@@ -56,7 +57,7 @@ class AccountController extends Controller
         return AccountResource::make($account);
     }
 
-    /** Reset akun pegawai SHD: login berikutnya memakai tanggal lahir lalu wajib ganti password. */
+    /** Reset akun pegawai SHD: login berikutnya memakai NIK sebagai password lalu wajib ganti password. */
     public function reset(Request $request, User $account): AccountResource
     {
         $this->ensureActive($account);

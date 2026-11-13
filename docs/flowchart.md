@@ -1,6 +1,6 @@
 # Flowchart — Sistem Informasi Aset SHD
 
-Disusun dari kode frontend & backend per 9 November 2026 (termasuk T30 R1: catat perubahan barang ruangan, Tandai sudah dicek, kartu ruangan; tampilan gudang; slug ikut nama). Diperbarui 13 November 2026 (T33: login NIK / username, wajib ganti password, Data Master > Akun).
+Disusun dari kode frontend & backend per 9 November 2026 (termasuk T30 R1: catat perubahan barang ruangan, Tandai sudah dicek, kartu ruangan; tampilan gudang; slug ikut nama). Diperbarui 13 November 2026 (T33: login NIK / username, wajib ganti password, Data Master > Akun; R1: password awal = NIK, kelola akun khusus akun pegawai SHD).
 
 Versi visual: **`docs/flowchart.drawio`** (buka dengan ekstensi Draw.io di VS Code; satu tab per alur). Isinya dibuat dari blok Mermaid di bawah: setelah mengubah file ini, jalankan `python docs/scripts/flowchart_drawio.py` dari root repo untuk membuat ulang `flowchart.drawio`.
 
@@ -291,21 +291,23 @@ flowchart TD
     N3 -- Ya --> SHD
     N1 -- Tidak: login pertama / setelah reset --> F1{Direktori pegawai bisa diakses?}
     F1 -- Tidak --> F2[Pesan: Data pegawai tidak bisa diakses, coba lagi nanti] --> B
-    F1 -- Ya --> F3{Password = tanggal lahir DDMMYYYY?}
+    F1 -- Ya --> F3{Password = NIK?}
     F3 -- Tidak --> X
     F3 -- Ya --> SHD{Pegawai ada & departemen SHD?}
     SHD -- Tidak --> S1[Pesan: Hanya pegawai Departemen SHD] --> B
     SHD -- Ya --> S2[(Buat akun pegawai bila belum ada; sinkron nama & departemen)] --> AKT
     AKT -- Tidak --> AK1[Pesan: Akun dinonaktifkan] --> B
     AKT -- Ya --> W{Wajib ganti password?}
-    W -- Ya --> G1[Halaman Buat password baru: tanggal lahir + password baru 2x; halaman lain tertutup] --> G2{Valid: min. 8, bukan NIK / tanggal lahir, konfirmasi sama?}
+    W -- Ya --> G1[Halaman Buat password baru: NIK sebagai password saat ini + password baru 2x; halaman lain tertutup] --> G2{Valid: min. 8, bukan NIK, konfirmasi sama?}
     G2 -- Tidak --> G1
     G2 -- Ya --> G3[(Simpan password, sesi lain dicabut)] --> D
     W -- Tidak --> D[[Dashboard]]
 
-    D -- Buka Data Master, tab Akun --> K{Aksi akun}
+    D -- Buka Data Master --> AKUN{Akun pegawai SHD?}
+    AKUN -- Tidak: akun bersama --> AK2[Tab Akun tidak tampil; API menolak 403]
+    AKUN -- Ya --> K{Aksi akun}
     K -- Tambah akun bersama --> K1[Username bukan angka saja, nama, departemen, password 2x] --> K2[(Simpan, tidak wajib ganti)]
-    K -- Reset akun pegawai --> K3[(Wajib ganti, login berikutnya pakai tanggal lahir, sesi dicabut)]
+    K -- Reset akun pegawai --> K3[(Wajib ganti, login berikutnya pakai NIK, sesi dicabut)]
     K -- Ubah password akun bersama --> K4[(Simpan, sesi lain dicabut)]
     K -- Nonaktifkan, bukan akun sendiri --> K5[(Soft delete, sesi dicabut)]
     K -- Aktifkan kembali --> K6[(Restore)]

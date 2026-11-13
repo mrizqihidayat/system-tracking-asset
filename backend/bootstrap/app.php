@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureEmployeeAccount;
 use App\Http\Middleware\EnsurePasswordChanged;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn () => null);
-        $middleware->alias(['password.changed' => EnsurePasswordChanged::class]);
+        $middleware->alias(['password.changed' => EnsurePasswordChanged::class, 'employee.account' => EnsureEmployeeAccount::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(function ($request, $e) {

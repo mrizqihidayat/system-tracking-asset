@@ -6,7 +6,6 @@ use App\Exceptions\LoginRejected;
 use App\Http\Requests\ChangePasswordRequest;
 use App\Http\Resources\AccountResource;
 use App\Services\AuthService;
-use App\Services\EmployeeDirectory\EmployeeDirectoryUnavailable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -56,20 +55,14 @@ class AuthController extends Controller
     }
 
     /**
-     * Ganti password sendiri. Akun api yang wajib ganti memakai tanggal lahir sebagai password saat ini.
+     * Ganti password sendiri. Akun api yang wajib ganti memakai NIK sebagai password saat ini.
      * Token lain milik akun ini dicabut; token yang sedang dipakai tetap berlaku.
      */
     public function changePassword(ChangePasswordRequest $request): JsonResponse
     {
         $user = $request->user();
 
-        try {
-            $currentValid = $this->auth->checkCurrentPassword($user, $request->validated('current_password'));
-        } catch (EmployeeDirectoryUnavailable) {
-            return response()->json(['message' => AuthService::MSG_DIRECTORY_DOWN], 503);
-        }
-
-        if (! $currentValid) {
+        if (! $this->auth->checkCurrentPassword($user, $request->validated('current_password'))) {
             throw ValidationException::withMessages(['current_password' => 'Password saat ini salah.']);
         }
 

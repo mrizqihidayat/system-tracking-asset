@@ -67,12 +67,12 @@ export default function LoginPage() {
           )}
           <FormField label="NIK / Username" error={errors.username}>
             <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus required />
-            <span className="block text-xs text-slate-500">Pegawai SHD memakai NIK. Login pertama: password = tanggal lahir (DDMMYYYY).</span>
           </FormField>
           <FormField label="Password" error={errors.password}>
             <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
           </FormField>
           <Button type="submit" loading={loading} className="w-full">Masuk</Button>
+          <p className="text-center text-sm text-slate-500">Lupa password? Hubungi admin Aset SHD.</p>
         </form>
       </main>
     </div>

@@ -14,7 +14,7 @@ interface Props {
  * Kolom nama dengan saran pegawai dari direktori pegawai (semua departemen, T33).
  * Ketik manual tetap boleh untuk orang yang tidak ada di direktori.
  */
-export default function EmployeeCombobox({ value, onChange, onPick, error, placeholder = 'Ketik nama atau NIK' }: Props) {
+export default function EmployeeCombobox({ value, onChange, onPick, error, placeholder = 'Ketik nama pegawai' }: Props) {
   const employees = useEmployeeSearch(value)
 
   return (
@@ -22,13 +22,14 @@ export default function EmployeeCombobox({ value, onChange, onPick, error, place
       value={value}
       onChange={onChange}
       filter={false}
-      options={employees.map((e) => ({
-        id: e.nik,
+      // Respons tanpa NIK: urutan di daftar saran dipakai sebagai id.
+      options={employees.map((e, index) => ({
+        id: index,
         label: e.name,
         description: [e.department, e.position].filter((part) => part && part !== '-').join(' · '),
       }))}
       onSelect={({ id }) => {
-        const employee = employees.find((e) => e.nik === id)
+        const employee = typeof id === 'number' ? employees[id] : undefined
         if (employee) onPick?.(employee)
       }}
       placeholder={placeholder}

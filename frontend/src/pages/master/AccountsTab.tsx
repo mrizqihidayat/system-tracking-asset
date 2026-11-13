@@ -130,7 +130,7 @@ const CONFIRM = {
   reset: {
     title: 'Reset password',
     label: 'Reset password',
-    text: (a: Account) => `${a.name} (NIK ${a.nik}) akan keluar dari semua perangkat. Login berikutnya memakai tanggal lahir (DDMMYYYY), lalu wajib membuat password baru.`,
+    text: (a: Account) => `${a.name} (NIK ${a.nik}) akan keluar dari semua perangkat. Login berikutnya memakai NIK sebagai password, lalu wajib membuat password baru.`,
     request: (a: Account) => api.post(`/accounts/${a.id}/reset`),
     done: 'Password direset.',
   },

@@ -7,17 +7,22 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Saran pegawai: hanya nik, nama, departemen (aturan fallback), jabatan (SPEC §15).
+ * Saran pegawai: hanya nama, departemen (aturan fallback), dan jabatan (SPEC §15).
+ * NIK tidak dikirim karena NIK adalah password awal akun pegawai SHD (T33 R1).
  *
  * @property Employee $resource
  */
 class EmployeeResource extends JsonResource
 {
     /**
-     * @return array{nik: string, name: string, department: string, position: string}
+     * @return array{name: string, department: string, position: string}
      */
     public function toArray(Request $request): array
     {
-        return $this->resource->toArray();
+        return [
+            'name' => $this->resource->name,
+            'department' => $this->resource->department,
+            'position' => $this->resource->position,
+        ];
     }
 }
