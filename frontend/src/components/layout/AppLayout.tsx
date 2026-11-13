@@ -4,7 +4,6 @@ import {
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import icon from '../../assets/icon.png'
 import { api } from '../../lib/api'
 import { cancelRoutePrefetch, prefetchRouteOnDwell } from '../../lib/queries/prefetch'
 import { clearSession, getUser } from '../../lib/auth'
@@ -28,7 +27,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3">
       <span className={`flex shrink-0 items-center justify-center rounded-lg bg-white ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
-        <img src={icon} alt="INALUM" className={compact ? 'w-5' : 'w-7'} />
+        <img src="/icon.png" alt="INALUM" className={compact ? 'w-5' : 'w-7'} />
       </span>
       <span className="min-w-0 leading-tight">
         <span className={`block font-bold ${compact ? 'text-base' : 'text-[17px]'}`}>Aset SHD</span>
