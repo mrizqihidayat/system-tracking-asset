@@ -17,10 +17,10 @@ class MasterDataSeeder extends Seeder
      */
     public function run(CodeGenerator $codes): void
     {
-        Department::create(['name' => 'SHD', 'is_internal' => true]);
+        Department::create(['code' => 'SHD', 'name' => 'SHD', 'is_internal' => true]);
 
         foreach (['SGA', 'SIT', 'SSO'] as $name) {
-            Department::create(['name' => $name, 'is_internal' => false]);
+            Department::create(['code' => $name, 'name' => $name, 'is_internal' => false]);
         }
 
         $buildings = [

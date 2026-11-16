@@ -40,6 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Direktori pegawai & akun (T33, SPEC §15)
     Route::get('/employees', [EmployeeController::class, 'index']);
+    Route::get('/employees/sync-status', [EmployeeController::class, 'syncStatus']);
     // Kelola akun: hanya akun pegawai SHD (akun bersama 403).
     Route::middleware('employee.account')->group(function () {
         Route::get('/accounts', [AccountController::class, 'index']);
@@ -59,14 +60,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/{type}', [ReportController::class, 'show'])->whereIn('type', ReportType::values())->middleware('throttle:reports');
 
     // Master & lookup (SPEC §14)
-    Route::get('/departments/{department}/usage', [DepartmentController::class, 'usage'])->whereNumber('department');
     Route::get('/buildings/{building}/usage', [BuildingController::class, 'usage'])->whereNumber('building');
     Route::get('/rooms/{room}/usage', [RoomController::class, 'usage'])->whereNumber('room');
     Route::get('/categories/{category}/usage', [CategoryController::class, 'usage'])->whereNumber('category');
     Route::get('/consumable-categories/{consumableCategory}/usage', [ConsumableCategoryController::class, 'usage'])->whereNumber('consumableCategory');
     Route::get('/asset-types/{assetType}/next-code', [AssetTypeController::class, 'nextCode'])->whereNumber('assetType');
     Route::get('/asset-types/{assetType}/usage', [AssetTypeController::class, 'usage'])->whereNumber('assetType');
-    Route::apiResource('departments', DepartmentController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::apiResource('departments', DepartmentController::class)->only(['index', 'update']);
     Route::apiResource('buildings', BuildingController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('/buildings/{building}/rooms', [RoomController::class, 'indexForBuilding']);
     Route::post('/buildings/{building}/rooms', [RoomController::class, 'store']);

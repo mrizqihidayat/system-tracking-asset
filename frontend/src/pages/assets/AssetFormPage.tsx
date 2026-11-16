@@ -2,6 +2,7 @@ import { TriangleAlert } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import DepartmentCombobox from '../../components/DepartmentCombobox'
 import EmployeeCombobox from '../../components/EmployeeCombobox'
 import { AssetCode } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -14,7 +15,7 @@ import { useToast } from '../../components/ui/toast-context'
 import AssetFilesManager from './AssetFilesManager'
 import NewAssetTypeModal from './modals/NewAssetTypeModal'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
-import { createBuilding, createDepartment, createRoom } from '../../lib/lookups'
+import { createBuilding, createRoom } from '../../lib/lookups'
 import { invalidate } from '../../lib/queries/invalidate'
 import { assetQueries } from '../../lib/queries/lists'
 import { useAssetTypes, useBuildings, useDepartments, useRooms } from '../../lib/queries/master'
@@ -155,7 +156,6 @@ export default function AssetFormPage() {
 
   const typeOptions = useMemo(() => types.map(typeOption), [types])
   const selectedType = types.find((t) => t.id === form.asset_type_id)
-  const departmentOptions = departments.map((d) => ({ id: d.id, label: d.name }))
   const buildingOptions = buildings.map((b) => ({ id: b.id, label: b.name }))
   const roomOptions = form.building_id ? rooms.map((r) => ({ id: r.id, label: r.name })) : []
 
@@ -168,11 +168,6 @@ export default function AssetFormPage() {
     }
   }
 
-  const addDepartment = (name: string) =>
-    guarded(async () => {
-      const d = await createDepartment(name)
-      return { id: d.id, label: d.name }
-    })
   const addBuilding = (name: string) =>
     guarded(async () => {
       const b = await createBuilding(name)
@@ -320,12 +315,10 @@ export default function AssetFormPage() {
 
       <Section title="Sumber & lokasi asal">
         <FormField label="Sumber (departemen)" required error={errors.source_department_id}>
-          <EntityCombobox
+          <DepartmentCombobox
             value={form.source_department_id}
-            options={departmentOptions}
             onChange={(v) => set('source_department_id', v)}
-            onCreate={addDepartment}
-            placeholder="Ketik nama departemen…"
+            departments={departments}
             error={errors.source_department_id}
           />
         </FormField>

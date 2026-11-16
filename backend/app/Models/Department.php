@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'is_internal'])]
+#[Fillable(['code', 'name', 'is_internal', 'is_active'])]
 class Department extends Model
 {
     /** @use HasFactory<DepartmentFactory> */
@@ -21,6 +21,7 @@ class Department extends Model
     {
         return [
             'is_internal' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 

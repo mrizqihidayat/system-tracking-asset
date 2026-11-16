@@ -1,4 +1,4 @@
-import type { AssetType, Building, Category, Department, Room } from '../types/asset'
+import type { AssetType, Building, Category, Room } from '../types/asset'
 import type { ConsumableCategory } from '../types/supply'
 import { api } from './api'
 import { queryKeys } from './queries/keys'
@@ -15,8 +15,6 @@ function added<T>(queryKey: readonly unknown[], item: T) {
   return item
 }
 
-export const createDepartment = async (name: string) =>
-  added(queryKeys.master.departments(), (await api.post<{ data: Department }>('/departments', { name })).data.data)
 export const createBuilding = async (name: string) =>
   added(queryKeys.master.buildings(), (await api.post<{ data: Building }>('/buildings', { name })).data.data)
 export const createRoom = async (buildingId: number, name: string, isStorage = false) =>

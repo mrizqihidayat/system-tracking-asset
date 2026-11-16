@@ -3,10 +3,8 @@
 namespace App\Providers;
 
 use App\Observers\CacheInvalidationObserver;
-use App\Services\EmployeeDirectory\DummyEmployeeDirectory;
-use App\Services\EmployeeDirectory\EmployeeDirectory;
-use App\Services\EmployeeDirectory\HttpEmployeeDirectory;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -18,10 +16,27 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Direktori pegawai (T33): data fiktif saat demo, API INALUM saat deploy (EMPLOYEE_DIRECTORY_DRIVER).
-        $this->app->singleton(EmployeeDirectory::class, fn () => config('employees.driver') === 'http'
-            ? new HttpEmployeeDirectory((string) config('employees.api_url'), config('employees.api_token'), (int) config('employees.api_timeout'))
-            : new DummyEmployeeDirectory((string) config('employees.dummy_path')));
+        $this->registerDevProcesses();
+    }
+
+    /**
+     * `composer run dev` (php artisan dev) juga menjalankan frontend (Vite) dan API pegawai tiruan (T34), sehingga
+     * satu perintah cukup untuk demo. Proses tiruan hanya didaftarkan bila foldernya ada: hapus
+     * postman/mocks/employee-api saat deploy dan backend cukup memakai EMPLOYEE_API_URL asli.
+     */
+    private function registerDevProcesses(): void
+    {
+        if (! $this->app->runningInConsole() || $this->app->isProduction()) {
+            return;
+        }
+
+        if (is_file(base_path('../postman/mocks/employee-api/default.js'))) {
+            DevCommands::register('node ../postman/mocks/employee-api/default.js', 'mock');
+        }
+
+        if (is_file(base_path('../frontend/package.json'))) {
+            DevCommands::register('npm --prefix ../frontend run dev', 'frontend');
+        }
     }
 
     /**

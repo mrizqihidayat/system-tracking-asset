@@ -64,9 +64,9 @@ Enum file_type {
 Table users {
   id bigint [pk, increment]
   nik varchar(30) [unique, note: 'akun pegawai SHD (source api), login NIK (T33)']
-  name varchar(100) [not null, note: 'akun api: disinkronkan dari direktori pegawai setiap login']
+  name varchar(100) [not null, note: 'akun api: disinkronkan dari salinan pegawai (employees) setiap login']
   username varchar(50) [unique, note: 'akun bersama (source manual), login username']
-  department varchar(100) [note: 'akun api: dari direktori (departemen/divisi/grup); akun manual: nama dari master departments']
+  department varchar(100) [note: 'akun api: dari salinan pegawai (departemen/divisi/grup); akun manual: nama dari master departments']
   source varchar(10) [not null, default: 'manual', note: 'api | manual (CHECK); api wajib nik, manual wajib username (CHECK)']
   password varchar(255) [not null, note: 'akun api: hash NIK sampai pegawai mengganti sendiri (opsional); reset mengembalikan ke NIK (T33 R2)']
   created_at timestamp
@@ -74,10 +74,44 @@ Table users {
   deleted_at timestamp [note: 'nonaktif (soft delete), bisa diaktifkan kembali']
 }
 
+Table employees {
+  id bigint [pk, increment]
+  nik varchar(30) [not null, unique, note: 'string (API memberi angka); kunci sinkronisasi pegawai']
+  name varchar(150) [not null]
+  group_name varchar(100) [note: 'grup; "-" disimpan null']
+  division varchar(100) [note: 'divisi; "-" disimpan null']
+  department_code varchar(100) [note: 'kolom departemen di API; "-" disimpan null; kunci departments.code']
+  section varchar(100)
+  position varchar(150)
+  email varchar(150)
+  is_active boolean [not null, default: true, note: 'false = tidak ada lagi di API pegawai (tidak dihapus)']
+  synced_at timestamp
+  created_at timestamp
+  updated_at timestamp
+  Note: 'T34: salinan lokal dari API pegawai (employees:sync). Tanggal lahir, agama, jenis kelamin, telepon, tanggal MPP/pensiun TIDAK disimpan.'
+}
+
+Table employee_sync_runs {
+  id bigint [pk, increment]
+  status varchar [not null, note: 'berhasil | gagal | dibatalkan (API mengembalikan daftar kosong)']
+  started_at timestamp [not null]
+  finished_at timestamp
+  total int [not null, default: 0]
+  created int [not null, default: 0]
+  updated int [not null, default: 0]
+  deactivated int [not null, default: 0]
+  skipped int [not null, default: 0]
+  message varchar(255)
+  created_at timestamp
+  updated_at timestamp
+}
+
 Table departments {
   id bigint [pk, increment]
-  name varchar(100) [not null, unique]
-  is_internal boolean [not null, default: false, note: 'true = SHD']
+  code varchar(100) [unique, note: 'kode dari API pegawai (kunci sinkronisasi); baris lama: code = name (T34)']
+  name varchar(100) [not null, unique, note: 'nama lengkap, diubah admin secara lokal; awalnya = code']
+  is_internal boolean [not null, default: false, note: 'true = SHD (code = EMPLOYEE_SHD_DEPARTMENT)']
+  is_active boolean [not null, default: true, note: 'false = tidak ada lagi di API (tetap tersimpan, tidak jadi pilihan baru)']
   created_at timestamp
   updated_at timestamp
 }

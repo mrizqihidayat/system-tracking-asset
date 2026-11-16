@@ -3,10 +3,8 @@
 namespace App\Services;
 
 use App\Exceptions\LoginRejected;
+use App\Models\Employee;
 use App\Models\User;
-use App\Services\EmployeeDirectory\Employee;
-use App\Services\EmployeeDirectory\EmployeeDirectory;
-use App\Services\EmployeeDirectory\EmployeeDirectoryUnavailable;
 use Closure;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -34,9 +32,7 @@ class AuthService
 
     public const MSG_INACTIVE = 'Akun dinonaktifkan. Hubungi staf SHD.';
 
-    public const MSG_DIRECTORY_DOWN = 'Data pegawai tidak bisa diakses. Coba lagi nanti.';
-
-    public function __construct(private EmployeeDirectory $directory) {}
+    public const MSG_NO_EMPLOYEE_DATA = 'Data pegawai belum tersedia. Hubungi admin.';
 
     public static function isNik(string $loginId): bool
     {
@@ -70,21 +66,16 @@ class AuthService
     private function attemptEmployee(string $nik, string $password): User
     {
         $user = User::withTrashed()->where('nik', $nik)->first();
-
-        try {
-            $employee = $this->directory->findByNik($nik);
-            $directoryDown = false;
-        } catch (EmployeeDirectoryUnavailable) {
-            $employee = null;
-            $directoryDown = true;
-        }
+        // Salinan lokal pegawai (diisi employees:sync); login tidak memanggil API.
+        $employee = Employee::query()->where('nik', $nik)->first();
+        $synced = Employee::query()->exists();
 
         if ($user) {
             $valid = Hash::check($password, $user->password);
         } else {
-            // Login pertama: password = NIK; pegawai & departemen SHD dicek ke direktori.
-            if ($directoryDown) {
-                throw new LoginRejected(self::MSG_DIRECTORY_DOWN, 503, 'directory_unavailable');
+            // Login pertama: password = NIK; pegawai harus ada di salinan lokal dan berdepartemen SHD.
+            if (! $synced) {
+                throw new LoginRejected(self::MSG_NO_EMPLOYEE_DATA, 503, 'employees_not_synced');
             }
             Hash::check($password, self::DUMMY_PASSWORD_HASH);
             $valid = $employee !== null && hash_equals($nik, $password);
@@ -97,33 +88,35 @@ class AuthService
             throw new LoginRejected(self::MSG_INACTIVE, 403, 'inactive');
         }
 
-        if ($directoryDown) {
-            // Hanya akun yang sudah ada & aktif yang sampai di sini; cek SHD dilewati.
-            Log::channel('security')->warning('login.directory_unavailable', ['user_id' => $user->id, 'nik' => $nik]);
+        if (! $synced) {
+            // Belum pernah sinkron: akun yang sudah ada tetap bisa masuk, cek SHD dilewati.
+            Log::channel('security')->warning('login.employees_not_synced', ['user_id' => $user->id, 'nik' => $nik]);
 
             return $user;
         }
 
-        if (! $employee || ! $employee->isInDepartment(config('employees.shd_department'))) {
+        if (! $employee || ! $employee->isActiveIn((string) config('employees.shd_department'))) {
             throw new LoginRejected(self::MSG_NOT_SHD, 403, 'not_shd');
         }
 
         return $this->syncEmployeeAccount($user, $employee);
     }
 
-    /** Buat akun api saat login pertama (password = NIK), atau perbarui nama & departemen dari API. */
+    /** Buat akun api saat login pertama (password = NIK), atau perbarui nama & departemen dari salinan pegawai. */
     private function syncEmployeeAccount(?User $user, Employee $employee): User
     {
+        $name = mb_substr($employee->name, 0, 100);
+
         if ($user) {
-            $user->update(['name' => mb_substr($employee->name, 0, 100), 'department' => $employee->department]);
+            $user->update(['name' => $name, 'department' => $employee->departmentLabel()]);
 
             return $user;
         }
 
         return User::create([
             'nik' => $employee->nik,
-            'name' => mb_substr($employee->name, 0, 100),
-            'department' => $employee->department,
+            'name' => $name,
+            'department' => $employee->departmentLabel(),
             'source' => User::SOURCE_API,
             'password' => $employee->nik,
         ]);

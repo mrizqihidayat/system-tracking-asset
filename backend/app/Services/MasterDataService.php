@@ -6,7 +6,6 @@ use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Category;
 use App\Models\ConsumableCategory;
-use App\Models\Department;
 use App\Models\Room;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -18,17 +17,6 @@ use Illuminate\Validation\ValidationException;
  */
 class MasterDataService
 {
-    private const SHD_LOCKED = 'Departemen SHD tidak dapat dihapus.';
-
-    public function deleteDepartment(Department $department): void
-    {
-        if ($department->is_internal) {
-            throw ValidationException::withMessages(['id' => self::SHD_LOCKED]);
-        }
-
-        $this->delete($department, 'Departemen', $this->usageMap($department));
-    }
-
     public function deleteBuilding(Building $building): void
     {
         $this->delete($building, 'Gedung', $this->usageMap($building));
@@ -59,7 +47,7 @@ class MasterDataService
      *
      * @return array{items: list<array{label: string, count: int}>, total: int, can_delete: bool, reason: ?string}
      */
-    public function usage(Department|Building|Room|Category|ConsumableCategory|AssetType $model): array
+    public function usage(Building|Room|Category|ConsumableCategory|AssetType $model): array
     {
         $items = [];
 
@@ -72,13 +60,12 @@ class MasterDataService
         }
 
         $total = array_sum(array_column($items, 'count'));
-        $locked = $model instanceof Department && $model->is_internal;
 
         return [
             'items' => $items,
             'total' => $total,
-            'can_delete' => ! $locked && $total === 0,
-            'reason' => $locked ? self::SHD_LOCKED : null,
+            'can_delete' => $total === 0,
+            'reason' => null,
         ];
     }
 
@@ -88,12 +75,6 @@ class MasterDataService
     private function usageMap(Model $model): array
     {
         return match (true) {
-            $model instanceof Department => [
-                'aset' => ['assets', 'source_department_id'],
-                'item katalog' => ['request_catalog', 'provider_department_id'],
-                'barang habis pakai' => ['consumables', 'provider_department_id'],
-                'permintaan' => ['supply_requests', 'provider_department_id'],
-            ],
             $model instanceof Building => ['ruangan' => ['rooms', 'building_id']],
             $model instanceof Room => [
                 'aset' => ['assets', 'room_id'],

@@ -55,7 +55,8 @@ Target: **backend matang dan siap deploy** (tim lain yang akan deploy dan membua
   - **Barang habis pakai**: hard delete hanya jika transaksinya saldo awal saja (kasus salah input); selain itu ditolak 422 dan staf mencatat Penghapusan agar stok menjadi 0.
 - Setiap perubahan jumlah stok **wajib lewat `ConsumableService::record()`** (tabel `stock_transactions`), sehingga jumlah stok selalu sama dengan hasil transaksi.
 - Setiap perubahan jumlah Ada barang habis pakai ruangan **wajib lewat `RoomStockService::record()`** (tabel `room_stock_transactions`), sehingga Ada selalu sama dengan hasil transaksi ruangan + barang.
-- **Jangan hardcode URL/host**; gunakan env (`APP_URL`, `FRONTEND_URL`, `QR_BASE_URL`).
+- **Jangan hardcode URL/host**; gunakan env (`APP_URL`, `FRONTEND_URL`, `QR_BASE_URL`, `EMPLOYEE_API_URL`).
+- **Data pribadi pegawai**: tabel `employees` hanya menyimpan kolom yang dibutuhkan (tanpa tanggal lahir, agama, jenis kelamin, telepon, tanggal MPP/pensiun). Jangan mencatat API key atau data pegawai di log.
 - Jangan commit/push kecuali pengguna meminta.
 
 ## 4. Konvensi
@@ -115,8 +116,14 @@ Diketahui flaky (bukan regresi): `AssetScanLabelTest::test_label_html_contains_c
 
 ## 10. Perintah
 ```
+cd backend && composer run dev                   # backend + queue + frontend + API pegawai tiruan (satu perintah)
 cd backend && php artisan serve                  # http://localhost:8000
 cd backend && php artisan test
 cd backend && php artisan route:list --path=api
+cd backend && php artisan employees:sync         # salin pegawai & departemen dari API pegawai (terjadwal 02.00 WIB)
+node postman/mocks/employee-api/default.js       # API pegawai tiruan saja: http://localhost:3001 (API key demo-key)
 cd frontend && npm run dev                       # http://localhost:5173
 ```
+
+**Setup awal (database baru):** `cd backend && php artisan migrate --seed`, tambahkan di `backend/.env` `EMPLOYEE_API_URL=http://localhost:3001` dan `EMPLOYEE_API_KEY=demo-key`, jalankan API tiruan (`composer run dev` sudah menjalankannya), lalu `php artisan employees:sync`. Tanpa langkah terakhir, pegawai SHD belum bisa login pertama kali (seeder tidak memanggil API).
+**Deploy:** isi `EMPLOYEE_API_URL`, `EMPLOYEE_API_KEY` (+ `EMPLOYEE_API_KEY_HEADER` / `EMPLOYEE_API_DATA_KEY` bila berbeda), hapus folder `postman/mocks/employee-api`, jalankan `php artisan employees:sync` **sekali setelah migration dan sebelum pegawai login**, dan aktifkan cron `* * * * * php artisan schedule:run` (sinkronisasi harian 02.00 WIB; tidak ada tombol sinkron di aplikasi).

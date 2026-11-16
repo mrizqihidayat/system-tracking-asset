@@ -2,11 +2,11 @@
 
 Daftar seluruh endpoint backend dan pemakaiannya di frontend web. Parameter dan bentuk respons ada di `docs/SPEC.md` §14.
 
-Disusun pada 4 November 2026 (diperbarui 17 November 2026, T36) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
+Disusun pada 4 November 2026 (diperbarui 17 November 2026, T34) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
 
 ## Ringkasan
 
-- **103 endpoint API:** 101 dipakai frontend web, 2 tidak dipakai.
+- **101 endpoint API:** 99 dipakai frontend web, 2 tidak dipakai.
 - **6 route non-API:** tidak ada yang dipakai frontend.
 - **Alamat:** semua endpoint API berawalan `/api`. Frontend web mengambil alamat API dari `VITE_API_URL`.
 - **Akses "Token":** wajib header `Authorization: Bearer {token}` dari `POST /api/login`. Tanpa token sah dijawab 401.
@@ -16,11 +16,11 @@ Disusun pada 4 November 2026 (diperbarui 17 November 2026, T36) dari `php artisa
 | Modul | Total | Dipakai | Tidak dipakai |
 |---|---|---|---|
 | Autentikasi | 4 | 4 | 0 |
-| Akun & direktori pegawai | 7 | 7 | 0 |
+| Akun & pegawai | 8 | 8 | 0 |
 | Halaman publik QR | 1 | 1 | 0 |
 | Dashboard | 3 | 3 | 0 |
 | Laporan | 1 | 1 | 0 |
-| Data master: departemen | 5 | 5 | 0 |
+| Data master: departemen | 2 | 2 | 0 |
 | Data master: gedung & ruangan | 11 | 10 | 1 |
 | Data master: kategori aset | 5 | 5 | 0 |
 | Data master: jenis aset | 6 | 6 | 0 |
@@ -31,7 +31,7 @@ Disusun pada 4 November 2026 (diperbarui 17 November 2026, T36) dari `php artisa
 | Kelengkapan ruangan | 7 | 7 | 0 |
 | Permintaan ke departemen lain | 12 | 12 | 0 |
 | Stok habis pakai | 8 | 8 | 0 |
-| **Total** | **103** | **101** | **2** |
+| **Total** | **101** | **99** | **2** |
 
 ## Endpoint API yang tidak dipakai frontend
 
@@ -88,11 +88,12 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | GET | `/api/user` | Data akun yang sedang login | Token | Ya: Pemeriksaan sesi (`components/RequireAuth.tsx`) |
 | PUT | `/api/user/password` | Ganti password sendiri (opsional); token lain dicabut | Token, maks. 10/menit per pengguna | Ya: Halaman Ganti password (`pages/ChangePasswordPage.tsx`) |
 
-### Akun & direktori pegawai
+### Akun & pegawai
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| GET | `/api/employees` | Saran pegawai (maks. 10): nama, departemen, jabatan (tanpa NIK) | Token | Ya: Nama peminjam & PIC (`components/EmployeeCombobox.tsx`) |
+| GET | `/api/employees` | Saran pegawai aktif dari salinan lokal (maks. 10): nama, departemen, jabatan (tanpa NIK); tidak memanggil API pegawai | Token | Ya: Nama peminjam & PIC (`components/EmployeeCombobox.tsx`) |
+| GET | `/api/employees/sync-status` | Sinkron terakhir salinan pegawai & departemen (hanya baca; tidak ada endpoint sinkronisasi) | Token | Ya: Data Master > Departemen (`pages/master/DepartmentsTab.tsx`) |
 | GET | `/api/accounts` | Daftar akun, termasuk nonaktif | Token, akun pegawai SHD | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
 | POST | `/api/accounts` | Tambah akun bersama | Token, akun pegawai SHD | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
 | PUT | `/api/accounts/{id}/password` | Ubah password akun bersama | Token, akun pegawai SHD | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
@@ -122,13 +123,12 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 
 ### Data master: departemen
 
+Departemen dibentuk dari API pegawai (`php artisan employees:sync`), jadi tidak ada tambah, hapus, atau rincian pemakaian.
+
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| GET | `/api/departments` | Daftar departemen | Token | Ya: Dropdown di banyak form, Data Master (`lib/queries/master.ts`) |
-| POST | `/api/departments` | Tambah departemen | Token | Ya: Form aset, Data Master (`lib/lookups.ts`, `pages/master/MasterModals.tsx`) |
-| PUT/PATCH | `/api/departments/{id}` | Ubah departemen | Token | Ya: Data Master (`pages/master/MasterModals.tsx`), memakai PUT |
-| DELETE | `/api/departments/{id}` | Hapus departemen, ditolak jika masih dipakai | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
-| GET | `/api/departments/{id}/usage` | Pemakaian departemen sebelum dihapus | Token | Ya: Data Master (`pages/master/MasterModals.tsx`) |
+| GET | `/api/departments` | Daftar departemen (semua, termasuk yang tidak aktif): `id`, `code`, `name`, `is_internal`, `is_active` | Token | Ya: Dropdown di banyak form, Data Master (`lib/queries/master.ts`) |
+| PUT/PATCH | `/api/departments/{id}` | Ubah nama lengkap (kode tetap) | Token | Ya: Data Master > Departemen (`pages/master/MasterModals.tsx`), memakai PUT |
 
 ### Data master: gedung & ruangan
 

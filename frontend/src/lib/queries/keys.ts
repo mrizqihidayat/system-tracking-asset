@@ -54,6 +54,8 @@ export const queryKeys = {
   accounts: {
     all: ['accounts'] as const,
   },
+  /** Sinkron terakhir pegawai & departemen dari API pegawai (T34). */
+  employeeSync: ['employee-sync'] as const,
   /** Saran pegawai dari direktori pegawai (T33), per teks pencarian. */
   employees: (search: string) => ['employees', search.trim().toLowerCase()] as const,
 }

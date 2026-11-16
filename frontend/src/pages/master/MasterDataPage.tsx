@@ -8,18 +8,20 @@ import { PageHeader } from '../../components/ui/Page'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { skeletonWidth } from '../../components/ui/skeleton-width'
 import { invalidate } from '../../lib/queries/invalidate'
-import { useAssetTypes, useBuildings, useCategories, useConsumableCategories, useRooms } from '../../lib/queries/master'
+import { useAssetTypes, useBuildings, useCategories, useConsumableCategories, useDepartments, useRooms } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
-import type { AssetType, Building, Category, Room } from '../../types/asset'
+import type { AssetType, Building, Category, Department, Room } from '../../types/asset'
 import type { ConsumableCategory } from '../../types/supply'
 import { getUser } from '../../lib/auth'
 import AccountsTab from './AccountsTab'
+import DepartmentsTab from './DepartmentsTab'
 import { MasterDeleteModal, MasterFormModal, type MasterTarget } from './MasterModals'
 
-type Tab = 'gedung' | 'jenis' | 'kategori-stok' | 'akun'
+type Tab = 'gedung' | 'departemen' | 'jenis' | 'kategori-stok' | 'akun'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'gedung', label: 'Gedung & Ruangan' },
+  { key: 'departemen', label: 'Departemen' },
   { key: 'jenis', label: 'Kategori & Jenis aset' },
   { key: 'kategori-stok', label: 'Kategori stok' },
   { key: 'akun', label: 'Akun' },
@@ -37,6 +39,7 @@ type FormState = {
 interface Data {
   buildings: Building[]
   rooms: Room[]
+  departments: Department[]
   categories: Category[]
   types: AssetType[]
   consumableCategories: ConsumableCategory[]
@@ -81,12 +84,12 @@ export default function MasterDataPage() {
   // Tab Akun hanya untuk akun pegawai SHD; akun bersama tidak melihatnya (API juga menolak 403).
   const tabs = getUser()?.source === 'api' ? TABS : TABS.filter((t) => t.key !== 'akun')
   const tab = (tabs.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'gedung') as Tab
-  const queries = [useBuildings(), useRooms(), useCategories(), useAssetTypes(), useConsumableCategories()] as const
+  const queries = [useBuildings(), useRooms(), useDepartments(), useCategories(), useAssetTypes(), useConsumableCategories()] as const
   useErrorToast(...queries.map((q) => q.error))
-  const [buildings, rooms, categories, types, consumableCategories] = queries
+  const [buildings, rooms, departments, categories, types, consumableCategories] = queries
   const data: Data | null = queries.every((q) => q.isSuccess)
     ? {
-        buildings: buildings.data, rooms: rooms.data,
+        buildings: buildings.data, rooms: rooms.data, departments: departments.data,
         categories: categories.data, types: types.data, consumableCategories: consumableCategories.data,
       }
     : null
@@ -176,6 +179,15 @@ export default function MasterDataPage() {
     )
   }
 
+  if (data && tab === 'departemen') {
+    body = (
+      <DepartmentsTab
+        departments={data.departments}
+        onEdit={(d) => setForm({ kind: 'Departemen', target: { kind: 'Departemen', name: d.name, url: `/departments/${d.id}` } })}
+      />
+    )
+  }
+
   if (data && tab === 'jenis') {
     const typeForm = (extra: Partial<FormState>) => setForm({ kind: 'Jenis aset', withCode: true, ...extra })
     body = (
@@ -249,7 +261,7 @@ export default function MasterDataPage() {
     <div className="max-w-4xl space-y-5">
       <PageHeader
         title="Data Master"
-        description="Kelola gedung, ruangan, kategori dan jenis aset, kategori stok, serta akun pengguna. Data yang masih digunakan tidak dapat dihapus."
+        description="Kelola gedung, ruangan, departemen, kategori dan jenis aset, kategori stok, serta akun pengguna. Data yang masih digunakan tidak dapat dihapus."
       />
 
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist">

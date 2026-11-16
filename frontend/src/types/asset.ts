@@ -8,8 +8,12 @@ export type FileType = (typeof FILE_TYPES)[number]
 
 export interface Department {
   id: number
+  /** Kode dari API pegawai (kunci sinkronisasi); `name` = nama lengkap yang bisa diubah. */
+  code: string | null
   name: string
   is_internal: boolean
+  /** false = tidak ada lagi di API pegawai (tetap tersimpan, tidak muncul sebagai pilihan baru). */
+  is_active: boolean
 }
 
 export interface Building {

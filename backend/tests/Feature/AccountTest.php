@@ -3,11 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Department;
+use App\Models\Employee;
 use App\Models\User;
-use App\Services\EmployeeDirectory\Employee;
-use App\Services\EmployeeDirectory\EmployeeDirectory;
-use App\Services\EmployeeDirectory\EmployeeDirectoryUnavailable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
@@ -25,6 +24,8 @@ class AccountTest extends TestCase
 
         Department::create(['name' => 'SHD', 'is_internal' => true]);
         Department::create(['name' => 'HRM', 'is_internal' => false]);
+        // Pegawai SHD di salinan lokal (dipakai login setelah Reset password = NIK).
+        Employee::factory()->inDepartment('SHD')->create(['nik' => '90100002']);
         // Kelola akun hanya untuk akun pegawai SHD yang sudah ganti password.
         $this->staff = User::factory()->employee('90100003')->create(['name' => 'Staf Pegawai SHD']);
         $this->actingAs($this->staff);
@@ -177,46 +178,50 @@ class AccountTest extends TestCase
 
     public function test_employee_search_returns_only_public_fields_across_departments(): void
     {
+        Employee::factory()->inDepartment('SHD')->create(['nik' => '90100001', 'name' => 'ANDI PRATAMA', 'email' => 'andi@contoh.invalid']);
+        Employee::factory()->inDepartment('HRM')->create(['nik' => '90100004', 'name' => 'DEWI ANGGRAINI']);
+        Employee::factory()->count(12)->create(['name' => 'ANTON']);
+
         $this->getJson('/api/employees?search=a')->assertUnprocessable();
 
         $response = $this->getJson('/api/employees?search=an')->assertOk();
-        $this->assertLessThanOrEqual(10, count($response->json('data')));
+        $this->assertCount(10, $response->json('data'));
         foreach ($response->json('data') as $row) {
             $this->assertSame(['name', 'department', 'position'], array_keys($row));
         }
 
-        $content = $this->getJson('/api/employees?search=9010000')->assertOk()->getContent();
-        // Pencarian dengan awalan NIK tetap jalan, tetapi NIK tidak ikut dikirim (NIK = password awal).
-        foreach (['nik', '90100001', 'tglLahir', '1990-03-14', 'contoh.invalid', '08000000', 'agama', 'tglPensiun', 'PKWTT'] as $private) {
+        // Pencarian dengan awalan NIK tetap jalan, tetapi NIK dan data lain tidak ikut dikirim (NIK = password awal).
+        $content = $this->getJson('/api/employees?search=9010000')->assertOk()->assertJsonCount(3, 'data')->getContent();
+        foreach (['nik', '90100001', '90100004', 'email', 'contoh.invalid', 'group_name'] as $private) {
             $this->assertStringNotContainsString($private, $content);
         }
     }
 
     public function test_employee_search_department_fallback(): void
     {
+        Employee::factory()->inDepartment('HRM')->create(['name' => 'DEWI KARTIKA']);
+        Employee::factory()->create(['name' => 'YUDHA KUSUMA', 'department_code' => null, 'division' => 'PME', 'group_name' => 'GPO', 'position' => 'Kepala Divisi']);
+        Employee::factory()->create(['name' => 'BENNY HASIBUAN', 'department_code' => null, 'division' => null, 'group_name' => 'GPO']);
+        Employee::factory()->create(['name' => 'TANPA UNIT', 'department_code' => null, 'division' => null, 'group_name' => null]);
+
         $this->getJson('/api/employees?search=Dewi Kartika')->assertOk()->assertJsonPath('data.0.department', 'HRM');
-        // departemen "-" → divisi
+        // departemen kosong → divisi
         $this->getJson('/api/employees?search=Yudha')->assertOk()
-            ->assertJsonPath('data.0', ['name' => 'YUDHA KUSUMA LUBIS', 'department' => 'PME', 'position' => 'Kepala Divisi']);
-        // departemen & divisi "-" → grup
+            ->assertJsonPath('data.0', ['name' => 'YUDHA KUSUMA', 'department' => 'PME', 'position' => 'Kepala Divisi']);
+        // departemen & divisi kosong → grup
         $this->getJson('/api/employees?search=Benny')->assertOk()->assertJsonPath('data.0.department', 'GPO');
+        $this->getJson('/api/employees?search=Tanpa')->assertOk()->assertJsonPath('data.0.department', '-');
     }
 
-    public function test_employee_search_returns_503_when_directory_down(): void
+    public function test_employee_search_skips_inactive_employees_and_reads_only_the_local_copy(): void
     {
-        $this->app->instance(EmployeeDirectory::class, new class implements EmployeeDirectory
-        {
-            public function search(string $query, int $limit = 10): array
-            {
-                throw new EmployeeDirectoryUnavailable('mati');
-            }
+        Employee::factory()->inactive()->create(['name' => 'PEGAWAI LAMA']);
+        Employee::factory()->create(['name' => 'PEGAWAI AKTIF']);
+        Http::fake();
 
-            public function findByNik(string $nik): ?Employee
-            {
-                throw new EmployeeDirectoryUnavailable('mati');
-            }
-        });
-
-        $this->getJson('/api/employees?search=andi')->assertStatus(503);
+        $this->getJson('/api/employees?search=pegawai')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'PEGAWAI AKTIF');
+        Http::assertNothingSent();
     }
 }

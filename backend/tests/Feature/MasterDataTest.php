@@ -8,7 +8,6 @@ use App\Models\Building;
 use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\Department;
-use App\Models\RequestCatalog;
 use App\Models\Room;
 use App\Models\SupplyRequest;
 use App\Models\User;
@@ -77,21 +76,31 @@ class MasterDataTest extends TestCase
             ->assertJsonPath('data.0.name', 'SGA');
     }
 
-    public function test_store_department_is_never_internal(): void
+    public function test_departments_expose_code_and_active_flag_including_inactive_ones(): void
     {
-        $this->postJson('/api/departments', ['name' => 'SSO', 'is_internal' => true])
-            ->assertCreated()
-            ->assertJsonPath('data.name', 'SSO')
-            ->assertJsonPath('data.is_internal', false);
+        Department::factory()->create(['code' => 'SGA', 'name' => 'Sarana Umum']);
+        Department::factory()->inactive()->create(['code' => 'LAMA', 'name' => 'Lama']);
+
+        $this->getJson('/api/departments')
+            ->assertOk()
+            ->assertJsonPath('data.0.code', 'LAMA')
+            ->assertJsonPath('data.0.is_active', false)
+            ->assertJsonPath('data.1.code', 'SGA')
+            ->assertJsonPath('data.1.name', 'Sarana Umum')
+            ->assertJsonPath('data.1.is_active', true);
     }
 
-    public function test_duplicate_name_is_rejected_case_insensitively_with_indonesian_message(): void
+    public function test_departments_cannot_be_created_or_deleted_manually(): void
     {
-        Department::factory()->create(['name' => 'SGA']);
+        $unit = Department::factory()->create(['name' => 'SGA']);
 
-        $this->postJson('/api/departments', ['name' => ' sga '])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['name' => 'Nama sudah digunakan.']);
+        // Departemen dibentuk dari API pegawai (employees:sync), bukan ditambah/dihapus dari aplikasi.
+        $this->postJson('/api/departments', ['name' => 'SSO'])->assertStatus(405);
+        $this->deleteJson("/api/departments/{$unit->id}")->assertStatus(405);
+        $this->getJson("/api/departments/{$unit->id}/usage")->assertNotFound();
+
+        $this->assertModelExists($unit);
+        $this->assertDatabaseMissing('departments', ['name' => 'SSO']);
     }
 
     public function test_required_name_message_is_indonesian(): void
@@ -412,37 +421,30 @@ class MasterDataTest extends TestCase
             ->assertExactJson(['data' => ['SIT']]);
     }
 
-    public function test_department_update_and_delete(): void
+    public function test_department_update_changes_only_the_full_name(): void
     {
-        $unit = Department::factory()->create(['name' => 'SGA']);
+        $unit = Department::factory()->create(['code' => 'SGA', 'name' => 'SGA']);
         Department::factory()->create(['name' => 'SIT']);
 
-        $this->putJson("/api/departments/{$unit->id}", ['name' => 'sit'])->assertUnprocessable()->assertJsonValidationErrors('name');
-        $this->putJson("/api/departments/{$unit->id}", ['name' => 'SGA Baru'])->assertOk()->assertJsonPath('data.name', 'SGA Baru');
-        $this->putJson("/api/departments/{$unit->id}", ['name' => 'SGA Baru'])->assertOk();
+        $this->putJson("/api/departments/{$unit->id}", ['name' => 'sit'])->assertUnprocessable()->assertJsonValidationErrors(['name' => 'Nama sudah digunakan.']);
+        $this->putJson("/api/departments/{$unit->id}", ['name' => ''])->assertUnprocessable()->assertJsonValidationErrors(['name' => 'Nama wajib diisi.']);
+        $this->putJson("/api/departments/{$unit->id}", ['name' => 'Sarana Umum'])->assertOk()->assertJsonPath('data.name', 'Sarana Umum');
+        $this->putJson("/api/departments/{$unit->id}", ['name' => 'Sarana Umum'])->assertOk();
 
-        $this->deleteJson("/api/departments/{$unit->id}")->assertOk();
-        $this->assertModelMissing($unit);
+        // Kode (kunci sinkronisasi) dan penanda lain tidak bisa diubah lewat API.
+        $this->putJson("/api/departments/{$unit->id}", ['name' => 'Sarana Umum', 'code' => 'XXX', 'is_internal' => true, 'is_active' => false])->assertOk();
+        $fresh = $unit->fresh();
+        $this->assertSame('SGA', $fresh->code);
+        $this->assertFalse($fresh->is_internal);
+        $this->assertTrue($fresh->is_active);
     }
 
-    public function test_internal_department_cannot_be_changed_or_deleted(): void
+    public function test_internal_department_full_name_can_be_changed_but_stays_internal(): void
     {
-        $shd = Department::factory()->internal()->create(['name' => 'SHD']);
+        $shd = Department::factory()->internal()->create(['code' => 'SHD', 'name' => 'SHD']);
 
-        $this->putJson("/api/departments/{$shd->id}", ['name' => 'Lain'])->assertUnprocessable();
-        $this->deleteJson("/api/departments/{$shd->id}")->assertUnprocessable();
-        $this->assertModelExists($shd);
-    }
-
-    public function test_used_department_cannot_be_deleted(): void
-    {
-        $unit = Department::factory()->create();
-        RequestCatalog::factory()->create(['provider_department_id' => $unit->id]);
-
-        $this->deleteJson("/api/departments/{$unit->id}")
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('id');
-        $this->assertModelExists($unit);
+        $this->putJson("/api/departments/{$shd->id}", ['name' => 'Sarana dan Hubungan'])->assertOk()->assertJsonPath('data.is_internal', true);
+        $this->assertSame('SHD', $shd->fresh()->code);
     }
 
     public function test_building_update_and_delete_rules(): void

@@ -1,6 +1,6 @@
 # Flowchart — Sistem Informasi Aset SHD
 
-Disusun dari kode frontend & backend per 9 November 2026 (termasuk T30 R1: catat perubahan barang ruangan, Tandai sudah dicek, kartu ruangan; tampilan gudang; slug ikut nama). Diperbarui 13 November 2026 (T33: login NIK / username, wajib ganti password, Data Master > Akun; R1: password awal = NIK, kelola akun khusus akun pegawai SHD; R2: tanpa wajib ganti password).
+Disusun dari kode frontend & backend per 9 November 2026 (termasuk T30 R1: catat perubahan barang ruangan, Tandai sudah dicek, kartu ruangan; tampilan gudang; slug ikut nama). Diperbarui 13 November 2026 (T33: login NIK / username, wajib ganti password, Data Master > Akun; R1: password awal = NIK, kelola akun khusus akun pegawai SHD; R2: tanpa wajib ganti password; T34: salinan pegawai & departemen dari API pegawai).
 
 Versi visual: **`docs/flowchart.drawio`** (buka dengan ekstensi Draw.io di VS Code; satu tab per alur). Isinya dibuat dari blok Mermaid di bawah: setelah mengubah file ini, jalankan `python docs/scripts/flowchart_drawio.py` dari root repo untuk membuat ulang `flowchart.drawio`.
 
@@ -286,16 +286,16 @@ flowchart TD
     C -- Ya: NIK --> N1{Akun pegawai sudah ada?}
     N1 -- Ya --> N2{Password tersimpan benar? awalnya NIK}
     N2 -- Tidak --> X
-    N2 -- Ya --> N3{Direktori pegawai bisa diakses?}
-    N3 -- Tidak --> N4[(Catat warning, cek SHD dilewati)] --> AKT
-    N3 -- Ya --> SHD
-    N1 -- Tidak: login pertama --> F1{Direktori pegawai bisa diakses?}
-    F1 -- Tidak --> F2[Pesan: Data pegawai tidak bisa diakses, coba lagi nanti] --> B
+    N2 -- Ya --> N3{Salinan pegawai sudah terisi?}
+    N3 -- Belum pernah sinkron --> N4[(Catat warning, cek SHD dilewati)] --> AKT
+    N3 -- Sudah --> SHD
+    N1 -- Tidak: login pertama --> F1{Salinan pegawai sudah terisi?}
+    F1 -- Belum pernah sinkron --> F2[Pesan: Data pegawai belum tersedia, hubungi admin] --> B
     F1 -- Ya --> F3{Password = NIK?}
     F3 -- Tidak --> X
     F3 -- Ya --> SHD{Pegawai ada & departemen SHD?}
-    SHD -- Tidak --> S1[Pesan: Hanya pegawai Departemen SHD] --> B
-    SHD -- Ya --> S2[(Buat akun pegawai bila belum ada, password = NIK; sinkron nama & departemen)] --> AKT
+    SHD -- Tidak: tidak ada, nonaktif, atau bukan SHD --> S1[Pesan: Hanya pegawai Departemen SHD] --> B
+    SHD -- Ya --> S2[(Buat akun pegawai bila belum ada, password = NIK; sinkron nama & departemen dari salinan pegawai)] --> AKT
     AKT -- Tidak --> AK1[Pesan: Akun dinonaktifkan] --> B
     AKT -- Ya --> D[[Dashboard, tanpa wajib ganti password]]
     D -- Menu Ganti password, opsional --> G1[Password saat ini + password baru 2x] --> G2{Valid: min. 8, bukan NIK / username, konfirmasi sama?}
@@ -310,4 +310,23 @@ flowchart TD
     K -- Ubah password akun bersama --> K4[(Simpan, sesi lain dicabut)]
     K -- Nonaktifkan, bukan akun sendiri --> K5[(Soft delete, sesi dicabut)]
     K -- Aktifkan kembali --> K6[(Restore)]
+```
+
+## 11. Sinkronisasi pegawai & departemen
+
+```mermaid
+flowchart TD
+    A([Jadwal harian 02.00 WIB, atau admin menjalankan employees:sync di server]) --> L{Sinkronisasi lain sedang berjalan?}
+    L -- Ya --> L1[Ditolak: sedang berjalan] --> Z([Selesai])
+    L -- Tidak --> B[GET EMPLOYEE_API_URL dengan API key di header]
+    B --> C{API menjawab dengan benar?}
+    C -- Tidak: mati, 401, timeout, bentuk salah --> F[(Catat run gagal + pesan; data lama tetap dipakai)] --> Z
+    C -- Ya --> D[Baca nik, nama, grup, divisi, departemen, seksi, jabatan, email; lewati baris tanpa nik/nama]
+    D --> E{Ada pegawai valid?}
+    E -- Tidak: daftar kosong --> G[(Catat run dibatalkan; tidak ada yang dinonaktifkan)] --> Z
+    E -- Ya --> H[(Satu transaksi: upsert pegawai per nik, aktifkan kembali yang muncul lagi)]
+    H --> I[(Pegawai yang tidak ada di API jadi tidak aktif, tidak dihapus)]
+    I --> J[(Departemen dari nilai unik departemen kecuali tanda hubung: buat yang baru, aktifkan kembali, nonaktifkan yang hilang kecuali SHD; nama lengkap lokal tidak ditimpa)]
+    J --> K[(Catat run berhasil + jumlah; kosongkan cache master)] --> Z
+    Z --> V[Data Master > Departemen menampilkan Sinkron terakhir, hanya baca]
 ```

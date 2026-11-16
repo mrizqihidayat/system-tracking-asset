@@ -17,14 +17,23 @@ class DepartmentFactory extends Factory
      */
     public function definition(): array
     {
+        $code = fake()->unique()->regexify('[A-Z]{3}');
+
         return [
-            'name' => fake()->unique()->regexify('[A-Z]{3}'),
+            'code' => $code,
+            'name' => $code,
             'is_internal' => false,
+            'is_active' => true,
         ];
     }
 
     public function internal(): static
     {
         return $this->state(fn (array $attributes) => ['is_internal' => true]);
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => ['is_active' => false]);
     }
 }

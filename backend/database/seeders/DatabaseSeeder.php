@@ -10,8 +10,8 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Akun bersama contoh (password hanya untuk demo). Akun pegawai SHD tidak di-seed:
-        // dibuat otomatis saat login pertama dengan NIK dari database/data/employees.json (T33).
+        // Akun bersama contoh (password hanya untuk demo). Akun pegawai SHD tidak di-seed: dibuat otomatis saat
+        // login pertama dengan NIK dari salinan pegawai (isi dengan `php artisan employees:sync`; seeder tidak memanggil API, T34).
         User::updateOrCreate(
             ['username' => 'staf1'],
             [

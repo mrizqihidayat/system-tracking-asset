@@ -18,6 +18,25 @@ export interface Employee {
   position: string
 }
 
+/** Hasil `employees:sync` terakhir (hanya baca); null = belum pernah sinkron. */
+export interface EmployeeSyncStatus {
+  status: 'berhasil' | 'gagal' | 'dibatalkan'
+  started_at: string
+  finished_at: string | null
+  total: number
+  created: number
+  updated: number
+  deactivated: number
+  skipped: number
+  message: string | null
+}
+
+export const useEmployeeSyncStatus = () =>
+  useQuery({
+    queryKey: queryKeys.employeeSync,
+    queryFn: async () => (await api.get<{ data: EmployeeSyncStatus | null }>('/employees/sync-status')).data.data,
+  })
+
 export const useAccounts = () =>
   useQuery({
     queryKey: queryKeys.accounts.all,

@@ -2,27 +2,26 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuthService;
-use App\Services\EmployeeDirectory\Employee;
-use App\Services\EmployeeDirectory\EmployeeDirectory;
-use App\Services\EmployeeDirectory\EmployeeDirectoryUnavailable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * Login NIK pegawai SHD dari direktori pegawai dummy (database/data/employees.json, data fiktif), T33 R2:
- * password awal / setelah reset = NIK, langsung masuk tanpa wajib ganti; ganti password opsional.
+ * Login NIK pegawai SHD memakai salinan lokal pegawai (tabel employees, diisi employees:sync; data fiktif), T33 R2 + T34:
+ * password awal / setelah reset = NIK, langsung masuk tanpa wajib ganti; ganti password opsional; login tidak memanggil API.
  */
 class EmployeeLoginTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** Pegawai SHD fiktif (lahir 1990-03-14 di data dummy; tanggal lahir tidak dipakai lagi). */
+    /** Pegawai SHD fiktif. */
     private const SHD_NIK = '90100001';
 
     /** Pegawai HRM (bukan SHD). */
@@ -35,6 +34,10 @@ class EmployeeLoginTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Employee::factory()->inDepartment('SHD')->create(['nik' => self::SHD_NIK, 'name' => 'ANDI PRATAMA SIREGAR']);
+        Employee::factory()->inDepartment('HRM')->create(['nik' => self::OTHER_NIK, 'name' => 'DEWI KARTIKA SARI']);
+        Employee::factory()->inDepartment('SHD')->create(['nik' => '90100002', 'name' => 'RINA MARLINA LUBIS']);
 
         $this->logDir = sys_get_temp_dir().'/employee-login-test-'.uniqid();
         File::ensureDirectoryExists($this->logDir);
@@ -58,22 +61,6 @@ class EmployeeLoginTest extends TestCase
     private function logged(): string
     {
         return implode('', array_map(file_get_contents(...), glob("{$this->logDir}/*.log") ?: []));
-    }
-
-    private function directoryDown(): void
-    {
-        $this->app->instance(EmployeeDirectory::class, new class implements EmployeeDirectory
-        {
-            public function search(string $query, int $limit = 10): array
-            {
-                throw new EmployeeDirectoryUnavailable('mati');
-            }
-
-            public function findByNik(string $nik): ?Employee
-            {
-                throw new EmployeeDirectoryUnavailable('mati');
-            }
-        });
     }
 
     /** Akun api yang sudah pernah ganti password. */
@@ -104,10 +91,10 @@ class EmployeeLoginTest extends TestCase
         $this->login(self::SHD_NIK, self::SHD_NIK)->assertOk();
     }
 
-    public function test_wrong_password_birth_date_or_unknown_nik_is_rejected_without_creating_account(): void
+    public function test_wrong_password_or_unknown_nik_is_rejected_without_creating_account(): void
     {
         $this->login(self::SHD_NIK, '12345678')->assertUnauthorized()->assertJsonPath('message', AuthService::MSG_WRONG);
-        // Tanggal lahir (DDMMYYYY) tidak lagi diterima.
+        // Tanggal lahir tidak dipakai sebagai password.
         $this->login(self::SHD_NIK, '14031990')->assertUnauthorized();
         $this->login('99999999', '99999999')->assertUnauthorized()->assertJsonPath('message', AuthService::MSG_WRONG);
 
@@ -127,6 +114,30 @@ class EmployeeLoginTest extends TestCase
 
         $this->login(self::OTHER_NIK, self::NEW_PASSWORD)->assertForbidden()->assertJsonPath('message', AuthService::MSG_NOT_SHD);
         $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_inactive_or_moved_employee_cannot_login(): void
+    {
+        $this->activeEmployeeAccount();
+
+        // Hilang dari API (is_active = false) atau pindah departemen → ditolak walau password benar.
+        Employee::where('nik', self::SHD_NIK)->update(['is_active' => false]);
+        $this->login(self::SHD_NIK, self::NEW_PASSWORD)->assertForbidden()->assertJsonPath('message', AuthService::MSG_NOT_SHD);
+
+        Employee::where('nik', self::SHD_NIK)->update(['is_active' => true, 'department_code' => 'HRM']);
+        $this->login(self::SHD_NIK, self::NEW_PASSWORD)->assertForbidden()->assertJsonPath('message', AuthService::MSG_NOT_SHD);
+
+        // Pegawai nonaktif tidak bisa membuat akun lewat login pertama.
+        Employee::where('nik', '90100002')->update(['is_active' => false]);
+        $this->login('90100002', '90100002')->assertForbidden()->assertJsonPath('message', AuthService::MSG_NOT_SHD);
+        $this->assertDatabaseMissing('users', ['nik' => '90100002']);
+    }
+
+    public function test_department_code_match_ignores_letter_case(): void
+    {
+        Employee::where('nik', self::SHD_NIK)->update(['department_code' => 'shd']);
+
+        $this->login(self::SHD_NIK, self::SHD_NIK)->assertOk();
     }
 
     public function test_optional_password_change_replaces_nik(): void
@@ -162,10 +173,10 @@ class EmployeeLoginTest extends TestCase
         $change(self::NEW_PASSWORD)->assertOk();
     }
 
-    public function test_password_change_does_not_need_directory(): void
+    public function test_password_change_works_without_any_employee_data(): void
     {
         $this->actingAs(User::factory()->employee(self::SHD_NIK)->create(['password' => self::SHD_NIK]));
-        $this->directoryDown();
+        Employee::query()->delete();
 
         $this->putJson('/api/user/password', [
             'current_password' => self::SHD_NIK,
@@ -213,30 +224,41 @@ class EmployeeLoginTest extends TestCase
         $this->assertSame(1, User::withTrashed()->count());
     }
 
-    public function test_directory_down_lets_active_api_account_login_and_logs_warning(): void
+    public function test_existing_account_can_login_before_first_sync_and_logs_warning(): void
     {
         $user = $this->activeEmployeeAccount();
-        $this->directoryDown();
+        Employee::query()->delete();
 
         $this->login(self::SHD_NIK, self::NEW_PASSWORD)->assertOk();
 
-        $this->assertMatchesRegularExpression('/WARNING: login\.directory_unavailable .*"user_id":'.$user->id.'/', $this->logged());
+        $this->assertMatchesRegularExpression('/WARNING: login\.employees_not_synced .*"user_id":'.$user->id.'/', $this->logged());
     }
 
-    public function test_directory_down_rejects_first_login_but_not_existing_or_manual_accounts(): void
+    public function test_first_login_is_rejected_before_first_sync_but_not_existing_or_manual_accounts(): void
     {
         // Akun yang sudah ada (termasuk yang masih memakai NIK, mis. setelah reset) memakai password tersimpan.
         User::factory()->employee('90100002')->create(['password' => '90100002']);
         User::factory()->create(['username' => 'bersama.shd', 'password' => 'Bersama-Uji-1']);
-        $this->directoryDown();
+        Employee::query()->delete();
 
-        $this->login(self::SHD_NIK, self::SHD_NIK)->assertStatus(503)->assertJsonPath('message', AuthService::MSG_DIRECTORY_DOWN);
+        $this->login(self::SHD_NIK, self::SHD_NIK)->assertStatus(503)->assertJsonPath('message', AuthService::MSG_NO_EMPLOYEE_DATA);
         $this->login('90100002', '90100002')->assertOk();
         $this->login('bersama.shd', 'Bersama-Uji-1')->assertOk();
         $this->assertDatabaseMissing('users', ['nik' => self::SHD_NIK]);
     }
 
-    public function test_login_syncs_name_and_department_from_directory(): void
+    public function test_login_never_calls_the_employee_api(): void
+    {
+        Http::fake();
+        config(['employees.api_url' => 'https://api-pegawai.test/data']);
+
+        $this->login(self::SHD_NIK, self::SHD_NIK)->assertOk();
+        $this->login(self::OTHER_NIK, self::OTHER_NIK)->assertForbidden();
+
+        Http::assertNothingSent();
+    }
+
+    public function test_login_syncs_name_and_department_from_the_local_copy(): void
     {
         $user = User::factory()->employee(self::SHD_NIK)->create(['name' => 'Nama Lama', 'department' => 'Lama', 'password' => self::NEW_PASSWORD]);
 
@@ -255,7 +277,7 @@ class EmployeeLoginTest extends TestCase
         $log = $this->logged();
         $this->assertStringContainsString('"reason":"not_shd"', $log);
         $this->assertStringNotContainsString('"password"', $log);
-        foreach (['Salah-Uji-1', '1990-03-14', 'contoh.invalid', 'Islam'] as $secret) {
+        foreach (['Salah-Uji-1', 'contoh.invalid', 'Islam'] as $secret) {
             $this->assertStringNotContainsString($secret, $log);
         }
     }

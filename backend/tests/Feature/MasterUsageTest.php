@@ -7,8 +7,6 @@ use App\Models\AssetType;
 use App\Models\Building;
 use App\Models\Consumable;
 use App\Models\ConsumableCategory;
-use App\Models\Department;
-use App\Models\RequestCatalog;
 use App\Models\Room;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -54,25 +52,6 @@ class MasterUsageTest extends TestCase
             ->assertJsonPath('data.items', [['label' => 'aset', 'count' => 2]])
             ->assertJsonPath('data.total', 2)
             ->assertJsonPath('data.can_delete', false);
-    }
-
-    public function test_department_usage_and_shd_is_locked(): void
-    {
-        $unit = Department::factory()->create();
-        RequestCatalog::factory()->create(['provider_department_id' => $unit->id]);
-
-        $this->getJson("/api/departments/{$unit->id}/usage")
-            ->assertOk()
-            ->assertJsonPath('data.items', [['label' => 'item katalog', 'count' => 1]])
-            ->assertJsonPath('data.can_delete', false)
-            ->assertJsonPath('data.reason', null);
-
-        $shd = Department::factory()->internal()->create();
-
-        $this->getJson("/api/departments/{$shd->id}/usage")
-            ->assertOk()
-            ->assertJsonPath('data.can_delete', false)
-            ->assertJsonPath('data.reason', 'Departemen SHD tidak dapat dihapus.');
     }
 
     public function test_consumable_category_usage(): void

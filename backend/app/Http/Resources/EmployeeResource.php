@@ -2,7 +2,7 @@
 
 namespace App\Http\Resources;
 
-use App\Services\EmployeeDirectory\Employee;
+use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,7 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Saran pegawai: hanya nama, departemen (aturan fallback), dan jabatan (SPEC §15).
  * NIK tidak dikirim karena NIK adalah password awal akun pegawai SHD (T33 R1).
  *
- * @property Employee $resource
+ * @mixin Employee
  */
 class EmployeeResource extends JsonResource
 {
@@ -20,9 +20,9 @@ class EmployeeResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'name' => $this->resource->name,
-            'department' => $this->resource->department,
-            'position' => $this->resource->position,
+            'name' => $this->name,
+            'department' => $this->departmentLabel(),
+            'position' => $this->position ?? '',
         ];
     }
 }

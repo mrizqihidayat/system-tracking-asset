@@ -1,0 +1,10 @@
+version: 1
+id: 9796835d-234c-4645-b66d-3b391cdbc964
+name: employee-api
+slug: employee-api
+protocol: http
+port: 3001
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true
