@@ -243,7 +243,7 @@ export default function MasterDataPage() {
         description="Kelola gedung, ruangan, kategori dan jenis aset, kategori stok, serta akun pengguna. Data yang masih digunakan tidak dapat dihapus."
       />
 
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist">
         {tabs.map((t) => (
           <button
             key={t.key}

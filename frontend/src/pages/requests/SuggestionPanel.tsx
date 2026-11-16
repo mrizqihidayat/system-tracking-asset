@@ -6,20 +6,24 @@ interface Props {
   groups: SuggestionGroup[]
   /** Buka popup permintaan sekaligus untuk barang yang belum diminta di grup ini. */
   onRequest: (group: SuggestionGroup) => void
-  /** Tampilkan riwayat permintaan ke departemen ini. */
-  onShowHistory: (departmentId: number) => void
 }
 
 const isHabis = (status: string) => status === 'Habis'
 
 /**
  * Saran permintaan (SPEC §9): kartu per departemen penyedia, tersusun mengalir sehingga tidak ada
- * ruang kosong walau departemennya banyak. Barang yang sudah punya permintaan terbuka diringkas satu baris.
+ * ruang kosong walau departemennya banyak. Hanya barang yang belum punya permintaan terbuka yang tampil;
+ * jumlah yang sudah diminta cukup disebut di judul kartu.
  */
-export default function SuggestionPanel({ groups, onRequest, onShowHistory }: Props) {
-  const items = groups.flatMap((g) => g.items)
-  const habis = items.filter((i) => isHabis(i.stock_status)).length
-  const menipis = items.length - habis
+export default function SuggestionPanel({ groups, onRequest }: Props) {
+  const cards = groups
+    .map((g) => ({ group: g, needed: g.items.filter((i) => !i.has_open_request), requested: g.items.filter((i) => i.has_open_request).length }))
+    .filter((c) => c.needed.length > 0)
+  if (cards.length === 0) return null
+
+  const needed = cards.flatMap((c) => c.needed)
+  const habis = needed.filter((i) => isHabis(i.stock_status)).length
+  const menipis = needed.length - habis
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white">
@@ -43,47 +47,31 @@ export default function SuggestionPanel({ groups, onRequest, onShowHistory }: Pr
       </div>
 
       <div className="grid items-start gap-3 border-t border-slate-100 p-4 sm:grid-cols-[repeat(auto-fill,minmax(17rem,1fr))]">
-        {groups.map((g) => {
-          const needed = g.items.filter((i) => !i.has_open_request)
-          const requested = g.items.filter((i) => i.has_open_request)
-          return (
-            <article key={g.provider_department.id} className="overflow-hidden rounded-lg border border-slate-200">
-              <header className="flex items-baseline gap-2 bg-slate-50 px-3 py-2">
-                <h3 className="text-sm font-semibold">{g.provider_department.name}</h3>
-                <p className="text-xs text-slate-500">
-                  {needed.length > 0 ? `${needed.length} item perlu diminta` : 'Semua sudah diminta'}
-                  {needed.length > 0 && requested.length > 0 && ` · ${requested.length} sudah diminta`}
-                </p>
-              </header>
-              {needed.length > 0 && (
-                <ul className="divide-y divide-slate-100">
-                  {needed.map((i) => (
-                    <li key={i.consumable_id} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 px-3 py-2 text-sm">
-                      <span className="min-w-0 truncate font-medium">{i.item_name}</span>
-                      <span className="tabular-nums text-xs text-slate-500">× {i.quantity}</span>
-                      <Badge color={isHabis(i.stock_status) ? 'red' : 'amber'}>{i.stock_status}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {requested.length > 0 && (
-                <div className="flex items-start justify-between gap-3 border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
-                  <p className="min-w-0">{requested.map((i) => i.item_name).join(', ')} sudah diminta</p>
-                  <button type="button" className="tap shrink-0 font-semibold text-brand-700 hover:underline" onClick={() => onShowHistory(g.provider_department.id)}>
-                    Lihat di riwayat
-                  </button>
-                </div>
-              )}
-              {needed.length > 0 && (
-                <div className="border-t border-slate-100 p-3">
-                  <Button className="w-full" onClick={() => onRequest(g)}>
-                    Buat permintaan ke {g.provider_department.name} ({needed.length} item)
-                  </Button>
-                </div>
-              )}
-            </article>
-          )
-        })}
+        {cards.map(({ group: g, needed: items, requested }) => (
+          <article key={g.provider_department.id} className="overflow-hidden rounded-lg border border-slate-200">
+            <header className="flex items-baseline gap-2 bg-slate-50 px-3 py-2">
+              <h3 className="text-sm font-semibold">{g.provider_department.name}</h3>
+              <p className="text-xs text-slate-500">
+                {items.length} item perlu diminta
+                {requested > 0 && ` · ${requested} sudah diminta`}
+              </p>
+            </header>
+            <ul className="divide-y divide-slate-100">
+              {items.map((i) => (
+                <li key={i.consumable_id} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 px-3 py-2 text-sm">
+                  <span className="min-w-0 truncate font-medium">{i.item_name}</span>
+                  <span className="tabular-nums text-xs text-slate-500">× {i.quantity}</span>
+                  <Badge color={isHabis(i.stock_status) ? 'red' : 'amber'}>{i.stock_status}</Badge>
+                </li>
+              ))}
+            </ul>
+            <div className="border-t border-slate-100 p-3">
+              <Button className="w-full" onClick={() => onRequest(g)}>
+                Buat permintaan ke {g.provider_department.name} ({items.length} item)
+              </Button>
+            </div>
+          </article>
+        ))}
       </div>
     </section>
   )

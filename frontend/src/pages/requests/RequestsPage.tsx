@@ -9,8 +9,9 @@ import Button from '../../components/ui/Button'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu, { type MenuItem } from '../../components/ui/DropdownMenu'
-import { FormField, Input, Textarea } from '../../components/ui/FormField'
+import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { PageHeader } from '../../components/ui/Page'
+import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { formatDate } from '../../lib/format'
@@ -28,7 +29,7 @@ import CatalogFormModal from './CatalogFormModal'
 import RequestFormModal from './RequestFormModal'
 import SuggestionPanel from './SuggestionPanel'
 
-const CATALOG_PER_PAGE = 5
+const CATALOG_PER_PAGE = 10
 const PREFILL_PARAMS = ['room_id', 'catalog_id', 'consumable_id']
 
 const statusColor = {
@@ -115,7 +116,12 @@ function StatusModal({ request, status, onClose, onDone }: {
           ) : impactError ? (
             <p role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">{errorMessage(impactError)}</p>
           ) : (
-            <p className="text-sm text-slate-500">Memeriksa dampak…</p>
+            // Placeholder seukuran kotak dampak (tanpa teks yang berkedip); pembaca layar tetap mendengar "Memuat…".
+            <div className="space-y-2 rounded-lg border border-slate-100 px-3 py-3" aria-busy="true">
+              <LoadingLabel />
+              <Skeleton className="h-3.5 w-11/12" />
+              <Skeleton className="h-3.5 w-2/3" />
+            </div>
           )}
           <FormField label="Catatan (opsional)" error={errors.note}>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} error={errors.note} maxLength={1000} />
@@ -128,31 +134,8 @@ function StatusModal({ request, status, onClose, onDone }: {
 
 type Tab = 'riwayat' | 'katalog'
 
-/** Chip status Riwayat permintaan; Dikembalikan & Dibatalkan hanya tampil bila ada. */
-const CHIPS: { status: SupplyRequest['display_status']; always: boolean }[] = [
-  { status: 'Diajukan', always: true },
-  { status: 'Belum direspons', always: true },
-  { status: 'Diterima sebagian', always: true },
-  { status: 'Diterima', always: true },
-  { status: 'Dikembalikan', always: false },
-  { status: 'Dibatalkan', always: false },
-]
-
-function Chip({ label, count, active, onClick }: { label: string; count?: number; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
-        active ? 'border-brand-800 bg-brand-800 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-      }`}
-    >
-      {label}
-      {count !== undefined && <span className={`tabular-nums ${active ? 'text-white/80' : 'text-slate-500'}`}>{count}</span>}
-    </button>
-  )
-}
+/** Pilihan filter status Riwayat permintaan (status tampilan; Diajukan tanpa yang Belum direspons). */
+const STATUS_OPTIONS: SupplyRequest['display_status'][] = ['Diajukan', 'Belum direspons', 'Diterima sebagian', 'Diterima', 'Dikembalikan', 'Dibatalkan']
 
 export default function RequestsPage() {
   const toast = useToast()
@@ -187,9 +170,15 @@ export default function RequestsPage() {
     }
   })
   const [deleting, setDeleting] = useState<{ item: RequestCatalog; usage: CatalogUsage } | null>(null)
-  // Katalog sudah dimuat utuh: halaman dibagi di browser, tanpa request baru.
+  // Katalog sudah dimuat utuh: cari, filter departemen, dan halaman dikerjakan di browser, tanpa request baru.
   const [catalogPage, setCatalogPage] = useState(1)
-  const catalogLastPage = Math.max(1, Math.ceil(catalog.length / CATALOG_PER_PAGE))
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalogProvider, setCatalogProvider] = useState<number | null>(null)
+  const catalogQueryText = catalogSearch.trim().toLowerCase()
+  const catalogRows = catalog.filter(
+    (c) => (!catalogQueryText || c.item_name.toLowerCase().includes(catalogQueryText)) && (!catalogProvider || c.provider_department?.id === catalogProvider),
+  )
+  const catalogLastPage = Math.max(1, Math.ceil(catalogRows.length / CATALOG_PER_PAGE))
   const catalogPageNow = Math.min(catalogPage, catalogLastPage)
   const status = list.get('status')
   const providerId = list.get('provider_department_id')
@@ -316,8 +305,9 @@ export default function RequestsPage() {
           <span className="tabular-nums">{r.quantity}</span>
         ),
     },
-    { header: 'Penyedia', cell: (r) => r.provider_department?.name ?? '-' },
-    { header: 'Cara', cell: (r) => r.request_method ?? '-' },
+    { header: 'Penyedia', className: 'text-center', cell: (r) => r.provider_department?.name ?? '-' },
+    { header: 'Cara', className: 'text-center', cell: (r) => r.request_method ?? '-' },
+    { header: 'Perlu dikembalikan', className: 'text-center', cell: (r) => (r.must_return ? 'Ya' : 'Tidak') },
     { header: 'Status', mobile: 'badge', cell: (r) => <Badge color={statusColor[r.display_status]} dot>{r.display_status}</Badge> },
     {
       header: '',
@@ -379,16 +369,10 @@ export default function RequestsPage() {
         }
       />
 
-      {suggestions.length > 0 && (
-        <SuggestionPanel
-          groups={suggestions}
-          onRequest={(group) => setModal({ kind: 'batch', group })}
-          onShowHistory={(id) => list.setFilter('provider_department_id', String(id), { tab: null, status: null })}
-        />
-      )}
+      <SuggestionPanel groups={suggestions} onRequest={(group) => setModal({ kind: 'batch', group })} />
 
       <section className="rounded-xl border border-slate-200 bg-white">
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 px-5" role="tablist">
+        <div className="flex gap-1 border-b border-slate-200 px-5" role="tablist">
           {(['riwayat', 'katalog'] as const).map((t) => (
             <button
               key={t}
@@ -417,13 +401,13 @@ export default function RequestsPage() {
             )}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input
-                className="sm:max-w-xs"
+                className="sm:w-60"
                 value={search}
                 onChange={(e) => list.setSearchText(e.target.value)}
                 placeholder="Cari item atau kegiatan"
                 aria-label="Cari permintaan"
               />
-              <div className="sm:w-56">
+              <div className="sm:w-48">
                 <DepartmentCombobox
                   value={providerId ? Number(providerId) : null}
                   onChange={(id) => list.setFilter('provider_department_id', id ? String(id) : '')}
@@ -431,12 +415,15 @@ export default function RequestsPage() {
                   placeholder="Semua penyedia"
                 />
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter status">
-              <Chip label="Semua" count={counts?.Semua} active={!status} onClick={() => list.setFilter('status', '')} />
-              {CHIPS.filter((c) => c.always || (counts?.[c.status] ?? 0) > 0 || status === c.status).map((c) => (
-                <Chip key={c.status} label={c.status} count={counts?.[c.status]} active={status === c.status} onClick={() => list.setFilter('status', c.status)} />
-              ))}
+              {/* Jumlah per status (meta.status_counts) tampil di dalam pilihan. */}
+              <Select clearable className="sm:w-56" value={status} onChange={(e) => list.setFilter('status', e.target.value)} aria-label="Status">
+                <option value="">Semua status</option>
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {counts ? `${s} (${counts[s] ?? 0})` : s}
+                  </option>
+                ))}
+              </Select>
             </div>
             <DataTable
               columns={historyColumns}
@@ -454,20 +441,42 @@ export default function RequestsPage() {
           </div>
         ) : (
           <div className="space-y-3 p-5">
-            <div className="flex justify-end">
-              <Button variant="secondary" onClick={() => setModal({ kind: 'catalog', item: null })}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <Input
+                className="sm:w-60"
+                value={catalogSearch}
+                onChange={(e) => {
+                  setCatalogSearch(e.target.value)
+                  setCatalogPage(1)
+                }}
+                placeholder="Cari item"
+                aria-label="Cari item katalog"
+              />
+              <div className="sm:w-48">
+                <DepartmentCombobox
+                  value={catalogProvider}
+                  onChange={(id) => {
+                    setCatalogProvider(id)
+                    setCatalogPage(1)
+                  }}
+                  departments={providers}
+                  placeholder="Semua penyedia"
+                />
+              </div>
+              <Button variant="secondary" className="sm:ml-auto" onClick={() => setModal({ kind: 'catalog', item: null })}>
                 <Plus size={16} /> Tambah item
               </Button>
             </div>
             <DataTable
               columns={catalogColumns}
-              rows={catalog.slice((catalogPageNow - 1) * CATALOG_PER_PAGE, catalogPageNow * CATALOG_PER_PAGE)}
+              rows={catalogRows.slice((catalogPageNow - 1) * CATALOG_PER_PAGE, catalogPageNow * CATALOG_PER_PAGE)}
               rowKey={(c) => c.id}
               loading={catalogQuery.isPending}
-              emptyText="Katalog masih kosong."
-              meta={catalog.length > CATALOG_PER_PAGE ? { current_page: catalogPageNow, last_page: catalogLastPage, per_page: CATALOG_PER_PAGE, total: catalog.length } : undefined}
+              emptyText={catalog.length === 0 ? 'Katalog masih kosong.' : 'Tidak ada item yang cocok.'}
+              meta={catalogRows.length > CATALOG_PER_PAGE ? { current_page: catalogPageNow, last_page: catalogLastPage, per_page: CATALOG_PER_PAGE, total: catalogRows.length } : undefined}
               unit="item"
               onPageChange={setCatalogPage}
+              dense
             />
           </div>
         )}
