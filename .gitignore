@@ -1,7 +1,20 @@
-# Dependency
-node_modules/
-.claude
+# Environment
+.env
+*.env.local
 .mcp.json
-.agent
+
+# Dependencies & build
+backend/vendor/
+frontend/node_modules/
+frontend/dist/
+
+# Cache
+backend/.phpunit.result.cache
+
+# AI tools (lokal)
+.claude/
+backend/.claude/
+.agent/
 .impeccable/
-AGENTS.md
+frontend/.impeccable/
+skills-lock.json
