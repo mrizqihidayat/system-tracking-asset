@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import DepartmentCombobox from '../../components/DepartmentCombobox'
+import { useCallback, useState } from 'react'
+import EntityCombobox from '../../components/ui/EntityCombobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
+import { invalidate } from '../../lib/queries/invalidate'
 import { useDepartments, useRequestMethods, useRooms } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { RequestCatalog, RequestPrefill, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
 import RoomSelect from '../loans/RoomSelect'
+import CatalogFormModal from './CatalogFormModal'
 
 interface Props {
   catalog: RequestCatalog[]
@@ -21,9 +26,19 @@ const today = () => new Date().toLocaleDateString('en-CA')
 const MANUAL = 'manual'
 const OTHER_METHOD = 'Lainnya'
 
+const catalogOption = (c: RequestCatalog) => ({
+  id: c.id,
+  label: c.provider_department?.name ? `${c.item_name} • ${c.provider_department.name}` : c.item_name,
+})
+
 /** Catat permintaan ke departemen lain (proses permintaan tetap di luar sistem). */
-export default function RequestFormModal({ catalog, request, prefill, onClose, onDone }: Props) {
+export default function RequestFormModal({ catalog: catalogProp, request, prefill, onClose, onDone }: Props) {
   const toast = useToast()
+  const queryClient = useQueryClient()
+  // Item yang baru ditambah dari form ini ikut tampil sebelum daftar katalog dimuat ulang.
+  const [added, setAdded] = useState<RequestCatalog[]>([])
+  const catalog = [...catalogProp, ...added.filter((a) => !catalogProp.some((c) => c.id === a.id))]
+  const [newItem, setNewItem] = useState<{ name: string; resolve: (c: RequestCatalog) => void; reject: () => void } | null>(null)
   const departments = useDepartments().data.filter((d) => !d.is_internal)
   const { data: allRooms } = useRooms()
   // Barang stok tidak memakai katalog (permintaan lama yang masih punya katalog ikut menjadi Item lain).
@@ -63,8 +78,16 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
   const prefillBuilding = !request && prefillRoom ? allRooms.find((r) => r.id === prefillRoom)?.building_id ?? null : null
   const effectiveBuildingId = buildingId ?? prefillBuilding
 
+  // Item di luar katalog hanya untuk data lama dan permintaan dari Stok; item baru ditambah ke katalog lewat ketikan.
   const manual = catalogId === MANUAL
   const selected = catalog.find((c) => String(c.id) === catalogId)
+
+  const addCatalogItem = (name: string) =>
+    new Promise<RequestCatalog>((resolve, reject) => setNewItem({ name, resolve, reject: () => reject(new Error('Dibatalkan')) }))
+  const cancelNewItem = useCallback(() => {
+    newItem?.reject()
+    setNewItem(null)
+  }, [newItem])
   const mustReturn = returnChoice ?? selected?.must_return ?? false
 
   // Tautan barang stok hanya berlaku selama itemnya tidak diganti di form.
@@ -93,31 +116,33 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
   }
 
   return (
+    <>
     <ActionModal
       title={request ? 'Ubah permintaan' : 'Buat permintaan'}
       submitLabel="Simpan"
-      submitDisabled={!catalogId || !method || requestMethods.isPending || (manual && (!itemName.trim() || !providerId))}
+      submitDisabled={!catalogId || !method || requestMethods.isPending || (manual && (!itemName.trim() || !providerId)) || !!newItem}
       onClose={onClose}
       onSubmit={submit}
     >
       {(errors) => (
         <>
-          <FormField label="Item" required error={errors.catalog_id}>
-            <Select
-              value={catalogId}
-              onChange={(e) => {
-                setCatalogId(e.target.value)
-                setReturnChoice(null)
-              }}
-              error={errors.catalog_id}
-            >
-              <option value="">Pilih item katalog</option>
-              {catalog.map((c) => (
-                <option key={c.id} value={c.id}>{c.item_name} • {c.provider_department?.name}</option>
-              ))}
-              <option value={MANUAL}>Item lain (tidak ada di katalog)</option>
-            </Select>
-          </FormField>
+          {!manual && (
+            <FormField label="Item" required error={errors.catalog_id}>
+              <EntityCombobox
+                value={selected?.id ?? null}
+                options={catalog.map(catalogOption)}
+                onChange={(id) => {
+                  setCatalogId(id ? String(id) : '')
+                  setReturnChoice(null)
+                }}
+                onCreate={async (name) => catalogOption(await addCatalogItem(name))}
+                createLabel={(name) => `+ Tambah '${name}' ke katalog`}
+                isExisting={(name) => catalog.some((c) => c.item_name.toLowerCase() === name.toLowerCase())}
+                placeholder="Ketik nama item…"
+                error={errors.catalog_id}
+              />
+            </FormField>
+          )}
           {selected && (
             <p className="-mt-1 text-xs text-slate-500">
               {selected.provider_department?.name} · lead time {selected.lead_time_days} hari
@@ -133,10 +158,7 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
                 <Input value={itemName} onChange={(e) => setItemName(e.target.value)} error={errors.item_name} maxLength={150} />
               </FormField>
               <FormField label="Departemen penyedia" required error={errors.provider_department_id}>
-                <Select value={providerId ?? ''} onChange={(e) => setProviderId(Number(e.target.value) || null)} error={errors.provider_department_id}>
-                  <option value="">Pilih departemen</option>
-                  {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </Select>
+                <DepartmentCombobox value={providerId} onChange={setProviderId} departments={departments} error={errors.provider_department_id} />
               </FormField>
             </div>
           )}
@@ -186,5 +208,19 @@ export default function RequestFormModal({ catalog, request, prefill, onClose, o
         </>
       )}
     </ActionModal>
+      {newItem && (
+        <CatalogFormModal
+          item={null}
+          initialName={newItem.name}
+          onClose={cancelNewItem}
+          onDone={(saved) => {
+            setAdded((list) => [...list, saved])
+            newItem.resolve(saved)
+            setNewItem(null)
+            invalidate.catalog(queryClient)
+          }}
+        />
+      )}
+    </>
   )
 }

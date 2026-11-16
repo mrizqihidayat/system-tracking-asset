@@ -1,10 +1,11 @@
 import {
-  Boxes, ClipboardCheck, HandHelping, KeyRound, LayoutDashboard, LogOut, Menu, PackageOpen, Send, Settings, X,
+  Boxes, ClipboardCheck, HandHelping, LayoutDashboard, Menu, PackageOpen, Send, Settings, X,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import DropdownMenu from '../ui/DropdownMenu'
 import { cancelRoutePrefetch, prefetchRouteOnDwell } from '../../lib/queries/prefetch'
 import { clearSession, getUser, loginId } from '../../lib/auth'
 
@@ -112,28 +113,29 @@ export default function AppLayout() {
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-semibold">
               {(user?.name ?? '?').charAt(0).toUpperCase()}
             </span>
-            <div className="min-w-0 leading-tight">
+            <div className="min-w-0 flex-1 leading-tight">
               <p className="truncate text-sm font-semibold">{user?.name ?? '-'}</p>
               <p className="truncate text-xs text-[#b5cadb]">
                 {user ? (user.source === 'api' ? loginId(user) : `Akun bersama ${loginId(user)}`) : 'Admin Aset SHD'}
               </p>
             </div>
+            {/* Pengaturan akun: Ganti password atau Keluar. */}
+            <DropdownMenu
+              label="Pengaturan akun"
+              trigger={<Settings size={18} />}
+              items={[
+                {
+                  label: 'Ganti password',
+                  onClick: () => {
+                    setOpen(false)
+                    navigate('/ganti-password')
+                  },
+                },
+                { label: 'Keluar', onClick: logout, danger: true },
+              ]}
+              triggerClassName="min-h-9! w-9 px-0! border-0! bg-transparent! text-[#d3e2ee]! hover:bg-white/10! hover:text-white!"
+            />
           </div>
-          <NavLink
-            to="/ganti-password"
-            onClick={() => setOpen(false)}
-            className="mt-3 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#d3e2ee] hover:bg-white/10 hover:text-white"
-          >
-            <KeyRound size={18} className="shrink-0" />
-            Ganti password
-          </NavLink>
-          <button
-            onClick={logout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#d3e2ee] hover:bg-white/10 hover:text-white"
-          >
-            <LogOut size={18} className="shrink-0" />
-            Keluar
-          </button>
         </div>
       </aside>
 

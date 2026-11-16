@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import Button from '../../../components/ui/Button'
 import Modal from '../../../components/ui/Modal'
 import { errorMessage, fieldErrors } from '../../../lib/api'
@@ -19,6 +19,8 @@ export default function ActionModal({ title, submitLabel, danger, submitDisabled
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  // Id unik per modal: popup bertumpuk (mis. tambah item katalog dari form permintaan) tidak saling mengirim form.
+  const formId = useId()
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -43,13 +45,13 @@ export default function ActionModal({ title, submitLabel, danger, submitDisabled
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Batal</Button>
-          <Button type="submit" form="action-form" variant={danger ? 'danger' : 'primary'} loading={saving} disabled={submitDisabled}>
+          <Button type="submit" form={formId} variant={danger ? 'danger' : 'primary'} loading={saving} disabled={submitDisabled}>
             {submitLabel}
           </Button>
         </>
       }
     >
-      <form id="action-form" onSubmit={submit} className="space-y-3">
+      <form id={formId} onSubmit={submit} className="space-y-3">
         {message && (
           <div role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
             {message}

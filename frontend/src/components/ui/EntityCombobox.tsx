@@ -40,6 +40,15 @@ export default function EntityCombobox({ value, options, onChange, onCreate, onP
       isExisting={isExisting}
       error={error}
       disabled={disabled}
+      // Tanpa onCreate hanya pilihan yang ada yang sah: saat kolom ditinggalkan, ketikan yang sama persis
+      // (tanpa beda huruf besar/kecil) dipilih otomatis, selain itu dikosongkan agar tidak tampak terpilih.
+      onBlur={onCreate || typed === null ? undefined : () => {
+        const match = options.find((o) => o.label.toLowerCase() === typed.trim().toLowerCase())
+        setTyped(null)
+        onPendingChange?.(false)
+        onTextChange?.('')
+        if (match) onChange(match.id)
+      }}
       onChange={(t) => {
         setTyped(t)
         onPendingChange?.(t.trim() !== '')

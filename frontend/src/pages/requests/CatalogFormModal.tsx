@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import DepartmentCombobox from '../../components/DepartmentCombobox'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api } from '../../lib/api'
@@ -8,15 +9,18 @@ import ActionModal from '../assets/modals/ActionModal'
 
 interface Props {
   item: RequestCatalog | null
+  /** Nama awal saat ditambah dari ketikan di form permintaan. */
+  initialName?: string
   onClose: () => void
-  onDone: () => void
+  /** Item yang disimpan dikirim balik, mis. agar langsung terpilih di form permintaan. */
+  onDone: (saved: RequestCatalog) => void
 }
 
 /** Tambah/ubah item katalog perlengkapan dari departemen lain (SPEC §9). */
-export default function CatalogFormModal({ item, onClose, onDone }: Props) {
+export default function CatalogFormModal({ item, initialName, onClose, onDone }: Props) {
   const toast = useToast()
   const departments = useDepartments().data.filter((d) => !d.is_internal)
-  const [name, setName] = useState(item?.item_name ?? '')
+  const [name, setName] = useState(item?.item_name ?? initialName ?? '')
   const [providerId, setProviderId] = useState<number | null>(item?.provider_department?.id ?? null)
   const [mustReturn, setMustReturn] = useState(item?.must_return ?? false)
   const [leadTime, setLeadTime] = useState(String(item?.lead_time_days ?? 3))
@@ -30,10 +34,11 @@ export default function CatalogFormModal({ item, onClose, onDone }: Props) {
       lead_time_days: Number(leadTime),
       note: note.trim() || null,
     }
-    if (item) await api.put(`/request-catalog/${item.id}`, payload)
-    else await api.post('/request-catalog', payload)
+    const res = item
+      ? await api.put<{ data: RequestCatalog }>(`/request-catalog/${item.id}`, payload)
+      : await api.post<{ data: RequestCatalog }>('/request-catalog', payload)
     toast.success(item ? 'Katalog diperbarui.' : 'Item katalog ditambahkan.')
-    onDone()
+    onDone(res.data.data)
   }
 
   return (
@@ -50,10 +55,7 @@ export default function CatalogFormModal({ item, onClose, onDone }: Props) {
             <Input value={name} onChange={(e) => setName(e.target.value)} error={errors.item_name} maxLength={150} />
           </FormField>
           <FormField label="Departemen penyedia" required error={errors.provider_department_id}>
-            <Select value={providerId ?? ''} onChange={(e) => setProviderId(Number(e.target.value) || null)} error={errors.provider_department_id}>
-              <option value="">Pilih departemen</option>
-              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </Select>
+            <DepartmentCombobox value={providerId} onChange={setProviderId} departments={departments} error={errors.provider_department_id} />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Perlu dikembalikan" required error={errors.must_return}>

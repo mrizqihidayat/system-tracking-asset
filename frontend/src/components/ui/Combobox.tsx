@@ -23,11 +23,13 @@ interface Props {
   isExisting?: (text: string) => boolean
   error?: string
   disabled?: boolean
+  /** Dipanggil saat kolom ditinggalkan (klik pilihan di daftar tidak memicu blur). */
+  onBlur?: () => void
 }
 
 /** Kolom ketik-untuk-mencari; daftar pilihannya sama dengan Select. */
 export default function Combobox({
-  value, onChange, onSelect, options, placeholder, allowCreate, createLabel, isExisting, error, disabled, filter = true,
+  value, onChange, onSelect, options, placeholder, allowCreate, createLabel, isExisting, error, disabled, filter = true, onBlur,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
@@ -104,6 +106,7 @@ export default function Combobox({
           show()
         }}
         onKeyDown={onKeyDown}
+        onBlur={onBlur}
       />
       <ChevronDown
         size={16}

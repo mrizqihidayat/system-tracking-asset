@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import DepartmentCombobox from '../../components/DepartmentCombobox'
 import EntityCombobox from '../../components/ui/EntityCombobox'
-import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
+import { FormField, Input, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
 import { createBuilding, createConsumableCategory, createRoom } from '../../lib/lookups'
@@ -145,10 +146,7 @@ export default function ConsumableFormModal({ item, onClose, onDone }: Props) {
           </div>
           {item && <p className="-mt-1 text-xs text-slate-500">Jumlah diubah lewat Catat transaksi di tabel.</p>}
           <FormField label="Minta ke (departemen penyedia)" required error={errors.provider_department_id}>
-            <Select value={providerId ?? ''} onChange={(e) => setProviderId(Number(e.target.value) || null)} error={errors.provider_department_id}>
-              <option value="">Pilih departemen</option>
-              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </Select>
+            <DepartmentCombobox value={providerId} onChange={setProviderId} departments={departments} error={errors.provider_department_id} />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Gedung lokasi simpan" required>

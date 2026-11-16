@@ -1,10 +1,11 @@
 import { Plus } from 'lucide-react'
+import DepartmentCombobox from '../../components/DepartmentCombobox'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
-import { FormField, Input, Select } from '../../components/ui/FormField'
+import { FormField, Input } from '../../components/ui/FormField'
 import Modal from '../../components/ui/Modal'
 import PasswordInput from '../../components/ui/PasswordInput'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
@@ -43,10 +44,10 @@ export default function AccountsTab() {
     <>
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-500">
-          Pegawai SHD login dengan NIK; akunnya dibuat otomatis saat login pertama. Akun bersama dibuat di sini.
+          Akun pegawai SHD terbentuk otomatis saat pegawai pertama kali masuk menggunakan NIK.
         </p>
         <Button variant="secondary" onClick={() => setAction({ kind: 'create' })}>
-          <Plus size={16} /> Tambah akun bersama
+          <Plus size={16} /> Tambah akun
         </Button>
       </div>
 
@@ -69,8 +70,7 @@ export default function AccountsTab() {
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2">
                     <span className={`font-medium ${a.is_active ? '' : 'text-slate-500'}`}>{a.name}</span>
-                    {isMe && <span className="text-xs text-slate-500">(Anda)</span>}
-                    {a.source === 'api' ? <Badge color="blue">Pegawai SHD</Badge> : <Badge>Akun bersama</Badge>}
+                    {isMe && <Badge color="blue">Anda</Badge>}
                     {!a.is_active && <Badge color="red">Nonaktif</Badge>}
                   </p>
                   <p className="mt-0.5 text-xs text-slate-500">
@@ -249,7 +249,7 @@ function SharedAccountModal({ onClose, onDone }: { onClose: () => void; onDone: 
   return (
     <Modal
       open
-      title="Tambah akun bersama"
+      title="Tambah akun"
       onClose={onClose}
       footer={
         <>
@@ -269,12 +269,12 @@ function SharedAccountModal({ onClose, onDone }: { onClose: () => void; onDone: 
           <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="mis. Akun Bersama HRM" maxLength={100} error={errors.name} />
         </FormField>
         <FormField label="Departemen" required error={errors.department}>
-          <Select value={form.department} onChange={(e) => set('department', e.target.value)} error={errors.department}>
-            <option value="">Pilih departemen</option>
-            {departments.data.map((d) => (
-              <option key={d.id} value={d.name}>{d.name}</option>
-            ))}
-          </Select>
+          <DepartmentCombobox
+            value={departments.data.find((d) => d.name === form.department)?.id ?? null}
+            onChange={(id) => set('department', departments.data.find((d) => d.id === id)?.name ?? '')}
+            departments={departments.data}
+            error={errors.department}
+          />
         </FormField>
         <PasswordFields form={form} errors={errors} set={set} />
       </form>
