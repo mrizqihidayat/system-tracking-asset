@@ -33,6 +33,33 @@ class SupplyRequestService
     }
 
     /**
+     * Satu permintaan per barang stok, semua ke departemen penyedia yang sama, dalam satu transaksi:
+     * gagal satu = tidak ada yang tersimpan. Barang harus bersumber (minta ke) departemen itu.
+     *
+     * @param  array{provider_department_id: int, request_method: string, request_date?: ?string, purpose?: ?string, room_id?: ?int, note?: ?string, items: list<array{consumable_id: int, quantity: int}>}  $data
+     * @return Collection<int, SupplyRequest>
+     */
+    public function createBatch(array $data, User $user): Collection
+    {
+        $consumables = Consumable::query()->whereKey(array_column($data['items'], 'consumable_id'))->get()->keyBy('id');
+
+        foreach ($data['items'] as $index => $item) {
+            if ((int) $consumables[$item['consumable_id']]->provider_department_id !== (int) $data['provider_department_id']) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.consumable_id" => "{$consumables[$item['consumable_id']]->name} tidak diminta ke departemen penyedia ini.",
+                ]);
+            }
+        }
+
+        $shared = collect($data)->only(['provider_department_id', 'request_method', 'request_date', 'purpose', 'room_id', 'note'])->all();
+
+        return DB::transaction(fn () => collect($data['items'])->map(fn (array $item) => $this->create(
+            $shared + ['consumable_id' => $item['consumable_id'], 'quantity' => $item['quantity'], 'must_return' => false],
+            $user,
+        )));
+    }
+
+    /**
      * Hanya yang masih Diajukan yang boleh diedit.
      *
      * @param  array<string, mixed>  $data

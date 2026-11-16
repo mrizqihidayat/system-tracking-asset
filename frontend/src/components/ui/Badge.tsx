@@ -6,14 +6,17 @@ const tone = {
   blue: 'bg-info-50 text-info-700',
   amber: 'bg-warn-50 text-warn-700',
   red: 'bg-bad-50 text-bad-700',
+  purple: 'bg-plum-50 text-plum-700',
   slate: 'bg-slate-100 text-slate-600',
 }
 
 export type BadgeColor = keyof typeof tone
 
-export function Badge({ children, color = 'slate' }: { children: string; color?: BadgeColor }) {
+/** `dot`: titik warna di depan teks (lencana status di tabel permintaan). */
+export function Badge({ children, color = 'slate', dot }: { children: string; color?: BadgeColor; dot?: boolean }) {
   return (
-    <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${tone[color]}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${tone[color]}`}>
+      {dot && <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />}
       {children}
     </span>
   )

@@ -2,11 +2,11 @@
 
 Daftar seluruh endpoint backend dan pemakaiannya di frontend web. Parameter dan bentuk respons ada di `docs/SPEC.md` §14.
 
-Disusun pada 4 November 2026 (diperbarui 16 November 2026, T33 R2) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
+Disusun pada 4 November 2026 (diperbarui 16 November 2026, T35) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
 
 ## Ringkasan
 
-- **102 endpoint API:** 100 dipakai frontend web, 2 tidak dipakai.
+- **103 endpoint API:** 101 dipakai frontend web, 2 tidak dipakai.
 - **6 route non-API:** tidak ada yang dipakai frontend.
 - **Alamat:** semua endpoint API berawalan `/api`. Frontend web mengambil alamat API dari `VITE_API_URL`.
 - **Akses "Token":** wajib header `Authorization: Bearer {token}` dari `POST /api/login`. Tanpa token sah dijawab 401.
@@ -29,9 +29,9 @@ Disusun pada 4 November 2026 (diperbarui 16 November 2026, T33 R2) dari `php art
 | Aset | 20 | 20 | 0 |
 | Peminjaman | 6 | 6 | 0 |
 | Kelengkapan ruangan | 7 | 7 | 0 |
-| Permintaan ke departemen lain | 11 | 11 | 0 |
+| Permintaan ke departemen lain | 12 | 12 | 0 |
 | Stok habis pakai | 8 | 8 | 0 |
-| **Total** | **102** | **100** | **2** |
+| **Total** | **103** | **101** | **2** |
 
 ## Endpoint API yang tidak dipakai frontend
 
@@ -240,8 +240,9 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | PUT/PATCH | `/api/request-catalog/{id}` | Ubah item katalog | Token | Ya: Form katalog (`pages/requests/CatalogFormModal.tsx`), memakai PUT |
 | DELETE | `/api/request-catalog/{id}` | Hapus item katalog dan melepas tautannya | Token | Ya: Permintaan (`pages/requests/RequestsPage.tsx`) |
 | GET | `/api/request-catalog/{id}/usage` | Pemakaian item katalog sebelum dihapus | Token | Ya: Permintaan (`pages/requests/RequestsPage.tsx`) |
-| GET | `/api/supply-requests` | Riwayat permintaan, filter dan pencarian | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
+| GET | `/api/supply-requests` | Riwayat permintaan, filter (`display_status` untuk chip) dan pencarian, plus `meta.status_counts` | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
 | POST | `/api/supply-requests` | Catat permintaan | Token | Ya: Form permintaan (`pages/requests/RequestFormModal.tsx`) |
+| POST | `/api/supply-requests/batch` | Catat beberapa permintaan barang stok ke satu departemen dalam satu transaksi | Token | Ya: Saran permintaan (`pages/requests/BatchRequestModal.tsx`) |
 | GET | `/api/supply-requests/suggestions` | Saran permintaan dari stok Menipis/Habis per departemen penyedia | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
 | PUT | `/api/supply-requests/{id}` | Ubah permintaan yang masih Diajukan | Token | Ya: Form permintaan (`pages/requests/RequestFormModal.tsx`) |
 | GET | `/api/supply-requests/{id}/status-impact` | Dampak perubahan status ke stok dan ruangan | Token | Ya: Popup status (`lib/queries/lists.ts`) |

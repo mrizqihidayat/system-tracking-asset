@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\RequestStatus;
 use App\Http\Controllers\Concerns\PaginatesList;
 use App\Http\Requests\IndexSupplyRequestRequest;
+use App\Http\Requests\StoreSupplyRequestBatchRequest;
 use App\Http\Requests\StoreSupplyRequestRequest;
 use App\Http\Requests\UpdateSupplyRequestRequest;
 use App\Http\Requests\UpdateSupplyRequestStatusRequest;
@@ -26,12 +27,16 @@ class SupplyRequestController extends Controller
         $filters = $request->validated();
 
         $query = SupplyRequest::query()->with(SupplyRequestResource::RELATIONS)->filter($filters);
+        // Angka chip mengikuti filter lain (cari, penyedia, ...), tetapi tidak dibatasi status yang sedang dipilih.
+        $counts = SupplyRequest::displayStatusCounts(
+            SupplyRequest::query()->filter(array_diff_key($filters, array_flip(['status', 'display_status', 'unresponded', 'id']))),
+        );
 
         $requests = $this->paginateList(
             $query, $filters, IndexSupplyRequestRequest::SORTABLE, fn ($query) => $query->listOrder(), IndexSupplyRequestRequest::DEFAULT_PER_PAGE,
         );
 
-        return SupplyRequestResource::collection($requests);
+        return SupplyRequestResource::collection($requests)->additional(['meta' => ['status_counts' => $counts]]);
     }
 
     public function store(StoreSupplyRequestRequest $request): JsonResponse
@@ -41,6 +46,18 @@ class SupplyRequestController extends Controller
         return SupplyRequestResource::make($supplyRequest->load(SupplyRequestResource::RELATIONS))
             ->response()
             ->setStatusCode(201);
+    }
+
+    /**
+     * Beberapa permintaan barang stok sekaligus ke satu departemen penyedia, dalam satu transaksi.
+     */
+    public function storeBatch(StoreSupplyRequestBatchRequest $request): JsonResponse
+    {
+        $created = $this->requests->createBatch($request->validated(), $request->user());
+
+        return SupplyRequestResource::collection(
+            SupplyRequest::query()->with(SupplyRequestResource::RELATIONS)->whereKey($created->pluck('id'))->orderBy('id')->get()
+        )->response()->setStatusCode(201);
     }
 
     public function update(UpdateSupplyRequestRequest $request, SupplyRequest $supplyRequest): SupplyRequestResource

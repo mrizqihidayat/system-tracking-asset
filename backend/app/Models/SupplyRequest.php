@@ -17,6 +17,12 @@ use Illuminate\Support\Facades\DB;
 #[Fillable(['request_date', 'catalog_id', 'consumable_id', 'item_name', 'quantity', 'purpose', 'room_id', 'received_quantity', 'provider_department_id', 'request_method', 'lead_time_days', 'must_return', 'status', 'received_at', 'returned_at', 'note', 'created_by'])]
 class SupplyRequest extends Model
 {
+    /** Status tampilan "Belum direspons" (dihitung dari lead time, tidak disimpan). */
+    public const UNRESPONDED = 'Belum direspons';
+
+    /** Pilihan chip status di Riwayat permintaan (urutan tampil). */
+    public const DISPLAY_STATUSES = ['Diajukan', self::UNRESPONDED, 'Diterima sebagian', 'Diterima', 'Dikembalikan', 'Dibatalkan'];
+
     /** @use HasFactory<SupplyRequestFactory> */
     use HasFactory;
 
@@ -130,12 +136,42 @@ class SupplyRequest extends Model
             ->when($filters['id'] ?? null, fn ($query, $id) => $query->whereKey($id))
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('supply_requests.status', $status))
             ->when(filter_var($filters['unresponded'] ?? false, FILTER_VALIDATE_BOOLEAN), fn ($query) => $query->unresponded())
+            ->when($filters['display_status'] ?? null, fn ($query, $display) => match ($display) {
+                self::UNRESPONDED => $query->unresponded(),
+                RequestStatus::Diajukan->value => $query->where('supply_requests.status', $display)->whereNot(fn ($q) => $q->unresponded()),
+                default => $query->where('supply_requests.status', $display),
+            })
             ->when($filters['provider_department_id'] ?? null, fn ($query, $id) => $query->where('provider_department_id', $id))
             ->when($filters['room_id'] ?? null, fn ($query, $id) => $query->where('room_id', $id))
             ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('request_date', '>=', $from))
             ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('request_date', '<=', $to));
 
         Search::apply($query, $filters['search'] ?? null, ['supply_requests.item_name', 'supply_requests.purpose']);
+    }
+
+    /**
+     * Jumlah per status tampilan untuk chip filter (SPEC §9): Belum direspons dipisah dari Diajukan,
+     * jadi semua angka saling lepas dan totalnya = Semua.
+     *
+     * @param  Builder<SupplyRequest>  $query  query yang sudah difilter (tanpa filter status)
+     * @return array<string, int>
+     */
+    public static function displayStatusCounts(Builder $query): array
+    {
+        $byStatus = (clone $query)->reorder()->toBase()
+            ->selectRaw('supply_requests.status as status, count(*) as total')
+            ->groupBy('supply_requests.status')
+            ->pluck('total', 'status');
+        $unresponded = (clone $query)->reorder()->unresponded()->count();
+
+        $counts = ['Semua' => (int) $byStatus->sum()];
+        foreach (self::DISPLAY_STATUSES as $status) {
+            $counts[$status] = (int) ($byStatus[$status] ?? 0);
+        }
+        $counts[self::UNRESPONDED] = $unresponded;
+        $counts[RequestStatus::Diajukan->value] -= $unresponded;
+
+        return $counts;
     }
 
     /**

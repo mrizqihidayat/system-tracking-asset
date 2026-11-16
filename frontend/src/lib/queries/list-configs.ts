@@ -13,9 +13,9 @@ export const listConfigs = {
   loanHistory: { filters: ['status'], perPage: 10 },
   consumables: { filters: ['status', 'building_id', 'room_id'], perPage: 20 },
   supplyRequests: {
-    filters: ['status', 'id'],
+    filters: ['status', 'id', 'provider_department_id'],
     perPage: 10,
-    // "Belum direspons" adalah status tampilan; API memakai flag unresponded.
-    toApi: ({ status, ...rest }) => (status === 'Belum direspons' ? { ...rest, unresponded: 1 } : status ? { ...rest, status } : rest),
+    // Chip status memakai status tampilan (Diajukan tanpa yang Belum direspons) → display_status di API.
+    toApi: ({ status, ...rest }) => (status ? { ...rest, display_status: status } : rest),
   },
 } satisfies Record<string, ListConfig>

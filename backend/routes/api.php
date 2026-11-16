@@ -133,6 +133,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/supply-requests/suggestions', [SupplyRequestController::class, 'suggestions']);
     Route::get('/supply-requests', [SupplyRequestController::class, 'index']);
     Route::post('/supply-requests', [SupplyRequestController::class, 'store']);
+    Route::post('/supply-requests/batch', [SupplyRequestController::class, 'storeBatch']);
     Route::put('/supply-requests/{supplyRequest}', [SupplyRequestController::class, 'update'])->whereNumber('supplyRequest');
     Route::get('/supply-requests/{supplyRequest}/status-impact', [SupplyRequestController::class, 'statusImpact'])->whereNumber('supplyRequest');
     Route::patch('/supply-requests/{supplyRequest}/status', [SupplyRequestController::class, 'updateStatus'])->whereNumber('supplyRequest');

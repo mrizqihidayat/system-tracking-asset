@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\RequestStatus;
 use App\Http\Requests\Concerns\ValidatesListQuery;
+use App\Models\SupplyRequest;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -30,6 +31,8 @@ class IndexSupplyRequestRequest extends FormRequest
         return [
             'id' => ['nullable', 'integer'],
             'status' => ['nullable', Rule::enum(RequestStatus::class)],
+            // Status tampilan (chip): "Diajukan" tanpa yang Belum direspons, atau "Belum direspons".
+            'display_status' => ['nullable', Rule::in(SupplyRequest::DISPLAY_STATUSES)],
             'provider_department_id' => ['nullable', 'integer'],
             'room_id' => ['nullable', 'integer'],
             'unresponded' => ['nullable', 'boolean'],

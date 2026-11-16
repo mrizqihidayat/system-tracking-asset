@@ -588,4 +588,114 @@ class SupplyRequestTest extends TestCase
     {
         $this->getJson('/api/supply-requests/suggestions')->assertOk()->assertExactJson(['data' => []]);
     }
+
+    public function test_status_counts_are_disjoint_and_follow_other_filters(): void
+    {
+        $catalog = $this->catalog(['lead_time_days' => 3]);
+        $deptB = Department::factory()->create(['name' => 'Dept B']);
+        $this->supplyRequest(['catalog_id' => $catalog->id, 'request_date' => today()->subDays(4)]);
+        $this->supplyRequest(['catalog_id' => $catalog->id, 'request_date' => today()]);
+        $this->supplyRequest(['status' => RequestStatus::DiterimaSebagian]);
+        $this->supplyRequest(['status' => RequestStatus::Diterima]);
+        $this->supplyRequest(['status' => RequestStatus::Diterima, 'provider_department_id' => $deptB->id]);
+
+        $this->getJson('/api/supply-requests?display_status=Diterima')->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.status_counts', [
+                'Semua' => 5, 'Diajukan' => 1, 'Belum direspons' => 1, 'Diterima sebagian' => 1,
+                'Diterima' => 2, 'Dikembalikan' => 0, 'Dibatalkan' => 0,
+            ])
+            ->assertJsonPath('meta.total', 2);
+
+        // Filter penyedia ikut membatasi angka chip.
+        $this->getJson("/api/supply-requests?provider_department_id={$deptB->id}")->assertOk()
+            ->assertJsonPath('meta.status_counts.Semua', 1)
+            ->assertJsonPath('meta.status_counts.Diterima', 1);
+    }
+
+    public function test_display_status_diajukan_excludes_unresponded(): void
+    {
+        $catalog = $this->catalog(['lead_time_days' => 3]);
+        $late = $this->supplyRequest(['catalog_id' => $catalog->id, 'request_date' => today()->subDays(4)]);
+        $onTime = $this->supplyRequest(['catalog_id' => $catalog->id, 'request_date' => today()]);
+        $noCatalog = $this->supplyRequest(['request_date' => today()->subDays(30)]);
+
+        $ids = fn (string $display) => collect($this->getJson('/api/supply-requests?display_status='.urlencode($display))->assertOk()->json('data'))
+            ->pluck('id')->sort()->values()->all();
+
+        $this->assertSame(collect([$onTime->id, $noCatalog->id])->sort()->values()->all(), $ids('Diajukan'));
+        $this->assertSame([$late->id], $ids('Belum direspons'));
+        $this->getJson('/api/supply-requests?display_status=Lain')->assertUnprocessable()->assertJsonValidationErrors('display_status');
+    }
+
+    /**
+     * @param  list<array{consumable_id: int, quantity: int}>  $items
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function batchPayload(array $items, array $overrides = []): array
+    {
+        return [
+            'provider_department_id' => $this->deptA->id,
+            'request_method' => 'WhatsApp',
+            'purpose' => 'Pengisian stok',
+            'items' => $items,
+            ...$overrides,
+        ];
+    }
+
+    public function test_batch_creates_one_request_per_stock_item(): void
+    {
+        $baterai = Consumable::factory()->create(['name' => 'Baterai AA', 'quantity' => 0, 'min_quantity' => 8, 'provider_department_id' => $this->deptA->id]);
+        $tinta = Consumable::factory()->create(['name' => 'Tinta Printer', 'quantity' => 1, 'min_quantity' => 2, 'provider_department_id' => $this->deptA->id]);
+
+        $this->postJson('/api/supply-requests/batch', $this->batchPayload([
+            ['consumable_id' => $baterai->id, 'quantity' => 8],
+            ['consumable_id' => $tinta->id, 'quantity' => 1],
+        ]))->assertCreated()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.item_name', 'Baterai AA')
+            ->assertJsonPath('data.0.quantity', 8)
+            ->assertJsonPath('data.0.consumable_id', $baterai->id)
+            ->assertJsonPath('data.0.request_method', 'WhatsApp')
+            ->assertJsonPath('data.0.purpose', 'Pengisian stok')
+            ->assertJsonPath('data.0.must_return', false)
+            ->assertJsonPath('data.1.item_name', 'Tinta Printer');
+
+        $this->assertSame(2, SupplyRequest::where('status', RequestStatus::Diajukan)->where('provider_department_id', $this->deptA->id)->count());
+        // Saran menandai kedua barang sudah diminta.
+        $this->getJson('/api/supply-requests/suggestions')->assertOk()
+            ->assertJsonPath('data.0.items.0.has_open_request', true)
+            ->assertJsonPath('data.0.items.1.has_open_request', true);
+    }
+
+    public function test_batch_is_all_or_nothing(): void
+    {
+        $deptB = Department::factory()->create(['name' => 'Dept B']);
+        $baterai = Consumable::factory()->create(['name' => 'Baterai AA', 'provider_department_id' => $this->deptA->id]);
+        $lain = Consumable::factory()->create(['name' => 'Kabel', 'provider_department_id' => $deptB->id]);
+
+        $this->postJson('/api/supply-requests/batch', $this->batchPayload([
+            ['consumable_id' => $baterai->id, 'quantity' => 2],
+            ['consumable_id' => $lain->id, 'quantity' => 1],
+        ]))->assertUnprocessable()->assertJsonValidationErrors('items.1.consumable_id');
+
+        $this->assertDatabaseCount('supply_requests', 0);
+    }
+
+    public function test_batch_validation(): void
+    {
+        $baterai = Consumable::factory()->create(['provider_department_id' => $this->deptA->id]);
+        $one = [['consumable_id' => $baterai->id, 'quantity' => 1]];
+
+        $this->postJson('/api/supply-requests/batch', $this->batchPayload([]))->assertUnprocessable()->assertJsonPath('errors.items.0', 'Pilih minimal satu barang.');
+        $this->postJson('/api/supply-requests/batch', $this->batchPayload([['consumable_id' => $baterai->id, 'quantity' => 0]]))
+            ->assertUnprocessable()->assertJsonValidationErrors('items.0.quantity');
+        $this->postJson('/api/supply-requests/batch', $this->batchPayload([...$one, ['consumable_id' => $baterai->id, 'quantity' => 2]]))
+            ->assertUnprocessable()->assertJsonValidationErrors('items.1.consumable_id');
+        $this->postJson('/api/supply-requests/batch', $this->batchPayload($one, ['request_method' => '']))
+            ->assertUnprocessable()->assertJsonValidationErrors('request_method');
+
+        $this->assertDatabaseCount('supply_requests', 0);
+    }
 }

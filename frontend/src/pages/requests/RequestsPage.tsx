@@ -2,35 +2,38 @@ import { EllipsisVertical, Plus } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import DepartmentCombobox from '../../components/DepartmentCombobox'
 import ExportButton from '../../components/ExportButton'
 import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu, { type MenuItem } from '../../components/ui/DropdownMenu'
-import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
-import { PageHeader, Panel } from '../../components/ui/Page'
+import { FormField, Input, Textarea } from '../../components/ui/FormField'
+import { PageHeader } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import { invalidate } from '../../lib/queries/invalidate'
 import { listConfigs } from '../../lib/queries/list-configs'
 import { useStatusImpact, useSuggestions, useSupplyRequests } from '../../lib/queries/lists'
-import { masterQueries, useRequestCatalog } from '../../lib/queries/master'
+import { masterQueries, useDepartments, useRequestCatalog } from '../../lib/queries/master'
 import { prefetchRoomOptions, prefetchStatusImpacts } from '../../lib/queries/prefetch'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { useListParams } from '../../lib/useListParams'
-import type { CatalogUsage, RequestCatalog, RequestPrefill, StatusImpact, SupplyRequest } from '../../types/supply'
+import type { CatalogUsage, RequestCatalog, RequestPrefill, StatusImpact, SuggestionGroup, SupplyRequest } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
+import BatchRequestModal from './BatchRequestModal'
 import CatalogFormModal from './CatalogFormModal'
 import RequestFormModal from './RequestFormModal'
+import SuggestionPanel from './SuggestionPanel'
 
 const CATALOG_PER_PAGE = 5
 const PREFILL_PARAMS = ['room_id', 'catalog_id', 'consumable_id']
 
 const statusColor = {
   Diajukan: 'blue',
-  'Diterima sebagian': 'amber',
+  'Diterima sebagian': 'purple',
   Diterima: 'green',
   'Belum direspons': 'amber',
   Dikembalikan: 'slate',
@@ -41,21 +44,10 @@ type TargetStatus = 'Diterima' | 'Dikembalikan' | 'Dibatalkan'
 
 type ModalState =
   | { kind: 'request'; request: SupplyRequest | null; prefill?: RequestPrefill }
+  | { kind: 'batch'; group: SuggestionGroup }
   | { kind: 'catalog'; item: RequestCatalog | null }
   | { kind: 'status'; request: SupplyRequest; status: TargetStatus }
   | null
-
-function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-semibold">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  )
-}
 
 /** Status tujuan yang tersedia di menu aksi baris permintaan. */
 function nextStatuses(request: SupplyRequest): TargetStatus[] {
@@ -134,6 +126,34 @@ function StatusModal({ request, status, onClose, onDone }: {
   )
 }
 
+type Tab = 'riwayat' | 'katalog'
+
+/** Chip status Riwayat permintaan; Dikembalikan & Dibatalkan hanya tampil bila ada. */
+const CHIPS: { status: SupplyRequest['display_status']; always: boolean }[] = [
+  { status: 'Diajukan', always: true },
+  { status: 'Belum direspons', always: true },
+  { status: 'Diterima sebagian', always: true },
+  { status: 'Diterima', always: true },
+  { status: 'Dikembalikan', always: false },
+  { status: 'Dibatalkan', always: false },
+]
+
+function Chip({ label, count, active, onClick }: { label: string; count?: number; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+        active ? 'border-brand-800 bg-brand-800 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+      }`}
+    >
+      {label}
+      {count !== undefined && <span className={`tabular-nums ${active ? 'text-white/80' : 'text-slate-500'}`}>{count}</span>}
+    </button>
+  )
+}
+
 export default function RequestsPage() {
   const toast = useToast()
   const queryClient = useQueryClient()
@@ -142,10 +162,13 @@ export default function RequestsPage() {
   const catalogQuery = useRequestCatalog()
   const historyQuery = useSupplyRequests(list.params)
   const suggestionsQuery = useSuggestions()
+  const providers = useDepartments().data.filter((d) => !d.is_internal)
   useErrorToast(catalogQuery.error, historyQuery.error, suggestionsQuery.error)
   const catalog = catalogQuery.data
   const history = historyQuery.data
   const suggestions = suggestionsQuery.data ?? []
+  const counts = history?.meta.status_counts
+  const tab: Tab = params.get('tab') === 'katalog' ? 'katalog' : 'riwayat'
   // Dari Kelengkapan Ruangan/Stok: /permintaan?room_id=&consumable_id=&item_name=&provider_department_id=&quantity= → buka form terisi otomatis.
   const [modal, setModal] = useState<ModalState>(() => {
     if (!PREFILL_PARAMS.some((k) => params.has(k))) return null
@@ -169,9 +192,11 @@ export default function RequestsPage() {
   const catalogLastPage = Math.max(1, Math.ceil(catalog.length / CATALOG_PER_PAGE))
   const catalogPageNow = Math.min(catalogPage, catalogLastPage)
   const status = list.get('status')
+  const providerId = list.get('provider_department_id')
   const search = list.searchText
 
   // Query sudah dipakai untuk isian awal modal → bersihkan dari URL (filter tabel tetap).
+  // provider_department_id dari Stok hanya dipakai bila datang bersama barang (consumable_id/item_name).
   useEffect(() => {
     if (!PREFILL_PARAMS.some((k) => params.has(k))) return
     setParams(
@@ -188,6 +213,16 @@ export default function RequestsPage() {
     prefetchRoomOptions(queryClient)
     queryClient.prefetchQuery(masterQueries.requestMethods())
   }, [queryClient])
+
+  const setTab = (next: Tab) =>
+    setParams(
+      (p) => {
+        if (next === 'katalog') p.set('tab', 'katalog')
+        else p.delete('tab')
+        return p
+      },
+      { replace: true },
+    )
 
   const closeModal = () => setModal(null)
   const done = () => {
@@ -252,38 +287,38 @@ export default function RequestsPage() {
   const historyColumns: Column<SupplyRequest>[] = [
     { header: 'Tanggal', sortKey: 'request_date', cell: (r) => <span className="whitespace-nowrap">{formatDate(r.request_date)}</span> },
     {
-      header: 'Item',
+      header: 'Item dan kegiatan',
       mobile: 'title',
       sortKey: 'item_name',
-      cell: (r) => (
-        <>
-          <span className="font-medium">{r.item_name}</span>
-          {r.note && <span className="block text-xs text-slate-500">{r.note}</span>}
-        </>
-      ),
+      cell: (r) => {
+        const room = r.room ? `${r.room.name}${r.room.building ? ` (${r.room.building.name})` : ''}` : null
+        const activity = r.purpose && room ? `${r.purpose} di ${room}` : (r.purpose ?? room)
+        return (
+          <>
+            <span className="font-semibold">{r.item_name}</span>
+            {activity && <span className="block text-xs text-slate-500">{activity}</span>}
+          </>
+        )
+      },
     },
     {
       header: 'Jumlah',
       sortKey: 'quantity',
-      cell: (r) => (
-        <>
+      cell: (r) =>
+        r.received_quantity > 0 && r.received_quantity < r.quantity ? (
+          <span className="inline-block min-w-16">
+            <span className="tabular-nums">{r.received_quantity} / {r.quantity}</span>
+            <span className="mt-1 block h-1 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+              <span className="block h-full rounded-full bg-plum-700" style={{ width: `${(r.received_quantity / r.quantity) * 100}%` }} />
+            </span>
+          </span>
+        ) : (
           <span className="tabular-nums">{r.quantity}</span>
-          {r.received_quantity > 0 && r.received_quantity < r.quantity && (
-            <span className="block whitespace-nowrap text-xs text-slate-500">diterima {r.received_quantity} dari {r.quantity}</span>
-          )}
-        </>
-      ),
+        ),
     },
-    {
-      header: 'Untuk kegiatan',
-      cell: (r) => {
-        const room = r.room ? `${r.room.name}${r.room.building ? ` (${r.room.building.name})` : ''}` : null
-        return r.purpose && room ? `${r.purpose} di ${room}` : (r.purpose ?? room ?? '-')
-      },
-    },
-    { header: 'Departemen penyedia', cell: (r) => r.provider_department?.name ?? '-' },
-    { header: 'Cara permintaan', cell: (r) => r.request_method ?? '-' },
-    { header: 'Status', mobile: 'badge', cell: (r) => <Badge color={statusColor[r.display_status]}>{r.display_status}</Badge> },
+    { header: 'Penyedia', cell: (r) => r.provider_department?.name ?? '-' },
+    { header: 'Cara', cell: (r) => r.request_method ?? '-' },
+    { header: 'Status', mobile: 'badge', cell: (r) => <Badge color={statusColor[r.display_status]} dot>{r.display_status}</Badge> },
     {
       header: '',
       className: 'w-10',
@@ -325,129 +360,123 @@ export default function RequestsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Permintaan ke Departemen Lain"
-        description="Perlengkapan yang tidak dimiliki SHD dan harus diminta ke departemen penyedia."
+        title="Permintaan ke Unit Lain"
+        description="Catat dan pantau permintaan perlengkapan ke departemen penyedia"
         actions={
           <>
             <ExportButton
               type="requests"
               filters={() => ({
-                ...(status === 'Belum direspons' ? { unresponded: 1 } : { status }),
+                ...(status ? { display_status: status } : {}),
+                ...(providerId ? { provider_department_id: providerId } : {}),
                 search: search.trim(),
               })}
             />
             <Button onClick={() => setModal({ kind: 'request', request: null })}>
-              <Plus size={16} /> Buat permintaan
+              <Plus size={16} /> Catat permintaan
             </Button>
           </>
         }
       />
 
       {suggestions.length > 0 && (
-        <Panel title="Saran permintaan" flush>
-          <div className="grid border-t border-slate-100 md:grid-cols-2 md:divide-x md:divide-slate-100">
-            {suggestions.map((g) => (
-              <div key={g.provider_department.id} className="border-b border-slate-100 last:border-b-0">
-                <p className="bg-slate-50 px-5 py-2 text-sm font-semibold text-slate-700">{g.provider_department.name}</p>
-                <ul className="divide-y divide-slate-100">
-                  {g.items.map((s, i) => (
-                    <li key={i} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
-                      <div className="min-w-0">
-                        <p className="font-medium">{s.item_name} <span className="font-normal tabular-nums text-slate-500">× {s.quantity}</span></p>
-                        <p className="text-xs text-slate-500">
-                          Stok {s.stock_status.toLowerCase()}
-                          {s.has_open_request && ' · sudah ada permintaan terbuka'}
-                        </p>
-                      </div>
-                      <Button
-                        variant="secondary"
-                        className="min-h-10! lg:min-h-8! shrink-0 px-3! text-xs!"
-                        onClick={() =>
-                          setModal({
-                            kind: 'request',
-                            request: null,
-                            prefill: {
-                              consumable_id: s.consumable_id,
-                              item_name: s.item_name,
-                              provider_department_id: g.provider_department.id,
-                              quantity: s.quantity,
-                            },
-                          })
-                        }
-                      >
-                        Buat permintaan
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </Panel>
+        <SuggestionPanel
+          groups={suggestions}
+          onRequest={(group) => setModal({ kind: 'batch', group })}
+          onShowHistory={(id) => list.setFilter('provider_department_id', String(id), { tab: null, status: null })}
+        />
       )}
 
-      <Card
-        title="Katalog perlengkapan dari departemen lain"
-        action={<Button variant="secondary" onClick={() => setModal({ kind: 'catalog', item: null })}><Plus size={16} /> Tambah item</Button>}
-      >
-        <DataTable
-          columns={catalogColumns}
-          rows={catalog.slice((catalogPageNow - 1) * CATALOG_PER_PAGE, catalogPageNow * CATALOG_PER_PAGE)}
-          rowKey={(c) => c.id}
-          loading={catalogQuery.isPending}
-          emptyText="Katalog masih kosong."
-          meta={catalog.length > CATALOG_PER_PAGE ? { current_page: catalogPageNow, last_page: catalogLastPage, per_page: CATALOG_PER_PAGE, total: catalog.length } : undefined}
-          unit="item"
-          onPageChange={setCatalogPage}
-        />
-      </Card>
-
-      <Card title="Riwayat permintaan">
-        {list.get('id') && (
-          <p className="text-sm text-slate-600">
-            Menampilkan satu permintaan.{' '}
-            <button type="button" className="font-semibold text-brand-700 hover:underline" onClick={() => list.setFilter('id', '')}>
-              Tampilkan semua
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 px-5" role="tablist">
+          {(['riwayat', 'katalog'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={`-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold transition-colors ${
+                tab === t ? 'border-brand-800 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              {t === 'riwayat' ? 'Riwayat permintaan' : 'Katalog perlengkapan'}
             </button>
-          </p>
-        )}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Input
-            className="sm:max-w-xs"
-            value={search}
-            onChange={(e) => list.setSearchText(e.target.value)}
-            placeholder="Cari item atau kegiatan"
-            aria-label="Cari permintaan"
-          />
-          <Select
-            clearable
-            className="sm:w-auto"
-            value={status}
-            onChange={(e) => list.setFilter('status', e.target.value)}
-            aria-label="Status"
-          >
-            <option value="">Semua status</option>
-            {Object.keys(statusColor).map((s) => <option key={s}>{s}</option>)}
-          </Select>
+          ))}
         </div>
-        <DataTable
-          columns={historyColumns}
-          rows={history?.data ?? []}
-          rowKey={(r) => r.id}
-          loading={historyQuery.isPending}
-          fetching={historyQuery.isPlaceholderData}
-          emptyText="Belum ada permintaan."
-          meta={history?.meta}
-          unit="permintaan"
-          onPageChange={list.setPage}
-          sort={list.sort}
-          onSortChange={list.setSort}
-        />
-      </Card>
+
+        {tab === 'riwayat' ? (
+          <div className="space-y-3 p-5">
+            {list.get('id') && (
+              <p className="text-sm text-slate-600">
+                Menampilkan satu permintaan.{' '}
+                <button type="button" className="font-semibold text-brand-700 hover:underline" onClick={() => list.setFilter('id', '')}>
+                  Tampilkan semua
+                </button>
+              </p>
+            )}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                className="sm:max-w-xs"
+                value={search}
+                onChange={(e) => list.setSearchText(e.target.value)}
+                placeholder="Cari item atau kegiatan"
+                aria-label="Cari permintaan"
+              />
+              <div className="sm:w-56">
+                <DepartmentCombobox
+                  value={providerId ? Number(providerId) : null}
+                  onChange={(id) => list.setFilter('provider_department_id', id ? String(id) : '')}
+                  departments={providers}
+                  placeholder="Semua penyedia"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter status">
+              <Chip label="Semua" count={counts?.Semua} active={!status} onClick={() => list.setFilter('status', '')} />
+              {CHIPS.filter((c) => c.always || (counts?.[c.status] ?? 0) > 0 || status === c.status).map((c) => (
+                <Chip key={c.status} label={c.status} count={counts?.[c.status]} active={status === c.status} onClick={() => list.setFilter('status', c.status)} />
+              ))}
+            </div>
+            <DataTable
+              columns={historyColumns}
+              rows={history?.data ?? []}
+              rowKey={(r) => r.id}
+              loading={historyQuery.isPending}
+              fetching={historyQuery.isPlaceholderData}
+              emptyText="Belum ada permintaan."
+              meta={history?.meta}
+              unit="permintaan"
+              onPageChange={list.setPage}
+              sort={list.sort}
+              onSortChange={list.setSort}
+            />
+          </div>
+        ) : (
+          <div className="space-y-3 p-5">
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={() => setModal({ kind: 'catalog', item: null })}>
+                <Plus size={16} /> Tambah item
+              </Button>
+            </div>
+            <DataTable
+              columns={catalogColumns}
+              rows={catalog.slice((catalogPageNow - 1) * CATALOG_PER_PAGE, catalogPageNow * CATALOG_PER_PAGE)}
+              rowKey={(c) => c.id}
+              loading={catalogQuery.isPending}
+              emptyText="Katalog masih kosong."
+              meta={catalog.length > CATALOG_PER_PAGE ? { current_page: catalogPageNow, last_page: catalogLastPage, per_page: CATALOG_PER_PAGE, total: catalog.length } : undefined}
+              unit="item"
+              onPageChange={setCatalogPage}
+            />
+          </div>
+        )}
+      </section>
 
       {modal?.kind === 'request' && (
         <RequestFormModal catalog={catalog} request={modal.request} prefill={modal.prefill} onClose={closeModal} onDone={done} />
       )}
+      {modal?.kind === 'batch' && <BatchRequestModal group={modal.group} onClose={closeModal} onDone={done} />}
       {modal?.kind === 'catalog' && <CatalogFormModal item={modal.item} onClose={closeModal} onDone={catalogDone} />}
       {modal?.kind === 'status' && <StatusModal request={modal.request} status={modal.status} onClose={closeModal} onDone={statusDone} />}
 

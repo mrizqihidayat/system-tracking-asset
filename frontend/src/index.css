@@ -44,6 +44,9 @@
   --color-bad-700: #b42318;
   --color-info-50: #e6f2fa;
   --color-info-700: #015e94;
+  /* Status antara (mis. Diterima sebagian). */
+  --color-plum-50: #f1ecfa;
+  --color-plum-700: #5b3a9e;
 
   /* Isian bar data (bukan teks). */
   --color-bar-ok: #86ad2e;

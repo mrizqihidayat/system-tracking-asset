@@ -3,6 +3,8 @@ export interface PaginationMeta {
   last_page: number
   per_page: number
   total: number
+  /** Riwayat permintaan: jumlah per status tampilan untuk chip filter. */
+  status_counts?: Record<string, number>
 }
 
 export interface Paginated<T> {
