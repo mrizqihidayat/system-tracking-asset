@@ -71,7 +71,6 @@ export default function LoginPage() {
             <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
           </FormField>
           <Button type="submit" loading={loading} className="w-full">Masuk</Button>
-          <p className="text-center text-sm text-slate-500">Lupa password? Hubungi admin Aset SHD.</p>
         </form>
       </main>
     </div>

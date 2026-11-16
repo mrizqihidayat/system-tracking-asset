@@ -14,10 +14,12 @@ interface Props {
   /** Jika diisi (terima kembali), Rusak Berat bisa memilih Perbaikan / Tidak Layak Pakai. */
   heavyDamage?: { status: HeavyDamageStatus; onChange: (s: HeavyDamageStatus) => void }
   errors: Record<string, string>
+  /** false: sembunyikan keterangan "Status otomatis: …" (mis. di form terima kembali). */
+  showAutoStatus?: boolean
 }
 
 /** Kondisi + pilihan status Rusak Ringan (dan Rusak Berat jika `heavyDamage` diisi); selain itu status otomatis. */
-export default function ConditionStatusFields({ label = 'Kondisi', options, condition, status, onCondition, onStatus, heavyDamage, errors }: Props) {
+export default function ConditionStatusFields({ label = 'Kondisi', options, condition, status, onCondition, onStatus, heavyDamage, errors, showAutoStatus = true }: Props) {
   return (
     <>
       <FormField label={label} required error={errors.condition}>
@@ -47,7 +49,7 @@ export default function ConditionStatusFields({ label = 'Kondisi', options, cond
           )}
         </>
       ) : (
-        <p className="text-xs text-slate-500">Status otomatis: {condition === 'Baik' ? 'Tersedia' : 'Perbaikan'}.</p>
+        showAutoStatus && <p className="text-xs text-slate-500">Status otomatis: {condition === 'Baik' ? 'Tersedia' : 'Perbaikan'}.</p>
       )}
     </>
   )

@@ -22,6 +22,8 @@ export interface Column<T> {
    * (tidak tampil bila sel `null`), `hidden` = tidak ditampilkan, kosong = baris "label: nilai".
    */
   mobile?: 'title' | 'badge' | 'stat' | 'footer' | 'hidden'
+  /** Kelas pembungkus sel footer di kartu (mis. `w-full` agar tombol memenuhi lebar kartu). */
+  footerClassName?: string
   /** Hanya di kartu (< lg), bukan kolom tabel lebar (mis. menu ⋮ pengganti ikon aksi). */
   cardOnly?: boolean
   /** Kunci sort server (lihat SPEC "Daftar (umum)"); kolom jadi bisa diklik bila tabel punya onSortChange. */
@@ -72,13 +74,13 @@ function SortHeader({ label, sortKey, sort, onSortChange }: { label: string; sor
 }
 
 /** Baris bawah kartu (kolom `mobile: 'footer'`): sel kosong dilewati, tidak dirender bila semuanya kosong. */
-function CardFooter({ cells }: { cells: ReactNode[] }) {
-  const shown = cells.filter((c) => c !== null && c !== undefined && c !== false)
+function CardFooter({ cells }: { cells: { node: ReactNode; className?: string }[] }) {
+  const shown = cells.filter((c) => c.node !== null && c.node !== undefined && c.node !== false)
   if (shown.length === 0) return null
   // relative: tombol di sini digambar di atas area sentuh `.tap` dari baris di atasnya.
   return (
     <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2">
-      {shown.map((c, i) => <div key={i}>{c}</div>)}
+      {shown.map((c, i) => <div key={i} className={c.className}>{c.node}</div>)}
     </div>
   )
 }
@@ -194,7 +196,7 @@ export default function DataTable<T>({
                     ))}
                   </dl>
                 )}
-                {footerCols.length > 0 && <CardFooter cells={footerCols.map((c) => c.cell(row))} />}
+                {footerCols.length > 0 && <CardFooter cells={footerCols.map((c) => ({ node: c.cell(row), className: c.footerClassName }))} />}
               </>
             )
             return (

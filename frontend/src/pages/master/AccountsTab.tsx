@@ -46,7 +46,7 @@ export default function AccountsTab() {
         <p className="text-sm text-slate-500">
           Akun pegawai SHD terbentuk otomatis saat pegawai pertama kali masuk menggunakan NIK.
         </p>
-        <Button variant="secondary" onClick={() => setAction({ kind: 'create' })}>
+        <Button variant="secondary" className="min-h-9! w-full sm:w-auto" onClick={() => setAction({ kind: 'create' })}>
           <Plus size={16} /> Tambah akun
         </Button>
       </div>

@@ -120,9 +120,14 @@ export default function AssetListPage() {
     {
       header: 'Detail',
       className: 'text-right',
-      mobile: 'hidden',
+      mobile: 'footer',
+      // HP: tombol memenuhi lebar kartu; laptop: tautan biasa di ujung kanan tabel.
+      footerClassName: 'w-full',
       cell: (a) => (
-        <Link to={`/daftar-aset/${a.id}`} className="font-semibold text-brand-700 hover:underline">
+        <Link
+          to={`/daftar-aset/${a.id}`}
+          className="font-semibold text-brand-700 hover:underline max-lg:flex max-lg:min-h-9 max-lg:items-center max-lg:justify-center max-lg:rounded-lg max-lg:bg-brand-50 max-lg:hover:bg-brand-100 max-lg:hover:no-underline"
+        >
           Detail
         </Link>
       ),
@@ -140,13 +145,16 @@ export default function AssetListPage() {
         title="Daftar Aset"
         description={subtitle}
         actions={
-          <>
+          // HP: Ekspor & Cetak berdampingan memenuhi lebar, Tambah aset satu baris penuh di bawahnya.
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
             <ExportButton
               type="assets"
               filters={() => new URLSearchParams(FILTERS.flatMap((k) => (list.get(k) ? [[k, list.get(k)]] : [])))}
+              className="min-w-0 px-3 sm:px-4"
             />
             <Button
               variant="secondary"
+              className="min-w-0 px-3 sm:px-4"
               disabled={selected.size === 0 || selected.size > MAX_LABELS}
               loading={printing}
               onClick={printLabels}
@@ -160,10 +168,10 @@ export default function AssetListPage() {
             >
               Cetak label QR{selected.size > 0 ? ` (${selected.size})` : ''}
             </Button>
-            <Link to="/daftar-aset/baru" className={buttonClass('primary')}>
+            <Link to="/daftar-aset/baru" className={buttonClass('primary', 'col-span-2')}>
               <Plus size={16} /> Tambah aset
             </Link>
-          </>
+          </div>
         }
       />
 

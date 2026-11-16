@@ -150,7 +150,6 @@ export default function RequestsPage() {
   const catalog = catalogQuery.data
   const history = historyQuery.data
   const suggestions = suggestionsQuery.data ?? []
-  const counts = history?.meta.status_counts
   const tab: Tab = params.get('tab') === 'katalog' ? 'katalog' : 'riwayat'
   // Dari Kelengkapan Ruangan/Stok: /permintaan?room_id=&consumable_id=&item_name=&provider_department_id=&quantity= → buka form terisi otomatis.
   const [modal, setModal] = useState<ModalState>(() => {
@@ -399,15 +398,15 @@ export default function RequestsPage() {
                 </button>
               </p>
             )}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
               <Input
-                className="sm:w-60"
+                className="col-span-2 sm:w-60"
                 value={search}
                 onChange={(e) => list.setSearchText(e.target.value)}
                 placeholder="Cari item atau kegiatan"
                 aria-label="Cari permintaan"
               />
-              <div className="sm:w-48">
+              <div className="min-w-0 sm:w-48">
                 <DepartmentCombobox
                   value={providerId ? Number(providerId) : null}
                   onChange={(id) => list.setFilter('provider_department_id', id ? String(id) : '')}
@@ -415,14 +414,9 @@ export default function RequestsPage() {
                   placeholder="Semua penyedia"
                 />
               </div>
-              {/* Jumlah per status (meta.status_counts) tampil di dalam pilihan. */}
-              <Select clearable className="sm:w-56" value={status} onChange={(e) => list.setFilter('status', e.target.value)} aria-label="Status">
+              <Select clearable className="min-w-0 sm:w-56" value={status} onChange={(e) => list.setFilter('status', e.target.value)} aria-label="Status">
                 <option value="">Semua status</option>
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {counts ? `${s} (${counts[s] ?? 0})` : s}
-                  </option>
-                ))}
+                {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
               </Select>
             </div>
             <DataTable
@@ -441,9 +435,9 @@ export default function RequestsPage() {
           </div>
         ) : (
           <div className="space-y-3 p-5">
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
               <Input
-                className="sm:w-60"
+                className="col-span-2 sm:w-60"
                 value={catalogSearch}
                 onChange={(e) => {
                   setCatalogSearch(e.target.value)
@@ -452,7 +446,7 @@ export default function RequestsPage() {
                 placeholder="Cari item"
                 aria-label="Cari item katalog"
               />
-              <div className="sm:w-48">
+              <div className="min-w-0 sm:w-48">
                 <DepartmentCombobox
                   value={catalogProvider}
                   onChange={(id) => {

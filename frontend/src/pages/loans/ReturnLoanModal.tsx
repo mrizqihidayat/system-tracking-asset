@@ -118,10 +118,8 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
                 onStatus={setStatus}
                 heavyDamage={{ status: heavyStatus, onChange: setHeavyStatus }}
                 errors={errors}
+                showAutoStatus={false}
               />
-              <p className="text-xs text-slate-500">
-                Rusak Ringan bisa dipilih Tersedia atau Perbaikan. Rusak Berat bisa dipilih Perbaikan atau Tidak Layak Pakai.
-              </p>
               <RoomSelect
                 buildingLabel="Gedung penyimpanan"
                 roomLabel="Ruangan penyimpanan"

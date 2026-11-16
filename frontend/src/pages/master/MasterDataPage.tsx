@@ -109,9 +109,18 @@ export default function MasterDataPage() {
     </li>
   )
 
-  const addButton = (label: string, onClick: () => void) => (
-    <Button variant="secondary" onClick={onClick}>
-      <Plus size={16} /> {label}
+  /** `short`: label ringkas di HP (dua tombol berdampingan tetap muat di kartu). */
+  const addButton = (label: string, onClick: () => void, short?: string) => (
+    <Button variant="secondary" onClick={onClick} className={`min-h-9! w-full sm:w-auto ${short ? 'px-3 sm:px-4' : ''}`}>
+      <Plus size={16} />
+      {short ? (
+        <>
+          <span className="sm:hidden">{short}</span>
+          <span className="hidden sm:inline">{label}</span>
+        </>
+      ) : (
+        label
+      )}
     </Button>
   )
 
@@ -171,9 +180,9 @@ export default function MasterDataPage() {
     const typeForm = (extra: Partial<FormState>) => setForm({ kind: 'Jenis aset', withCode: true, ...extra })
     body = (
       <>
-        <div className="mb-2 flex justify-end gap-2">
-          {addButton('Tambah kategori', () => setForm({ kind: 'Kategori', createUrl: '/categories' }))}
-          {data.categories.length > 0 && addButton('Tambah jenis aset', () => typeForm({ createUrl: '/asset-types' }))}
+        <div className="mb-2 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+          {addButton('Tambah kategori', () => setForm({ kind: 'Kategori', createUrl: '/categories' }), 'Kategori')}
+          {data.categories.length > 0 && addButton('Tambah jenis aset', () => typeForm({ createUrl: '/asset-types' }), 'Jenis aset')}
         </div>
         {data.categories.length === 0 && <p className="text-sm text-slate-500">Belum ada kategori. Tambah kategori dulu, lalu jenis asetnya.</p>}
         <ul className="divide-y divide-slate-100">

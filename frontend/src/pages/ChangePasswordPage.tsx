@@ -75,9 +75,7 @@ export default function ChangePasswordPage() {
         <FormField label="Password baru" required error={errors.password}>
           <PasswordInput value={form.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" error={errors.password} required />
           {!errors.password && (
-            <span className="block text-xs text-slate-500">
-              Minimal {PASSWORD_MIN} karakter, tidak sama dengan {isEmployee ? 'NIK' : 'username'}.
-            </span>
+            <span className="block text-xs text-slate-500">Minimal {PASSWORD_MIN} karakter.</span>
           )}
         </FormField>
         <FormField label="Konfirmasi password baru" required error={errors.password_confirmation}>
