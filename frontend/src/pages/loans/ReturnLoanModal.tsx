@@ -8,6 +8,7 @@ import { CONDITIONS, type Condition } from '../../types/asset'
 import type { Loan } from '../../types/loan'
 import ActionModal from '../assets/modals/ActionModal'
 import ConditionStatusFields, { type ChoiceStatus, type HeavyDamageStatus } from '../assets/modals/ConditionStatusFields'
+import ConditionPhotoField from './ConditionPhotoField'
 import RoomSelect from './RoomSelect'
 
 interface Props {
@@ -38,12 +39,15 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
   const [buildingId, setBuildingId] = useState<number | null>(loan.asset?.room?.building_id ?? null)
   const [roomId, setRoomId] = useState<number | null>(loan.asset?.room?.id ?? null)
   const [note, setNote] = useState('')
+  const [photo, setPhoto] = useState<File | null>(null)
 
   const lost = result === 'hilang'
   const destination = loan.destination_room
     ? `${loan.destination_room.name}${loan.destination_room.building ? ` · ${loan.destination_room.building.name}` : ''}`
     : loan.destination_note || '-'
   const noteRequired = lost || condition !== 'Baik'
+  // Foto kondisi wajib untuk Rusak Ringan / Rusak Berat (T36).
+  const photoRequired = !lost && condition !== 'Baik'
 
   const submit = async () => {
     const payload: Record<string, unknown> = {
@@ -57,7 +61,16 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
       if (condition === 'Rusak Ringan') payload.status = status
       if (condition === 'Rusak Berat') payload.status = heavyStatus
     }
-    await api.patch(`/loans/${loan.id}/return`, payload)
+    if (!lost && photo) {
+      // Multipart: PHP tidak membaca isi PATCH multipart, jadi dikirim POST dengan _method=PATCH.
+      const body = new FormData()
+      for (const [key, value] of Object.entries(payload)) if (value !== null && value !== undefined) body.append(key, String(value))
+      body.append('condition_photo', photo)
+      body.append('_method', 'PATCH')
+      await api.post(`/loans/${loan.id}/return`, body)
+    } else {
+      await api.patch(`/loans/${loan.id}/return`, payload)
+    }
     toast.success(lost ? 'Aset dilaporkan hilang saat dipinjam.' : `${loan.asset?.code} diterima kembali.`)
     onDone()
   }
@@ -67,6 +80,7 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
       title={`Terima kembali • ${loan.asset?.code}`}
       submitLabel="Simpan"
       danger={lost}
+      submitDisabled={photoRequired && !photo}
       onClose={onClose}
       onSubmit={submit}
     >
@@ -120,6 +134,7 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
                 errors={errors}
                 showAutoStatus={false}
               />
+              <ConditionPhotoField file={photo} onChange={setPhoto} required={photoRequired} error={errors.condition_photo} />
               <RoomSelect
                 buildingLabel="Gedung penyimpanan"
                 roomLabel="Ruangan penyimpanan"

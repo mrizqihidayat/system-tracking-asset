@@ -21,11 +21,16 @@ class ReturnLoanRequest extends FormRequest
     }
 
     /**
-     * result=kembali: kondisi wajib, status A6, ruangan penyimpanan (default lokasi asal), catatan wajib jika tidak Baik.
+     * result=kembali: kondisi wajib, foto kondisi wajib jika tidak Baik, status A6, ruangan penyimpanan (default lokasi asal), catatan wajib jika tidak Baik.
      * result=hilang: hanya tanggal & catatan (wajib).
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
+    protected function prepareForValidation(): void
+    {
+        StoreAssetFileRequest::rejectIfTooLarge($this->file('condition_photo'));
+    }
+
     public function rules(): array
     {
         /** @var Loan $loan */
@@ -38,6 +43,13 @@ class ReturnLoanRequest extends FormRequest
             'return_condition' => $lost ? ['prohibited'] : ['required', Rule::enum(AssetCondition::class)],
             'status' => $lost ? ['prohibited'] : $this->statusRules(),
             'return_room_id' => $lost ? ['prohibited'] : ['nullable', 'integer', 'exists:rooms,id'],
+            // Foto kondisi (T36): wajib jika kondisi tidak Baik, opsional jika Baik, tidak dipakai jika hilang.
+            'condition_photo' => $lost
+                ? ['prohibited']
+                : [
+                    Rule::requiredIf(fn () => in_array($this->input('return_condition'), [AssetCondition::RusakRingan->value, AssetCondition::RusakBerat->value], true)),
+                    'nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'mimetypes:image/jpeg,image/png,image/webp', StoreAssetFileRequest::validName(),
+                ],
             'note' => [
                 'nullable',
                 'string',
@@ -68,6 +80,10 @@ class ReturnLoanRequest extends FormRequest
             'return_condition.prohibited' => 'Kondisi tidak diisi jika aset hilang.',
             'status.prohibited' => $this->isLost() ? 'Status tidak diisi jika aset hilang.' : 'Status tidak dipilih jika kondisi Baik.',
             'return_room_id.prohibited' => 'Ruangan tidak diisi jika aset hilang.',
+            'condition_photo.required' => 'Foto kondisi wajib diunggah jika kondisi tidak Baik.',
+            'condition_photo.mimes' => 'Foto harus berupa JPG, PNG, atau WebP.',
+            'condition_photo.mimetypes' => 'Foto harus berupa JPG, PNG, atau WebP.',
+            'condition_photo.prohibited' => 'Foto kondisi tidak diunggah jika aset hilang.',
         ];
     }
 

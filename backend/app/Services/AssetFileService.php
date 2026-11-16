@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\FileType;
 use App\Models\Asset;
 use App\Models\AssetFile;
+use App\Models\Loan;
 use App\Models\User;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
@@ -66,8 +67,9 @@ class AssetFileService
             return DB::transaction(function () use ($asset, $type, $attributes) {
                 Asset::query()->whereKey($asset->getKey())->lockForUpdate()->firstOrFail();
 
+                // File tertaut peminjaman (foto kondisi, T36) bukan bagian slot: tidak ikut tergantikan.
                 $old = self::isSlot($type)
-                    ? AssetFile::query()->where('asset_id', $asset->id)->where('file_type', $type->value)->get()
+                    ? AssetFile::query()->where('asset_id', $asset->id)->whereNull('loan_id')->where('file_type', $type->value)->get()
                     : collect();
 
                 if ($old->isNotEmpty()) {
@@ -77,6 +79,37 @@ class AssetFileService
 
                 return ['file' => AssetFile::create($attributes), 'replaced' => $old->isNotEmpty()];
             });
+        } catch (Throwable $e) {
+            $this->disk()->delete($path);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Foto kondisi saat Terima kembali: tertaut ke peminjaman, tidak menggantikan foto lain (riwayat utuh).
+     * Dipanggil di dalam transaksi terima kembali; pemanggil menghapus file bila transaksi gagal sesudahnya.
+     */
+    public function storeForLoan(Loan $loan, UploadedFile $upload, User $user): AssetFile
+    {
+        $extension = $upload->guessExtension() ?: strtolower($upload->getClientOriginalExtension());
+        $path = $this->disk()->putFileAs("assets/{$loan->asset_id}", $upload, Str::uuid().'.'.$extension);
+
+        if ($path === false) {
+            throw new RuntimeException('Gagal menyimpan file.');
+        }
+
+        try {
+            return AssetFile::create([
+                'asset_id' => $loan->asset_id,
+                'loan_id' => $loan->id,
+                'file_type' => FileType::FotoKondisi,
+                'path' => $path,
+                'original_name' => $upload->getClientOriginalName(),
+                'mime_type' => $upload->getMimeType(),
+                'size' => $upload->getSize(),
+                'uploaded_by' => $user->id,
+            ]);
         } catch (Throwable $e) {
             $this->disk()->delete($path);
 

@@ -26,8 +26,14 @@ class StoreAssetFileRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        $file = $this->file('file');
+        self::rejectIfTooLarge($this->file('file'));
+    }
 
+    /**
+     * Dipakai juga oleh unggahan foto di request lain (mis. foto kondisi saat Terima kembali, T36).
+     */
+    public static function rejectIfTooLarge(mixed $file): void
+    {
         if (! $file instanceof UploadedFile) {
             return;
         }
@@ -47,14 +53,14 @@ class StoreAssetFileRequest extends FormRequest
     {
         return [
             'file_type' => ['required', Rule::enum(FileType::class)],
-            'file' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'mimetypes:image/jpeg,image/png,image/webp,application/pdf', $this->validName()],
+            'file' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'mimetypes:image/jpeg,image/png,image/webp,application/pdf', self::validName()],
         ];
     }
 
     /**
      * Nama asli disimpan di kolom varchar(255) dan dikirim sebagai JSON: wajib UTF-8 sah dan maks. 255 karakter.
      */
-    private function validName(): Closure
+    public static function validName(): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail): void {
             if (! $value instanceof UploadedFile) {

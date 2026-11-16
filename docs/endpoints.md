@@ -2,7 +2,7 @@
 
 Daftar seluruh endpoint backend dan pemakaiannya di frontend web. Parameter dan bentuk respons ada di `docs/SPEC.md` §14.
 
-Disusun pada 4 November 2026 (diperbarui 16 November 2026, T35) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
+Disusun pada 4 November 2026 (diperbarui 17 November 2026, T36) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
 
 ## Ringkasan
 
@@ -64,6 +64,7 @@ Di balik reverse proxy, batas per IP hanya benar jika `TRUSTED_PROXIES` diisi. T
 
 | Input | Aturan | Jika dilanggar |
 |---|---|---|
+| `condition_photo` pada terima kembali | File JPG/PNG/WebP, maks. 5 MB; wajib jika Rusak Ringan/Rusak Berat; dilarang jika hilang | 422 (413 jika terlalu besar) |
 | `username` pada login (isian berlabel "Username", diisi NIK atau username; angka saja = NIK) | Teks UTF-8 tanpa karakter NUL, maks. 50 karakter | 422 |
 | `search` pada `/api/employees` | Wajib, 2–100 karakter | 422 |
 | Password baru (`/api/user/password`, `/api/accounts`) | 8–72 karakter, dikonfirmasi, tidak sama dengan NIK/username | 422 |
@@ -215,7 +216,7 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | GET | `/api/loans` | Daftar peminjaman, filter dan pencarian | Token | Ya: Peminjaman (`lib/queries/lists.ts`) |
 | POST | `/api/loans` | Catat peminjaman; tanggal pinjam di masa depan menjadi pemesanan `Direncanakan` | Token | Ya: Form pinjam (`pages/loans/LoanFormModal.tsx`) |
 | GET | `/api/loans/{id}` | Detail satu peminjaman | Token | Ya: Terima kembali dari hasil scan (`pages/loans/LoanPage.tsx`) |
-| PATCH | `/api/loans/{id}/return` | Terima kembali, atau hilang saat dipinjam | Token | Ya: Popup terima kembali (`pages/loans/ReturnLoanModal.tsx`) |
+| PATCH | `/api/loans/{id}/return` | Terima kembali (dengan foto kondisi, wajib jika rusak; multipart via POST `_method=PATCH`), atau hilang saat dipinjam | Token | Ya: Popup terima kembali (`pages/loans/ReturnLoanModal.tsx`) |
 | PATCH | `/api/loans/{id}/hand-over` | Serahkan pemesanan `Direncanakan` (aset menjadi Dipinjam) | Token | Ya: Popup serahkan (`pages/loans/HandOverModal.tsx`) |
 | PATCH | `/api/loans/{id}/cancel` | Batalkan peminjaman atau pemesanan | Token | Ya: Popup batal (`pages/loans/CancelLoanModal.tsx`) |
 

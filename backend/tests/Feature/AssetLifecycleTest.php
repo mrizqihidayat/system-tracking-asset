@@ -111,7 +111,7 @@ class AssetLifecycleTest extends TestCase
         $this->assertSame(1, Loan::count());
 
         // 3. Kembali rusak berat → Perbaikan
-        $this->patchJson("/api/loans/{$loanId}/return", ['return_condition' => 'Rusak Berat', 'note' => 'Lensa pecah'])
+        $this->returnLoanWithPhoto($loanId, ['return_condition' => 'Rusak Berat', 'note' => 'Lensa pecah'])
             ->assertOk()
             ->assertJsonPath('data.status', 'Dikembalikan')
             ->assertJsonPath('data.return_condition', 'Rusak Berat');

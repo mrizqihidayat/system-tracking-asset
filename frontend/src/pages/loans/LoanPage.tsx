@@ -21,6 +21,7 @@ import type { Loan, LoanStatus } from '../../types/loan'
 import CancelLoanModal from './CancelLoanModal'
 import HandOverModal from './HandOverModal'
 import LoanFormModal from './LoanFormModal'
+import LoanPhotoLink from './LoanPhotoLink'
 import ReturnLoanModal from './ReturnLoanModal'
 
 type ModalState = { kind: 'return' | 'cancel' | 'handover'; loan: Loan } | { kind: 'borrow' } | null
@@ -227,6 +228,7 @@ export default function LoanPage() {
           <LoanStatusBadge status={l.status} />
           {l.is_unhanded && <span className="whitespace-nowrap text-xs font-medium text-bad-700">Belum diserahkan</span>}
           {returnedNotGood(l) && <ConditionDot condition={returnedNotGood(l)!} />}
+          <LoanPhotoLink photo={l.condition_photo} />
         </div>
       ),
     },
@@ -294,6 +296,7 @@ export default function LoanPage() {
             {condition && <><span aria-hidden>·</span><ConditionDot condition={condition} /></>}
           </p>
         )}
+        <LoanPhotoLink photo={l.condition_photo} />
         {l.is_unhanded && <p className="text-xs font-medium text-bad-700">Belum diserahkan</p>}
         {/* Baris sendiri di kanan bawah agar baris "Kembali · kondisi" tidak terpotong. */}
         {l.asset && (

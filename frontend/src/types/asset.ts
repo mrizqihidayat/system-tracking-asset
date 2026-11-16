@@ -112,6 +112,8 @@ export interface AssetEvent {
 
 export interface AssetFile {
   id: number
+  /** Peminjaman asal (foto kondisi saat Terima kembali); null = file biasa di aset. */
+  loan_id?: number | null
   file_type: FileType
   original_name: string
   mime_type: string

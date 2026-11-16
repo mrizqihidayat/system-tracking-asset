@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AssetCondition;
+use App\Enums\FileType;
 use App\Enums\LoanStatus;
 use App\Support\Search;
 use Carbon\CarbonInterface;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['asset_id', 'borrower_name', 'borrower_unit', 'purpose', 'destination_room_id', 'destination_note', 'borrow_date', 'handover_date', 'due_date', 'condition_out', 'approval_number', 'approval_date', 'borrowed_by', 'status', 'return_date', 'return_condition', 'return_room_id', 'received_by', 'cancel_reason', 'note'])]
 class Loan extends Model
@@ -51,6 +53,16 @@ class Loan extends Model
     public function asset(): BelongsTo
     {
         return $this->belongsTo(Asset::class);
+    }
+
+    /**
+     * Foto kondisi saat Terima kembali (T36): satu per peminjaman, tidak menggantikan foto peminjaman lain.
+     *
+     * @return HasOne<AssetFile, $this>
+     */
+    public function conditionPhoto(): HasOne
+    {
+        return $this->hasOne(AssetFile::class)->where('file_type', FileType::FotoKondisi->value);
     }
 
     /**

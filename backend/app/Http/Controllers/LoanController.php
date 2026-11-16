@@ -88,6 +88,7 @@ class LoanController extends Controller
             'asset.room.building',
             'destinationRoom.building',
             'returnRoom.building',
+            'conditionPhoto',
             'borrowedBy',
             'receivedBy',
         ];

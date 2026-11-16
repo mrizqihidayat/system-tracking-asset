@@ -11,9 +11,11 @@ use App\Models\Loan;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Peminjaman (SPEC §7). Semua di DB::transaction() + lockForUpdate() pada transaksi & aset;
@@ -21,7 +23,7 @@ use Illuminate\Validation\ValidationException;
  */
 class LoanService
 {
-    public function __construct(private AssetEventService $events) {}
+    public function __construct(private AssetEventService $events, private AssetFileService $files) {}
 
     /**
      * Pinjam atau pesan. Tanggal pinjam > hari ini → Direncanakan (aset tidak berubah, tanpa riwayat aset;
@@ -126,64 +128,92 @@ class LoanService
      * Terima kembali: kondisi & status aset aturan A6, lokasi asal ikut ruangan penyimpanan.
      * Rusak Berat boleh langsung Tidak Layak Pakai (riwayat terpisah, sama dengan catat tidak layak pakai).
      *
-     * @param  array{return_date?: ?string, return_condition: string, status?: ?string, return_room_id?: ?int, note?: ?string}  $data
+     * Foto kondisi (opsional, wajib jika tidak Baik, divalidasi di request) disimpan per peminjaman dalam transaksi
+     * yang sama; bila transaksi gagal, file yang sudah ditulis dihapus.
+     *
+     * @param  array{return_date?: ?string, return_condition: string, status?: ?string, return_room_id?: ?int, note?: ?string, condition_photo?: ?UploadedFile}  $data
      */
     public function giveBack(Loan $loan, array $data, User $actor): Loan
     {
-        return DB::transaction(function () use ($loan, $data, $actor) {
-            [$loan, $asset] = $this->lockActive($loan);
+        $photo = $data['condition_photo'] ?? null;
+        unset($data['condition_photo']);
+        $storedPath = null;
 
-            $returnDate = $this->returnDate($data['return_date'] ?? null);
-            $condition = AssetCondition::from($data['return_condition']);
-            $chosen = AssetStatus::tryFrom((string) ($data['status'] ?? ''));
-            $unfit = $condition === AssetCondition::RusakBerat && $chosen === AssetStatus::TidakLayakPakai;
-            $status = $unfit ? AssetStatus::TidakLayakPakai : $condition->resolveStatus($chosen);
-            $fromRoomId = $asset->room_id;
-            $returnRoomId = (int) ($data['return_room_id'] ?? $fromRoomId);
-            $note = $data['note'] ?? null;
+        try {
+            return DB::transaction(function () use ($loan, $data, $actor, $photo, &$storedPath) {
+                return $this->giveBackLocked($loan, $data, $actor, $photo, $storedPath);
+            });
+        } catch (Throwable $e) {
+            if ($storedPath !== null) {
+                $this->files->disk()->delete($storedPath);
+            }
 
-            $loan->update([
-                'status' => LoanStatus::Dikembalikan,
-                'return_date' => $returnDate,
-                'return_condition' => $condition,
-                'return_room_id' => $returnRoomId,
-                'received_by' => $actor->id,
-                'note' => $note,
-            ]);
+            throw $e;
+        }
+    }
 
-            $asset->update(['condition' => $condition, 'status' => $status, 'room_id' => $returnRoomId]);
+    /**
+     * @param  array{return_date?: ?string, return_condition: string, status?: ?string, return_room_id?: ?int, note?: ?string}  $data
+     */
+    private function giveBackLocked(Loan $loan, array $data, User $actor, ?UploadedFile $photo, ?string &$storedPath): Loan
+    {
+        [$loan, $asset] = $this->lockActive($loan);
 
-            $this->events->record($asset, EventType::Dikembalikan, $actor, [
+        $returnDate = $this->returnDate($data['return_date'] ?? null);
+        $condition = AssetCondition::from($data['return_condition']);
+        $chosen = AssetStatus::tryFrom((string) ($data['status'] ?? ''));
+        $unfit = $condition === AssetCondition::RusakBerat && $chosen === AssetStatus::TidakLayakPakai;
+        $status = $unfit ? AssetStatus::TidakLayakPakai : $condition->resolveStatus($chosen);
+        $fromRoomId = $asset->room_id;
+        $returnRoomId = (int) ($data['return_room_id'] ?? $fromRoomId);
+        $note = $data['note'] ?? null;
+
+        $loan->update([
+            'status' => LoanStatus::Dikembalikan,
+            'return_date' => $returnDate,
+            'return_condition' => $condition,
+            'return_room_id' => $returnRoomId,
+            'received_by' => $actor->id,
+            'note' => $note,
+        ]);
+
+        $asset->update(['condition' => $condition, 'status' => $status, 'room_id' => $returnRoomId]);
+
+        if ($photo !== null) {
+            $storedPath = $this->files->storeForLoan($loan, $photo, $actor)->path;
+        }
+
+        $this->events->record($asset, EventType::Dikembalikan, $actor, [
+            'event_date' => $returnDate,
+            'party' => $loan->borrower_name,
+            'condition' => $condition,
+            'loan_id' => $loan->id,
+            'to_room_id' => $returnRoomId,
+            'note' => $note,
+        ]);
+
+        if ($returnRoomId !== $fromRoomId) {
+            $this->events->record($asset, EventType::PindahLokasi, $actor, [
                 'event_date' => $returnDate,
-                'party' => $loan->borrower_name,
+                'party' => 'SHD',
+                'from_room_id' => $fromRoomId,
+                'to_room_id' => $returnRoomId,
+                'loan_id' => $loan->id,
+            ]);
+        }
+
+        if ($unfit) {
+            $this->events->record($asset, EventType::TidakLayakPakai, $actor, [
+                'event_date' => $returnDate,
+                'party' => 'SHD',
                 'condition' => $condition,
                 'loan_id' => $loan->id,
-                'to_room_id' => $returnRoomId,
                 'note' => $note,
             ]);
+        }
 
-            if ($returnRoomId !== $fromRoomId) {
-                $this->events->record($asset, EventType::PindahLokasi, $actor, [
-                    'event_date' => $returnDate,
-                    'party' => 'SHD',
-                    'from_room_id' => $fromRoomId,
-                    'to_room_id' => $returnRoomId,
-                    'loan_id' => $loan->id,
-                ]);
-            }
+        return $loan;
 
-            if ($unfit) {
-                $this->events->record($asset, EventType::TidakLayakPakai, $actor, [
-                    'event_date' => $returnDate,
-                    'party' => 'SHD',
-                    'condition' => $condition,
-                    'loan_id' => $loan->id,
-                    'note' => $note,
-                ]);
-            }
-
-            return $loan;
-        });
     }
 
     /**

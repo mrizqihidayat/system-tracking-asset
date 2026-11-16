@@ -1,4 +1,4 @@
-import type { Condition, Room, Status } from './asset'
+import type { AssetFile, Condition, Room, Status } from './asset'
 
 /** Direncanakan = pemesanan (tanggal pinjam di masa depan), aset tetap Tersedia sampai diserahkan. */
 export type LoanStatus = 'Direncanakan' | 'Dipinjam' | 'Dikembalikan' | 'Dibatalkan' | 'Hilang'
@@ -26,6 +26,8 @@ export interface Loan {
   return_date: string | null
   return_condition: Condition | null
   return_room: Room | null
+  /** Foto kondisi saat Terima kembali (satu per peminjaman). */
+  condition_photo?: AssetFile | null
   cancel_reason: string | null
   note: string | null
 }

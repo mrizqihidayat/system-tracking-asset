@@ -44,6 +44,7 @@ class LoanResource extends JsonResource
             'return_date' => $this->return_date?->toIso8601String(),
             'return_condition' => $this->return_condition,
             'return_room' => RoomResource::make($this->whenLoaded('returnRoom')),
+            'condition_photo' => AssetFileResource::make($this->whenLoaded('conditionPhoto')),
             'cancel_reason' => $this->cancel_reason,
             'note' => $this->note,
             'borrowed_by' => $this->userSummary('borrowedBy'),

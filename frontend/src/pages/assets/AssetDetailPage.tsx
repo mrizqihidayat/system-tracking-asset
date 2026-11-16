@@ -21,6 +21,7 @@ import { useBlobUrl } from '../../lib/useBlobUrl'
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { AssetEvent, AssetFile, FileType, Room } from '../../types/asset'
 import type { Loan } from '../../types/loan'
+import LoanPhotoLink from '../loans/LoanPhotoLink'
 import DeleteAssetModal from './modals/DeleteAssetModal'
 import FoundModal from './modals/FoundModal'
 import MoveLocationModal from './modals/MoveLocationModal'
@@ -254,6 +255,7 @@ export default function AssetDetailPage() {
           <span className="flex flex-col gap-1">
             <span className="whitespace-nowrap">{formatDate(l.return_date)}</span>
             {l.return_condition && l.return_condition !== 'Baik' && <ConditionDot condition={l.return_condition} />}
+            <LoanPhotoLink photo={l.condition_photo} />
           </span>
         ) : (
           <span className="text-slate-500">-</span>

@@ -60,6 +60,11 @@ class AssetFileController extends Controller
 
     public function destroy(AssetFile $assetFile): JsonResponse
     {
+        // Foto kondisi dari Terima kembali adalah bukti per peminjaman: tidak dihapus dari sini.
+        if ($assetFile->loan_id !== null) {
+            return response()->json(['message' => 'Foto kondisi dari peminjaman tidak dapat dihapus.'], 422);
+        }
+
         $name = $assetFile->original_name;
         $this->files->delete($assetFile);
 

@@ -178,7 +178,7 @@ class LoanTest extends TestCase
         $overdue = $this->borrow($this->asset(), ['borrower_name' => 'Budi', 'borrow_date' => today()->subDays(4)->toDateString(), 'due_date' => today()->subDay()->toDateString()]);
         $dueToday = $this->borrow($this->asset(), ['borrower_name' => 'Citra', 'due_date' => today()->toDateString()]);
         $returned = $this->borrow($this->asset(), ['borrower_name' => 'Dedi', 'borrow_date' => today()->subDays(30)->toDateString(), 'due_date' => today()->subDays(28)->toDateString()]);
-        $this->patchJson("/api/loans/{$returned->id}/return", ['return_condition' => 'Rusak Berat', 'note' => 'Retak'])->assertOk();
+        $this->returnLoanWithPhoto($returned->id, ['return_condition' => 'Rusak Berat', 'note' => 'Retak'])->assertOk();
 
         $this->getJson('/api/loans')->assertOk()->assertJsonCount(3, 'data')
             ->assertJsonPath('data.0.id', $overdue->id)
@@ -220,7 +220,7 @@ class LoanTest extends TestCase
         $asset = $this->asset(AssetCondition::from($out));
         $loan = $this->borrow($asset);
 
-        $this->patchJson("/api/loans/{$loan->id}/return", ['return_condition' => $back, 'status' => $status, 'note' => $back === 'Baik' ? null : 'Catatan'])
+        $this->returnLoanWithPhoto($loan->id, ['return_condition' => $back, 'status' => $status, 'note' => $back === 'Baik' ? null : 'Catatan'])
             ->assertOk()
             ->assertJsonPath('data.status', 'Dikembalikan')
             ->assertJsonPath('data.return_condition', $back)
@@ -238,7 +238,7 @@ class LoanTest extends TestCase
         $asset = $this->asset();
         $loan = $this->borrow($asset);
 
-        $this->patchJson("/api/loans/{$loan->id}/return", ['return_condition' => 'Rusak Berat', 'status' => 'Tidak Layak Pakai', 'note' => 'Hancur'])
+        $this->returnLoanWithPhoto($loan->id, ['return_condition' => 'Rusak Berat', 'status' => 'Tidak Layak Pakai', 'note' => 'Hancur'])
             ->assertOk()
             ->assertJsonPath('data.status', 'Dikembalikan')
             ->assertJsonPath('data.return_condition', 'Rusak Berat');

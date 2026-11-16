@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['asset_id', 'file_type', 'path', 'original_name', 'mime_type', 'size', 'uploaded_by'])]
+#[Fillable(['asset_id', 'loan_id', 'file_type', 'path', 'original_name', 'mime_type', 'size', 'uploaded_by'])]
 class AssetFile extends Model
 {
     /** @use HasFactory<AssetFileFactory> */
@@ -43,6 +43,16 @@ class AssetFile extends Model
             'file_type' => FileType::class,
             'size' => 'integer',
         ];
+    }
+
+    /**
+     * Peminjaman asal file (foto kondisi saat Terima kembali, T36); null = file biasa di aset.
+     *
+     * @return BelongsTo<Loan, $this>
+     */
+    public function loan(): BelongsTo
+    {
+        return $this->belongsTo(Loan::class);
     }
 
     /**
