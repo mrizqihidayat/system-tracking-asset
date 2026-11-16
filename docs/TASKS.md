@@ -249,6 +249,7 @@ Label prioritas: **[Inti]** wajib untuk demo · **[Lengkap]** dikerjakan setelah
 - [ ] **T29 Lisensi Digital** — sesuai SPEC §16.
 
 ## Catatan / temuan di luar scope
+- (Uji pengguna) Panduan uji coba per fitur (11 fitur, tiap peserta memilih 5–6), kuesioner SUS, cara menghitung skor, dan rekap per fitur ada di `docs/UJI-PENGGUNA.md` (melengkapi T27 QA & demo).
 - (T37) Permintaan lama berstatus Diterima sebagian di database ikut aturan baru: tidak lagi dianggap terbuka (barangnya bisa muncul lagi di Saran permintaan) dan tidak bisa diterima lagi atau dibatalkan. Tidak ada migration.
 - (T36) Migration `2026_11_16_000002_add_loan_id_to_asset_files_table` wajib dijalankan (`php artisan migrate`) bersamaan dengan kode T36. Aturan baru: terima kembali dengan kondisi Rusak Ringan/Rusak Berat **wajib** menyertakan foto; klien lama (mis. versi HP) yang mengirim JSON tanpa foto akan ditolak 422 untuk kondisi rusak. Foto dikirim multipart; karena PHP tidak membaca isi PATCH multipart, klien memakai `POST` dengan `_method=PATCH`.
 - (Saran tahap berikutnya, T36) Foto opsional saat peminjaman (check-out) supaya kerusakan bisa dibandingkan sebelum dan sesudah dipinjam; sekarang hanya ada foto saat kembali. Bisa memakai kolom `loan_id` yang sama dengan jenis atau penanda baru.
