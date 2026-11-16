@@ -11,7 +11,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -35,7 +34,6 @@ class AccountController extends Controller
         $account = User::create([
             ...$request->safe()->only(['username', 'name', 'department', 'password']),
             'source' => User::SOURCE_MANUAL,
-            'must_change_password' => false,
         ]);
 
         $this->log($request, 'account.created', $account);
@@ -57,7 +55,7 @@ class AccountController extends Controller
         return AccountResource::make($account);
     }
 
-    /** Reset akun pegawai SHD: login berikutnya memakai NIK sebagai password lalu wajib ganti password. */
+    /** Reset akun pegawai SHD: password kembali ke NIK, semua sesinya dicabut. */
     public function reset(Request $request, User $account): AccountResource
     {
         $this->ensureActive($account);
@@ -66,8 +64,7 @@ class AccountController extends Controller
         }
         $this->ensureNotSelf($request, $account, 'Gunakan Ganti password untuk akun sendiri.');
 
-        $account->forceFill(['password' => Str::random(64), 'must_change_password' => true])->save();
-        $account->tokens()->delete();
+        $this->auth->resetEmployeePassword($account);
         $this->log($request, 'account.reset', $account);
 
         return AccountResource::make($account);

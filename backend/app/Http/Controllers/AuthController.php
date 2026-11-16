@@ -16,7 +16,7 @@ class AuthController extends Controller
     public function __construct(private AuthService $auth) {}
 
     /**
-     * Satu kolom "NIK / Username" (field `username`): angka saja = NIK pegawai SHD, selain itu akun manual (SPEC §15).
+     * Satu kolom berlabel "Username" (field `username`): angka saja = NIK pegawai SHD, selain itu akun manual (SPEC §15).
      */
     public function login(Request $request): JsonResponse
     {
@@ -55,7 +55,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Ganti password sendiri. Akun api yang wajib ganti memakai NIK sebagai password saat ini.
+     * Ganti password sendiri (opsional). Akun api yang belum pernah ganti memakai NIK sebagai password saat ini.
      * Token lain milik akun ini dicabut; token yang sedang dipakai tetap berlaku.
      */
     public function changePassword(ChangePasswordRequest $request): JsonResponse

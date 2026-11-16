@@ -30,8 +30,7 @@ export default function LoginPage() {
     try {
       const res = await api.post<{ token: string; user: AuthUser }>('/login', { username, password })
       setSession(res.data.token, res.data.user)
-      // Akun pegawai SHD saat login pertama / setelah reset: wajib ganti password dulu (SPEC §15).
-      navigate(res.data.user.must_change_password ? `/ganti-password?next=${encodeURIComponent(next)}` : next, { replace: true })
+      navigate(next, { replace: true })
     } catch (error) {
       setErrors(fieldErrors(error))
       setMessage(errorMessage(error))
@@ -65,7 +64,7 @@ export default function LoginPage() {
               {message}
             </div>
           )}
-          <FormField label="NIK / Username" error={errors.username}>
+          <FormField label="Username" error={errors.username}>
             <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus required />
           </FormField>
           <FormField label="Password" error={errors.password}>

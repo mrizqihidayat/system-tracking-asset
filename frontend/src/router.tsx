@@ -23,7 +23,7 @@ export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   // Halaman publik QR (SPEC §6): /aset/{public_token}, tanpa login.
   { path: '/aset/:token', element: <PublicAssetPage /> },
-  // Ganti password (SPEC §15): di luar layout karena juga dipakai saat akun wajib ganti password.
+  // Ganti password (SPEC §15): opsional, dibuka dari menu akun di sidebar.
   {
     path: '/ganti-password',
     element: (

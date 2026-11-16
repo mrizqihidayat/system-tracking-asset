@@ -14,7 +14,7 @@ use Laravel\Sanctum\HasApiTokens;
  * Akun staf (T33). source "api" = pegawai SHD dari API pegawai, login dengan NIK;
  * source "manual" = akun bersama buatan staf, login dengan username. Nonaktif = soft delete.
  */
-#[Fillable(['nik', 'name', 'username', 'department', 'source', 'password', 'must_change_password'])]
+#[Fillable(['nik', 'name', 'username', 'department', 'source', 'password'])]
 #[Hidden(['password'])]
 class User extends Authenticatable
 {
@@ -29,7 +29,6 @@ class User extends Authenticatable
     {
         return [
             'password' => 'hashed',
-            'must_change_password' => 'boolean',
         ];
     }
 

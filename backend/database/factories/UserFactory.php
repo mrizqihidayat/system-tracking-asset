@@ -29,7 +29,6 @@ class UserFactory extends Factory
             'department' => 'SHD',
             'source' => User::SOURCE_MANUAL,
             'password' => static::$password ??= Hash::make('password'),
-            'must_change_password' => false,
         ];
     }
 

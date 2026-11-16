@@ -1,6 +1,6 @@
 # Flowchart — Sistem Informasi Aset SHD
 
-Disusun dari kode frontend & backend per 9 November 2026 (termasuk T30 R1: catat perubahan barang ruangan, Tandai sudah dicek, kartu ruangan; tampilan gudang; slug ikut nama). Diperbarui 13 November 2026 (T33: login NIK / username, wajib ganti password, Data Master > Akun; R1: password awal = NIK, kelola akun khusus akun pegawai SHD).
+Disusun dari kode frontend & backend per 9 November 2026 (termasuk T30 R1: catat perubahan barang ruangan, Tandai sudah dicek, kartu ruangan; tampilan gudang; slug ikut nama). Diperbarui 13 November 2026 (T33: login NIK / username, wajib ganti password, Data Master > Akun; R1: password awal = NIK, kelola akun khusus akun pegawai SHD; R2: tanpa wajib ganti password).
 
 Versi visual: **`docs/flowchart.drawio`** (buka dengan ekstensi Draw.io di VS Code; satu tab per alur). Isinya dibuat dari blok Mermaid di bawah: setelah mengubah file ini, jalankan `python docs/scripts/flowchart_drawio.py` dari root repo untuk membuat ulang `flowchart.drawio`.
 
@@ -16,7 +16,7 @@ flowchart TD
     Q -- Aksi staf, login bila perlu --> M1
     B -- Staf membuka web --> C{Token tersimpan & valid?}
     C -- Ya --> E
-    C -- Tidak --> D[Input NIK / Username & password]
+    C -- Tidak --> D[Input username atau NIK & password]
     D --> D1[[Login & Akun]]
     D1 -- Gagal --> D
     D1 -- Berhasil --> E[Dashboard: 6 kartu ringkasan & panel; kartu dan panel menaut ke halaman terkait]
@@ -278,36 +278,35 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Input NIK / Username & password]
+    A([Mulai]) --> B[Input username atau NIK & password]
     B --> C{Angka saja?}
     C -- Tidak: username --> M1{Akun bersama ada & password benar?}
     M1 -- Tidak --> X[Pesan: NIK/Username atau password salah; lebih dari 5 percobaan per menit harus menunggu] --> B
     M1 -- Ya --> AKT{Akun aktif?}
-    C -- Ya: NIK --> N1{Akun pegawai sudah pernah ganti password?}
-    N1 -- Ya --> N2{Password tersimpan benar?}
+    C -- Ya: NIK --> N1{Akun pegawai sudah ada?}
+    N1 -- Ya --> N2{Password tersimpan benar? awalnya NIK}
     N2 -- Tidak --> X
     N2 -- Ya --> N3{Direktori pegawai bisa diakses?}
     N3 -- Tidak --> N4[(Catat warning, cek SHD dilewati)] --> AKT
     N3 -- Ya --> SHD
-    N1 -- Tidak: login pertama / setelah reset --> F1{Direktori pegawai bisa diakses?}
+    N1 -- Tidak: login pertama --> F1{Direktori pegawai bisa diakses?}
     F1 -- Tidak --> F2[Pesan: Data pegawai tidak bisa diakses, coba lagi nanti] --> B
     F1 -- Ya --> F3{Password = NIK?}
     F3 -- Tidak --> X
     F3 -- Ya --> SHD{Pegawai ada & departemen SHD?}
     SHD -- Tidak --> S1[Pesan: Hanya pegawai Departemen SHD] --> B
-    SHD -- Ya --> S2[(Buat akun pegawai bila belum ada; sinkron nama & departemen)] --> AKT
+    SHD -- Ya --> S2[(Buat akun pegawai bila belum ada, password = NIK; sinkron nama & departemen)] --> AKT
     AKT -- Tidak --> AK1[Pesan: Akun dinonaktifkan] --> B
-    AKT -- Ya --> W{Wajib ganti password?}
-    W -- Ya --> G1[Halaman Buat password baru: NIK sebagai password saat ini + password baru 2x; halaman lain tertutup] --> G2{Valid: min. 8, bukan NIK, konfirmasi sama?}
+    AKT -- Ya --> D[[Dashboard, tanpa wajib ganti password]]
+    D -- Menu Ganti password, opsional --> G1[Password saat ini + password baru 2x] --> G2{Valid: min. 8, bukan NIK / username, konfirmasi sama?}
     G2 -- Tidak --> G1
     G2 -- Ya --> G3[(Simpan password, sesi lain dicabut)] --> D
-    W -- Tidak --> D[[Dashboard]]
 
     D -- Buka Data Master --> AKUN{Akun pegawai SHD?}
     AKUN -- Tidak: akun bersama --> AK2[Tab Akun tidak tampil; API menolak 403]
     AKUN -- Ya --> K{Aksi akun}
     K -- Tambah akun bersama --> K1[Username bukan angka saja, nama, departemen, password 2x] --> K2[(Simpan, tidak wajib ganti)]
-    K -- Reset akun pegawai --> K3[(Wajib ganti, login berikutnya pakai NIK, sesi dicabut)]
+    K -- Reset akun pegawai --> K3[(Password kembali ke NIK, sesi dicabut)]
     K -- Ubah password akun bersama --> K4[(Simpan, sesi lain dicabut)]
     K -- Nonaktifkan, bukan akun sendiri --> K5[(Soft delete, sesi dicabut)]
     K -- Aktifkan kembali --> K6[(Restore)]

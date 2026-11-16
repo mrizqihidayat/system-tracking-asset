@@ -72,7 +72,6 @@ export default function AccountsTab() {
                     {isMe && <span className="text-xs text-slate-500">(Anda)</span>}
                     {a.source === 'api' ? <Badge color="blue">Pegawai SHD</Badge> : <Badge>Akun bersama</Badge>}
                     {!a.is_active && <Badge color="red">Nonaktif</Badge>}
-                    {a.is_active && a.must_change_password && <Badge color="amber">Wajib ganti password</Badge>}
                   </p>
                   <p className="mt-0.5 text-xs text-slate-500">
                     <span className="font-mono">{loginId(a)}</span>
@@ -130,7 +129,7 @@ const CONFIRM = {
   reset: {
     title: 'Reset password',
     label: 'Reset password',
-    text: (a: Account) => `${a.name} (NIK ${a.nik}) akan keluar dari semua perangkat. Login berikutnya memakai NIK sebagai password, lalu wajib membuat password baru.`,
+    text: (a: Account) => `${a.name} (NIK ${a.nik}) akan keluar dari semua perangkat. Password kembali ke NIK.`,
     request: (a: Account) => api.post(`/accounts/${a.id}/reset`),
     done: 'Password direset.',
   },

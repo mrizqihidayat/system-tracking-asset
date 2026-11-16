@@ -25,7 +25,6 @@ class AccountResource extends JsonResource
             'username' => $this->username,
             'department' => $this->department,
             'source' => $this->source,
-            'must_change_password' => (bool) $this->must_change_password,
             'is_active' => ! $this->trashed(),
             'deactivated_at' => $this->deleted_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),

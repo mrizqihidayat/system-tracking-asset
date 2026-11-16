@@ -37,10 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:password');
-});
 
-// Endpoint di bawah ditolak 403 selama akun wajib ganti password (SPEC §15).
-Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     // Direktori pegawai & akun (T33, SPEC §15)
     Route::get('/employees', [EmployeeController::class, 'index']);
     // Kelola akun: hanya akun pegawai SHD (akun bersama 403).

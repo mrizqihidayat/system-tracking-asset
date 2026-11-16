@@ -9,13 +9,14 @@ use App\Services\EmployeeDirectory\EmployeeDirectory;
 use App\Services\EmployeeDirectory\EmployeeDirectoryUnavailable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * Login NIK pegawai SHD dari direktori pegawai dummy (database/data/employees.json, data fiktif), T33 R1:
- * password login pertama / setelah reset = NIK, lalu wajib ganti password.
+ * Login NIK pegawai SHD dari direktori pegawai dummy (database/data/employees.json, data fiktif), T33 R2:
+ * password awal / setelah reset = NIK, langsung masuk tanpa wajib ganti; ganti password opsional.
  */
 class EmployeeLoginTest extends TestCase
 {
@@ -81,17 +82,26 @@ class EmployeeLoginTest extends TestCase
         return User::factory()->employee($nik)->create(['password' => self::NEW_PASSWORD]);
     }
 
-    public function test_first_login_with_nik_creates_api_account_that_must_change_password(): void
+    public function test_first_login_with_nik_creates_api_account_and_goes_straight_in(): void
     {
         $response = $this->login(self::SHD_NIK, self::SHD_NIK)->assertOk()
             ->assertJsonPath('user.nik', self::SHD_NIK)
             ->assertJsonPath('user.name', 'ANDI PRATAMA SIREGAR')
             ->assertJsonPath('user.department', 'SHD')
             ->assertJsonPath('user.source', 'api')
-            ->assertJsonPath('user.must_change_password', true);
+            ->assertJsonMissingPath('user.must_change_password');
 
         $this->assertStringNotContainsString('1990-03-14', $response->getContent());
-        $this->assertDatabaseHas('users', ['nik' => self::SHD_NIK, 'source' => 'api', 'must_change_password' => true]);
+        $user = User::where('nik', self::SHD_NIK)->firstOrFail();
+        $this->assertTrue(Hash::check(self::SHD_NIK, $user->password));
+
+        // Tidak ada pemblokiran: token langsung bisa dipakai untuk semua fitur.
+        $token = $response->json('token');
+        $this->withToken($token)->getJson('/api/assets')->assertOk();
+        $this->withToken($token)->getJson('/api/accounts')->assertOk();
+
+        // Login berikutnya tetap dengan NIK selama belum diganti.
+        $this->login(self::SHD_NIK, self::SHD_NIK)->assertOk();
     }
 
     public function test_wrong_password_birth_date_or_unknown_nik_is_rejected_without_creating_account(): void
@@ -119,33 +129,23 @@ class EmployeeLoginTest extends TestCase
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
-    public function test_must_change_password_blocks_other_endpoints_until_changed(): void
+    public function test_optional_password_change_replaces_nik(): void
     {
         $token = $this->login(self::SHD_NIK, self::SHD_NIK)->json('token');
 
-        $this->withToken($token)->getJson('/api/assets')->assertForbidden()->assertJsonPath('code', 'password_change_required');
-        $this->withToken($token)->getJson('/api/employees?search=andi')->assertForbidden();
-        $this->withToken($token)->getJson('/api/accounts')->assertForbidden()->assertJsonPath('code', 'password_change_required');
-        $this->withToken($token)->getJson('/api/user')->assertOk()->assertJsonPath('must_change_password', true);
-
-        // Password lama = NIK.
         $this->withToken($token)->putJson('/api/user/password', [
             'current_password' => self::SHD_NIK,
             'password' => self::NEW_PASSWORD,
             'password_confirmation' => self::NEW_PASSWORD,
-        ])->assertOk()->assertJsonPath('must_change_password', false);
+        ])->assertOk();
 
-        $this->app['auth']->forgetGuards();
-        $this->withToken($token)->getJson('/api/assets')->assertOk();
-
-        // Setelah ganti: password baru berlaku, NIK tidak lagi.
-        $this->login(self::SHD_NIK, self::NEW_PASSWORD)->assertOk()->assertJsonPath('user.must_change_password', false);
+        $this->login(self::SHD_NIK, self::NEW_PASSWORD)->assertOk();
         $this->login(self::SHD_NIK, self::SHD_NIK)->assertUnauthorized();
     }
 
     public function test_new_password_rules(): void
     {
-        $user = User::factory()->employee(self::SHD_NIK)->create(['must_change_password' => true]);
+        $user = User::factory()->employee(self::SHD_NIK)->create(['password' => self::SHD_NIK]);
         $this->actingAs($user);
 
         $change = fn (string $password, ?string $confirmation = null, string $current = self::SHD_NIK) => $this->putJson('/api/user/password', [
@@ -162,9 +162,9 @@ class EmployeeLoginTest extends TestCase
         $change(self::NEW_PASSWORD)->assertOk();
     }
 
-    public function test_forced_change_does_not_need_directory(): void
+    public function test_password_change_does_not_need_directory(): void
     {
-        $this->actingAs(User::factory()->employee(self::SHD_NIK)->create(['must_change_password' => true]));
+        $this->actingAs(User::factory()->employee(self::SHD_NIK)->create(['password' => self::SHD_NIK]));
         $this->directoryDown();
 
         $this->putJson('/api/user/password', [
@@ -223,14 +223,15 @@ class EmployeeLoginTest extends TestCase
         $this->assertMatchesRegularExpression('/WARNING: login\.directory_unavailable .*"user_id":'.$user->id.'/', $this->logged());
     }
 
-    public function test_directory_down_rejects_first_login_and_reset_accounts_but_not_manual_accounts(): void
+    public function test_directory_down_rejects_first_login_but_not_existing_or_manual_accounts(): void
     {
-        User::factory()->employee('90100002')->create(['must_change_password' => true]);
+        // Akun yang sudah ada (termasuk yang masih memakai NIK, mis. setelah reset) memakai password tersimpan.
+        User::factory()->employee('90100002')->create(['password' => '90100002']);
         User::factory()->create(['username' => 'bersama.shd', 'password' => 'Bersama-Uji-1']);
         $this->directoryDown();
 
         $this->login(self::SHD_NIK, self::SHD_NIK)->assertStatus(503)->assertJsonPath('message', AuthService::MSG_DIRECTORY_DOWN);
-        $this->login('90100002', '90100002')->assertStatus(503);
+        $this->login('90100002', '90100002')->assertOk();
         $this->login('bersama.shd', 'Bersama-Uji-1')->assertOk();
         $this->assertDatabaseMissing('users', ['nik' => self::SHD_NIK]);
     }

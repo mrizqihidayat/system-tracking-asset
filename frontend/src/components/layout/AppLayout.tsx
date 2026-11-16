@@ -115,7 +115,7 @@ export default function AppLayout() {
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-semibold">{user?.name ?? '-'}</p>
               <p className="truncate text-xs text-[#b5cadb]">
-                {user ? `${user.source === 'api' ? 'NIK' : 'Akun bersama'} ${loginId(user)}` : 'Admin Aset SHD'}
+                {user ? (user.source === 'api' ? loginId(user) : `Akun bersama ${loginId(user)}`) : 'Admin Aset SHD'}
               </p>
             </div>
           </div>

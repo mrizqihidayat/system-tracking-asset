@@ -11,7 +11,6 @@ export interface AuthUser {
   username: string | null
   department: string | null
   source: 'api' | 'manual'
-  must_change_password: boolean
 }
 
 /** NIK untuk akun pegawai, username untuk akun bersama. */

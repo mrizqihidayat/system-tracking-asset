@@ -8,7 +8,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Kelola akun hanya untuk akun pegawai SHD (source api); akun bersama ditolak 403 (SPEC §15).
- * Wajib ganti password sudah ditolak lebih dulu oleh EnsurePasswordChanged.
  */
 class EnsureEmployeeAccount
 {

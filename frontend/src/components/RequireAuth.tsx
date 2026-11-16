@@ -2,7 +2,7 @@ import axios from 'axios'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { api } from '../lib/api'
-import { getToken, getUser, isVerified, markVerified, setUser, type AuthUser } from '../lib/auth'
+import { getToken, isVerified, markVerified, setUser, type AuthUser } from '../lib/auth'
 
 export default function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -39,10 +39,6 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Memuat…</div>
     )
-  }
-  // Akun wajib ganti password: halaman lain tertutup sampai password diganti (SPEC §15).
-  if (getUser()?.must_change_password && location.pathname !== '/ganti-password') {
-    return <Navigate to={`/ganti-password?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
   }
   return <>{children}</>
 }

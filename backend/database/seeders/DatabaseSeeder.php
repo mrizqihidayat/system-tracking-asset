@@ -19,7 +19,6 @@ class DatabaseSeeder extends Seeder
                 'department' => 'SHD',
                 'source' => User::SOURCE_MANUAL,
                 'password' => Hash::make('inalum2026'),
-                'must_change_password' => false,
             ]
         );
 

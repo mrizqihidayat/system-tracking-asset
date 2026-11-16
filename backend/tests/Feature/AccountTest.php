@@ -51,12 +51,10 @@ class AccountTest extends TestCase
         $this->postJson('/api/accounts', $this->payload(['username' => ' Bersama.HRM ']))->assertCreated()
             ->assertJsonPath('data.username', 'bersama.hrm')
             ->assertJsonPath('data.source', 'manual')
-            ->assertJsonPath('data.must_change_password', false)
             ->assertJsonMissingPath('data.password');
 
         $this->app['auth']->forgetGuards();
         $this->postJson('/api/login', ['username' => 'bersama.hrm', 'password' => 'Bersama-Uji-1'])->assertOk()
-            ->assertJsonPath('user.must_change_password', false)
             ->assertJsonPath('user.department', 'HRM');
     }
 
@@ -94,7 +92,7 @@ class AccountTest extends TestCase
         $shared->createToken('web');
 
         $this->putJson("/api/accounts/{$shared->id}/password", ['password' => 'Baru-Uji-2026', 'password_confirmation' => 'Baru-Uji-2026'])
-            ->assertOk()->assertJsonPath('data.must_change_password', false);
+            ->assertOk();
 
         $this->assertSame(0, $shared->tokens()->count());
         $this->app['auth']->forgetGuards();
@@ -111,17 +109,17 @@ class AccountTest extends TestCase
         $this->postJson("/api/accounts/{$shared->id}/reset")->assertUnprocessable()->assertJsonValidationErrors('account');
     }
 
-    public function test_reset_api_account_returns_to_nik_login_and_forces_change(): void
+    public function test_reset_api_account_returns_password_to_nik(): void
     {
         $employee = User::factory()->employee('90100002')->create(['password' => 'Lama-Uji-2026']);
         $employee->createToken('web');
 
-        $this->postJson("/api/accounts/{$employee->id}/reset")->assertOk()->assertJsonPath('data.must_change_password', true);
+        $this->postJson("/api/accounts/{$employee->id}/reset")->assertOk();
         $this->assertSame(0, $employee->tokens()->count());
 
         $this->app['auth']->forgetGuards();
         $this->postJson('/api/login', ['username' => '90100002', 'password' => 'Lama-Uji-2026'])->assertUnauthorized();
-        $this->postJson('/api/login', ['username' => '90100002', 'password' => '90100002'])->assertOk()->assertJsonPath('user.must_change_password', true);
+        $this->postJson('/api/login', ['username' => '90100002', 'password' => '90100002'])->assertOk();
     }
 
     public function test_deactivate_and_restore_account(): void
