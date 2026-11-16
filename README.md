@@ -27,5 +27,13 @@ Tanpa langkah ini pegawai SHD belum bisa login dengan NIK untuk pertama kali (se
   `* * * * * cd /path/ke/backend && php artisan schedule:run >> /dev/null 2>&1`
 - Checklist keamanan sebelum go-live: `docs/security-review.md`.
 
+### Deploy uji coba di Vercel (container, T38)
+- Di Vercel, atur **Root Directory = `backend`**. File: `Dockerfile.vercel`, `Caddyfile`, `vercel.json` (region `sin1`, cron).
+- Build lokal: `cd backend && docker build -f Dockerfile.vercel -t asset-backend .`, lalu `docker run -p 8080:80 -e APP_KEY=... asset-backend` (uji `http://localhost:8080/up`).
+- Isi env di Vercel (bukan di image): `APP_KEY`, `DB_*`, `AWS_*` (upload ke Supabase Storage, `ASSET_DISK=s3`), `APP_URL`, `FRONTEND_URL`, `TRUSTED_PROXIES`, `CRON_SECRET`, `EMPLOYEE_API_URL`, `EMPLOYEE_API_KEY`. Daftar lengkap ada di blok T38 pada `backend/.env.example`.
+- Jalankan `php artisan migrate --force` sebagai langkah terpisah (jangan saat container start).
+- Uji coba memakai API pegawai tiruan: `EMPLOYEE_MOCK_ENABLED=true` dan `EMPLOYEE_API_URL=https://<domain>/api/mock/employees`. API pegawai asli hanya bisa diakses dari jaringan INALUM; untuk produksi perlu server internal atau mekanisme push. Hapus API tiruan saat produksi.
+- Batas file aset 4 MB (batas body Vercel 4,5 MB); foto dikecilkan otomatis di browser.
+
 ## Perintah
 Lihat bagian "Perintah" di `CLAUDE.md`.

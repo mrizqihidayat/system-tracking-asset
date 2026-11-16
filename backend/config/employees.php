@@ -19,6 +19,12 @@ return [
     // Hanya pegawai departemen ini (kode, kolom departemen di API) yang bisa login dengan NIK.
     'shd_department' => env('EMPLOYEE_SHD_DEPARTMENT', 'SHD'),
 
+    // Vercel Cron (T38): GET /api/internal/cron/employees-sync dengan `Authorization: Bearer {CRON_SECRET}`. Kosong = endpoint mati.
+    'cron_secret' => env('CRON_SECRET'),
+
+    // API pegawai tiruan di aplikasi ini (GET /api/mock/employees), hanya untuk uji coba. Hapus saat produksi.
+    'mock_enabled' => (bool) env('EMPLOYEE_MOCK_ENABLED', false),
+
     // Jadwal sinkronisasi harian (zona waktu WIB).
     'sync_time' => env('EMPLOYEE_SYNC_TIME', '02:00'),
     'sync_timezone' => 'Asia/Jakarta',

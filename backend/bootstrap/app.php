@@ -26,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (PostTooLargeException $e, Request $request) {
             if ($request->is('api/*')) {
-                return response()->json(['message' => 'Ukuran file maksimal 5 MB.'], 413);
+                return response()->json(['message' => 'Ukuran file maksimal 4 MB.'], 413);
             }
         });
 

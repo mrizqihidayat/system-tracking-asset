@@ -252,15 +252,15 @@ class AssetFileTest extends TestCase
         $this->assertSame(0, $this->asset->files()->count());
     }
 
-    public function test_file_over_5_mb_returns_413_and_keeps_existing_file(): void
+    public function test_file_over_4_mb_returns_413_and_keeps_existing_file(): void
     {
         $id = $this->upload('Foto Aset')->json('data.id');
 
-        $this->upload('Foto Aset', UploadedFile::fake()->create('besar.pdf', 5121, 'application/pdf'))
+        $this->upload('Foto Aset', UploadedFile::fake()->create('besar.pdf', 4097, 'application/pdf'))
             ->assertStatus(413)
-            ->assertJsonPath('message', 'Ukuran file maksimal 5 MB.');
+            ->assertJsonPath('message', 'Ukuran file maksimal 4 MB.');
 
-        $this->upload('Foto Aset', UploadedFile::fake()->create('pas.pdf', 5120, 'application/pdf'))->assertCreated();
+        $this->upload('Foto Aset', UploadedFile::fake()->create('pas.pdf', 4096, 'application/pdf'))->assertCreated();
 
         $this->assertDatabaseMissing('asset_files', ['id' => $id]);
         $this->assertSame(1, $this->asset->files()->where('file_type', 'Foto Aset')->count());

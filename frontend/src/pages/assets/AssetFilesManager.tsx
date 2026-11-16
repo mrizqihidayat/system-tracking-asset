@@ -6,13 +6,13 @@ import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { openInNewTab } from '../../lib/blob'
 import { formatSize } from '../../lib/format'
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL, compressImage } from '../../lib/image'
 import { queryKeys } from '../../lib/queries/keys'
 import { useAssetFiles } from '../../lib/queries/lists'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { Skeleton } from '../../components/ui/Skeleton'
 import type { AssetFile, FileType } from '../../types/asset'
 
-const MAX_BYTES = 5 * 1024 * 1024
 const ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf'
 
 const SLOTS: { type: FileType; label: string }[] = [
@@ -38,14 +38,19 @@ export default function AssetFilesManager({ assetId }: { assetId: number }) {
 
   const upload = async (type: FileType, file: File | undefined, key: string) => {
     if (!file) return
-    if (file.size > MAX_BYTES) return toast.error('Ukuran file maksimal 5 MB.')
     if (!ACCEPT.split(',').includes(file.type)) return toast.error('Tipe file harus JPG, PNG, WebP, atau PDF.')
 
-    const body = new FormData()
-    body.append('file_type', type)
-    body.append('file', file)
     setBusy(key)
     try {
+      // Foto dikecilkan dulu agar muat di batas server; PDF tidak diubah.
+      const ready = await compressImage(file)
+      if (ready.size > MAX_UPLOAD_BYTES) {
+        toast.error(`Ukuran file maksimal ${MAX_UPLOAD_LABEL}.`)
+        return
+      }
+      const body = new FormData()
+      body.append('file_type', type)
+      body.append('file', ready)
       const res = await api.post<{ meta?: { replaced?: boolean } }>(`/assets/${assetId}/files`, body)
       toast.success(res.data.meta?.replaced ? 'File diganti.' : 'File diunggah.')
       await load()
@@ -97,7 +102,7 @@ export default function AssetFilesManager({ assetId }: { assetId: number }) {
       <div>
         <h2 className="font-semibold">Foto &amp; dokumen</h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Perubahan file langsung tersimpan. JPG, PNG, WebP, atau PDF, maksimal 5 MB per file.
+          Perubahan file langsung tersimpan. JPG, PNG, WebP, atau PDF, maksimal {MAX_UPLOAD_LABEL} per file (foto dikecilkan otomatis).
         </p>
       </div>
       {loading ? (

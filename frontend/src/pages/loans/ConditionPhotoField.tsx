@@ -1,8 +1,8 @@
 import { Camera, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FormField } from '../../components/ui/FormField'
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL, compressImage } from '../../lib/image'
 
-const MAX_BYTES = 5 * 1024 * 1024
 const ACCEPT = 'image/jpeg,image/png,image/webp'
 
 interface Props {
@@ -27,12 +27,14 @@ export default function ConditionPhotoField({ file, onChange, required, error }:
     if (preview) URL.revokeObjectURL(preview)
   }, [preview])
 
-  const pick = (picked: File | undefined) => {
+  const pick = async (picked: File | undefined) => {
     if (!picked) return
     if (!ACCEPT.split(',').includes(picked.type)) return setLocalError('Foto harus berupa JPG, PNG, atau WebP.')
-    if (picked.size > MAX_BYTES) return setLocalError('Ukuran foto maksimal 5 MB.')
+    // Foto kamera HP bisa 5-10 MB: dikecilkan dulu agar muat di batas server.
+    const ready = await compressImage(picked)
+    if (ready.size > MAX_UPLOAD_BYTES) return setLocalError(`Ukuran foto maksimal ${MAX_UPLOAD_LABEL}.`)
     setLocalError('')
-    onChange(picked)
+    onChange(ready)
   }
 
   const shownError = localError || error
@@ -82,7 +84,7 @@ export default function ConditionPhotoField({ file, onChange, required, error }:
             <Camera size={16} aria-hidden /> Ambil atau pilih foto
           </button>
         )}
-        {!shownError && <p className="mt-1.5 text-xs text-slate-500">JPG, PNG, atau WebP, maksimal 5 MB.</p>}
+        {!shownError && <p className="mt-1.5 text-xs text-slate-500">JPG, PNG, atau WebP, maksimal {MAX_UPLOAD_LABEL} (dikecilkan otomatis).</p>}
       </div>
     </FormField>
   )

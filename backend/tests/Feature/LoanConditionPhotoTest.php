@@ -166,7 +166,7 @@ class LoanConditionPhotoTest extends TestCase
             ->assertJsonValidationErrors(['condition_photo' => 'Foto harus berupa JPG, PNG, atau WebP.']);
         $this->giveBack($loan, $data, UploadedFile::fake()->create('kondisi.jpg', 6 * 1024, 'image/jpeg'))
             ->assertStatus(413)
-            ->assertJsonPath('message', 'Ukuran file maksimal 5 MB.');
+            ->assertJsonPath('message', 'Ukuran file maksimal 4 MB.');
 
         $this->assertSame('Dipinjam', $loan->fresh()->status->value);
         $this->assertDatabaseCount('asset_files', 0);

@@ -64,7 +64,7 @@ Di balik reverse proxy, batas per IP hanya benar jika `TRUSTED_PROXIES` diisi. T
 
 | Input | Aturan | Jika dilanggar |
 |---|---|---|
-| `condition_photo` pada terima kembali | File JPG/PNG/WebP, maks. 5 MB; wajib jika Rusak Ringan/Rusak Berat; dilarang jika hilang | 422 (413 jika terlalu besar) |
+| `condition_photo` pada terima kembali | File JPG/PNG/WebP, maks. 4 MB; wajib jika Rusak Ringan/Rusak Berat; dilarang jika hilang | 422 (413 jika terlalu besar) |
 | `username` pada login (isian berlabel "Username", diisi NIK atau username; angka saja = NIK) | Teks UTF-8 tanpa karakter NUL, maks. 50 karakter | 422 |
 | `search` pada `/api/employees` | Wajib, 2–100 karakter | 422 |
 | Password baru (`/api/user/password`, `/api/accounts`) | 8–72 karakter, dikonfirmasi, tidak sama dengan NIK/username | 422 |

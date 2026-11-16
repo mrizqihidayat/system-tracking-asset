@@ -12,7 +12,8 @@ use Illuminate\Validation\Rule;
 
 class StoreAssetFileRequest extends FormRequest
 {
-    public const MAX_BYTES = 5 * 1024 * 1024;
+    // 4 MB: batas body request Vercel 4,5 MB (T38). Frontend mengompres foto sebelum unggah.
+    public const MAX_BYTES = 4 * 1024 * 1024;
 
     private const MAX_NAME_LENGTH = 255;
 
@@ -42,7 +43,7 @@ class StoreAssetFileRequest extends FormRequest
             || ($file->isValid() && $file->getSize() > self::MAX_BYTES);
 
         if ($tooLarge) {
-            throw new HttpResponseException(response()->json(['message' => 'Ukuran file maksimal 5 MB.'], 413));
+            throw new HttpResponseException(response()->json(['message' => 'Ukuran file maksimal 4 MB.'], 413));
         }
     }
 

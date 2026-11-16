@@ -14,11 +14,13 @@ use App\Http\Controllers\BuildingController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ConsumableCategoryController;
 use App\Http\Controllers\ConsumableController;
+use App\Http\Controllers\CronController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LookupController;
+use App\Http\Controllers\MockEmployeeApiController;
 use App\Http\Controllers\PublicAssetController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RequestCatalogController;
@@ -29,6 +31,11 @@ use App\Http\Controllers\SupplyRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+// Uji coba di Vercel (T38): sinkronisasi pegawai via Vercel Cron (dijaga CRON_SECRET) dan API pegawai tiruan (dijaga
+// EMPLOYEE_MOCK_ENABLED + API key). Keduanya 404 bila env-nya kosong.
+Route::get('/internal/cron/employees-sync', [CronController::class, 'employeesSync']);
+Route::get('/mock/employees', MockEmployeeApiController::class);
 
 // Halaman publik QR: tanpa auth, read-only, rate limit per IP (SPEC §6)
 Route::get('/public/assets/{token}', [PublicAssetController::class, 'show'])->middleware('throttle:public-assets');

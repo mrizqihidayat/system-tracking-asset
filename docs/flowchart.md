@@ -68,7 +68,7 @@ flowchart TD
     S -- Tidak Layak Pakai --> S5[Pindah lokasi]
     S1 & S2 & S3 & S4 & S5 --> AK{Pilih aksi; Ubah data & Hapus aset selalu ada}
     AK -- Lihat file / label QR --> V1[(Ambil file atau PDF label, buka di tab baru)] --> D1
-    AK -- Ubah data --> E1[Form ubah tanpa kondisi & status; kelola foto & dokumen JPG/PNG/WebP/PDF maks. 5 MB]
+    AK -- Ubah data --> E1[Form ubah tanpa kondisi & status; kelola foto & dokumen JPG/PNG/WebP/PDF maks. 4 MB]
     E1 --> E0{Jenis diganti?}
     E0 -- Ya --> E2[Peringatan kode berganti, pratinjau code-preview] --> E4[(Kode baru dari jenis baru, kode lama tetap bisa dicari, riwayat Ubah Data)] --> D1
     E0 -- Tidak --> E5[(Simpan, riwayat Ubah Data / Pindah Lokasi)] --> D1

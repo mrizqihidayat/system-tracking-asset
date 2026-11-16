@@ -19,6 +19,9 @@ class ApiAccessTest extends TestCase
     private const PUBLIC_ROUTES = [
         'POST api/login',
         'GET api/public/assets/{token}',
+        // T38: dijaga CRON_SECRET / EMPLOYEE_MOCK_ENABLED + API key (lihat CronEmployeesSyncTest), 404 bila env kosong.
+        'GET api/internal/cron/employees-sync',
+        'GET api/mock/employees',
     ];
 
     /**

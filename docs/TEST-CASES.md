@@ -12,7 +12,7 @@ Cara pakai: kerjakan berurutan dari atas (beberapa test memakai data dari test s
 - Frontend: `cd frontend && npm run dev` → http://localhost:5173
 - Data demo bersih (opsional, menghapus semua data): jalankan sendiri `php artisan migrate:fresh --seed`.
 - Akun demo: username `staf1`, password `inalum2026`.
-- Siapkan: 1 file JPG/PNG < 5 MB, 1 file PDF < 5 MB, 1 file > 5 MB, webcam (untuk scan QR).
+- Siapkan: 1 file JPG/PNG < 4 MB, 1 file PDF < 4 MB, 1 file > 4 MB, webcam (untuk scan QR).
 - Nama ruangan di bawah memakai data demo (Ruang Kelas 1, Ruang Kelas 2, Gudang IHS, dst.). Jika nama di database kamu sudah diganti (mis. Ruang Akasia), pakai ruangan yang setara.
 
 Konvensi: **Langkah** → **Hasil yang diharapkan**.
@@ -77,7 +77,7 @@ Konvensi: **Langkah** → **Hasil yang diharapkan**.
 - [ ] **TC-AST-12 Unggah foto & PDF** — Di detail aset unggah Foto Aset (JPG) dan BAST (PDF) → Tampil; bisa dibuka/diunduh.
 - [ ] **TC-AST-13 Slot tunggal diganti** — Unggah Foto Aset lagi → Foto lama diganti (bukan bertambah).
 - [ ] **TC-AST-14 Lainnya menumpuk** — Unggah 2 file jenis Lainnya → Keduanya tampil dengan nama asli.
-- [ ] **TC-AST-15 File terlalu besar** — Unggah file > 5 MB → Ditolak "Ukuran file maksimal 5 MB."
+- [ ] **TC-AST-15 File terlalu besar** — Unggah file > 4 MB → Ditolak "Ukuran file maksimal 4 MB."
 - [ ] **TC-AST-16 Hapus file** — Hapus satu file → Hilang dari daftar; riwayat aset tidak bertambah.
 
 ### Aksi status
