@@ -698,4 +698,47 @@ class SupplyRequestTest extends TestCase
 
         $this->assertDatabaseCount('supply_requests', 0);
     }
+
+    public function test_partial_receipt_is_not_open_and_the_item_returns_to_suggestions_when_stock_is_still_low(): void
+    {
+        $spidol = Consumable::factory()->create(['name' => 'Spidol', 'quantity' => 0, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
+        $request = SupplyRequest::findOrFail($this->postJson('/api/supply-requests', $this->stockRequestPayload($spidol, ['quantity' => 10]))->assertCreated()->json('data.id'));
+
+        // Diajukan = terbuka: barang ditandai sudah diminta.
+        $this->getJson('/api/supply-requests/suggestions')->assertOk()->assertJsonPath('data.0.items.0.has_open_request', true);
+
+        $this->patchJson("/api/supply-requests/{$request->id}/status", ['status' => 'Diterima', 'received_quantity' => 4])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Diterima sebagian');
+
+        // Selesai (bukan terbuka): stok baru 4 (di bawah minimum 10), jadi barang muncul lagi untuk diminta ulang.
+        $this->getJson('/api/supply-requests/suggestions')->assertOk()
+            ->assertJsonPath('data.0.items.0.consumable_id', $spidol->id)
+            ->assertJsonPath('data.0.items.0.has_open_request', false)
+            ->assertJsonPath('data.0.items.0.quantity', 6)
+            ->assertJsonPath('data.0.items.0.stock_status', 'Menipis');
+    }
+
+    public function test_partial_receipt_does_not_return_to_suggestions_when_stock_is_enough_after_receiving(): void
+    {
+        $map = Consumable::factory()->create(['name' => 'Map', 'quantity' => 6, 'min_quantity' => 10, 'provider_department_id' => $this->deptA->id]);
+        $request = SupplyRequest::findOrFail($this->postJson('/api/supply-requests', $this->stockRequestPayload($map, ['quantity' => 8]))->assertCreated()->json('data.id'));
+
+        $this->patchJson("/api/supply-requests/{$request->id}/status", ['status' => 'Diterima', 'received_quantity' => 5])->assertOk();
+
+        // Stok 6 + 5 = 11 (di atas minimum 10): tidak perlu diminta lagi.
+        $this->getJson('/api/supply-requests/suggestions')->assertOk()->assertExactJson(['data' => []]);
+    }
+
+    public function test_partial_receipt_counts_as_finished_not_open_in_status_counts(): void
+    {
+        $this->supplyRequest(['status' => RequestStatus::DiterimaSebagian, 'received_quantity' => 4, 'quantity' => 8]);
+        $this->supplyRequest(['status' => RequestStatus::Diajukan]);
+
+        $counts = $this->getJson('/api/supply-requests')->assertOk()->json('meta.status_counts');
+
+        $this->assertSame(1, $counts['Diterima sebagian']);
+        $this->assertSame(1, $counts['Diajukan']);
+        $this->getJson('/api/supply-requests?display_status=Diajukan')->assertOk()->assertJsonCount(1, 'data');
+    }
 }

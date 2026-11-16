@@ -6,7 +6,7 @@ const tone = {
   blue: 'bg-info-50 text-info-700',
   amber: 'bg-warn-50 text-warn-700',
   red: 'bg-bad-50 text-bad-700',
-  purple: 'bg-plum-50 text-plum-700',
+  teal: 'bg-teal-50 text-teal-700',
   slate: 'bg-slate-100 text-slate-600',
 }
 

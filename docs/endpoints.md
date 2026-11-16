@@ -2,7 +2,7 @@
 
 Daftar seluruh endpoint backend dan pemakaiannya di frontend web. Parameter dan bentuk respons ada di `docs/SPEC.md` §14.
 
-Disusun pada 4 November 2026 (diperbarui 17 November 2026, T34) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
+Disusun pada 4 November 2026 (diperbarui 17 November 2026, T37) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
 
 ## Ringkasan
 
@@ -247,7 +247,7 @@ Departemen dibentuk dari API pegawai (`php artisan employees:sync`), jadi tidak 
 | GET | `/api/supply-requests/suggestions` | Saran permintaan dari stok Menipis/Habis per departemen penyedia | Token | Ya: Permintaan (`lib/queries/lists.ts`) |
 | PUT | `/api/supply-requests/{id}` | Ubah permintaan yang masih Diajukan | Token | Ya: Form permintaan (`pages/requests/RequestFormModal.tsx`) |
 | GET | `/api/supply-requests/{id}/status-impact` | Dampak perubahan status ke stok dan ruangan | Token | Ya: Popup status (`lib/queries/lists.ts`) |
-| PATCH | `/api/supply-requests/{id}/status` | Ubah status permintaan | Token | Ya: Popup status (`pages/requests/RequestsPage.tsx`) |
+| PATCH | `/api/supply-requests/{id}/status` | Ubah status permintaan (Diterima sebagian = selesai: hanya bisa Dikembalikan bila perlu dikembalikan) | Token | Ya: Popup status (`pages/requests/RequestsPage.tsx`) |
 
 ### Stok habis pakai
 

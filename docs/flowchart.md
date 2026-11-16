@@ -222,11 +222,14 @@ flowchart TD
     P2 --> P3[(Simpan status Diajukan; snapshot lead time & pengembalian)] --> B
     C -- Aksi baris riwayat --> U0{Status permintaan}
     U0 -- Dikembalikan / Dibatalkan --> U3[Tanpa aksi] --> B
-    U0 -- Diajukan / Diterima sebagian --> U1{Aksi}
-    U1 -- Catat barang diterima --> M1[Isi jumlah yang datang, popup dampak] --> I1[(Barang Masuk ke stok gudang; kurang dari sisa = Diterima sebagian; ruangan diisi lewat Isi dari stok)] --> B
-    U1 -- Batalkan / Batalkan sisa --> I2[(Dibatalkan; stok yang sudah masuk tetap)] --> B
+    U0 -- Diajukan, termasuk Belum direspons: terbuka --> U1{Aksi}
+    U1 -- Catat barang diterima --> M1[Isi jumlah yang datang, popup dampak] --> I1[(Barang Masuk ke stok gudang sebanyak yang diterima; kurang dari yang diminta = Diterima sebagian, selesai; ruangan diisi lewat Isi dari stok)] --> B
+    U1 -- Tandai Dibatalkan --> I2[(Dibatalkan)] --> B
     U0 -- Diterima --> U2{Aksi}
     U2 -- Tandai Dikembalikan / Dibatalkan --> M3[Popup dampak] --> I3[(Koreksi mengurangi stok, minimal 0)] --> B
+    U0 -- Diterima sebagian: selesai --> U4{Perlu dikembalikan?}
+    U4 -- Ya --> U5[Tandai Dikembalikan, popup dampak] --> I4[(Koreksi mengurangi stok sejumlah yang diterima, minimal 0)] --> B
+    U4 -- Tidak --> U6[Final: tanpa aksi; sisa diajukan ulang lewat Saran permintaan] --> B
     C -- Ekspor Excel --> X1[(Laporan Permintaan .xlsx)] --> B
     C -- Pindah menu --> Z([Selesai])
 ```

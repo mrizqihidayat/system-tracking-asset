@@ -259,7 +259,7 @@ class StockTransactionTest extends TestCase
         return $this->patchJson("/api/supply-requests/{$request->id}/status", ['status' => 'Diterima', 'received_quantity' => $quantity]);
     }
 
-    public function test_partial_receipt_until_full(): void
+    public function test_partial_receipt_is_final_and_adds_only_the_received_quantity(): void
     {
         $item = $this->createItem(1);
         $request = $this->stockRequest($item);
@@ -271,6 +271,7 @@ class StockTransactionTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'Diterima sebagian')
             ->assertJsonPath('data.received_quantity', 4);
+        // Stok bertambah sebanyak yang benar-benar diterima (4), bukan yang diajukan (10).
         $this->assertSame(5, $item->fresh()->quantity);
 
         $this->getJson("/api/consumables/{$item->id}/transactions")
@@ -278,21 +279,31 @@ class StockTransactionTest extends TestCase
             ->assertJsonPath('data.0.quantity', 4)
             ->assertJsonPath('data.0.supply_request_id', $request->id);
 
-        // Masih terbuka: tautan di stok tetap ke permintaan ini.
-        $this->getJson("/api/consumables/{$item->id}")->assertJsonPath('data.open_request.id', $request->id);
+        // Diterima sebagian sudah selesai: bukan permintaan terbuka lagi.
+        $this->getJson("/api/consumables/{$item->id}")->assertJsonPath('data.open_request', null);
 
-        $this->receive($request, 7)
+        // Final: sisa tidak bisa diterima lagi dan tidak bisa dibatalkan.
+        $this->receive($request, 2)->assertUnprocessable()->assertJsonValidationErrors('status');
+        $this->receive($request)->assertUnprocessable()->assertJsonValidationErrors('status');
+        $this->patchJson("/api/supply-requests/{$request->id}/status", ['status' => 'Dibatalkan'])->assertUnprocessable()->assertJsonValidationErrors('status');
+        $this->assertSame(5, $item->fresh()->quantity);
+        $this->assertSame(4, $request->fresh()->received_quantity);
+        $this->assertBalanced($item);
+    }
+
+    public function test_received_quantity_cannot_exceed_the_requested_quantity(): void
+    {
+        $item = $this->createItem(1);
+        $request = $this->stockRequest($item);
+
+        $this->receive($request, 11)
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['received_quantity' => 'Jumlah diterima melebihi sisa permintaan (6).']);
+            ->assertJsonValidationErrors(['received_quantity' => 'Jumlah diterima melebihi sisa permintaan (10).']);
 
-        $this->receive($request, 2)->assertOk()->assertJsonPath('data.status', 'Diterima sebagian')->assertJsonPath('data.received_quantity', 6);
-
-        // Tanpa jumlah = semua sisa.
+        // Tanpa jumlah = semua yang diminta, jadi Diterima penuh.
         $this->receive($request)->assertOk()->assertJsonPath('data.status', 'Diterima')->assertJsonPath('data.received_quantity', 10);
         $this->assertSame(11, $item->fresh()->quantity);
         $this->assertBalanced($item);
-
-        $this->receive($request, 1)->assertJsonValidationErrors('status');
     }
 
     public function test_partial_status_cannot_be_chosen_directly_and_quantity_only_for_received(): void
@@ -304,21 +315,35 @@ class StockTransactionTest extends TestCase
         $this->receive($request, 0)->assertJsonValidationErrors('received_quantity');
     }
 
-    public function test_cancelling_partial_receipt_closes_remainder_and_keeps_stock(): void
+    public function test_partial_receipt_can_only_be_returned_and_only_when_must_return(): void
     {
         $item = $this->createItem(1);
-        $request = $this->stockRequest($item);
-        $this->receive($request, 3)->assertOk();
+        $notReturnable = $this->stockRequest($item, 5, ['must_return' => false]);
+        $this->receive($notReturnable, 3)->assertOk()->assertJsonPath('data.status', 'Diterima sebagian');
 
-        $this->getJson("/api/supply-requests/{$request->id}/status-impact?status=Dibatalkan")
-            ->assertJsonPath('data.message', 'Sisa permintaan dibatalkan. Stok yang sudah masuk (3) tetap.');
+        // Tidak perlu dikembalikan: status ini final (tanpa Dikembalikan maupun Dibatalkan).
+        $this->patchJson("/api/supply-requests/{$notReturnable->id}/status", ['status' => 'Dikembalikan'])
+            ->assertUnprocessable()->assertJsonValidationErrors(['status' => 'Barang ini tidak perlu dikembalikan.']);
+        $this->patchJson("/api/supply-requests/{$notReturnable->id}/status", ['status' => 'Dibatalkan'])->assertUnprocessable();
+        $this->assertSame(4, $item->fresh()->quantity);
 
-        $this->patchJson("/api/supply-requests/{$request->id}/status", ['status' => 'Dibatalkan'])
+        $returnable = $this->stockRequest($item, 8, ['must_return' => true]);
+        $this->receive($returnable, 4)->assertOk()->assertJsonPath('data.status', 'Diterima sebagian');
+        $this->assertSame(8, $item->fresh()->quantity);
+
+        // Dikembalikan mengurangi stok sejumlah yang sudah diterima (4), bukan yang diajukan (8).
+        $this->getJson("/api/supply-requests/{$returnable->id}/status-impact?status=Dikembalikan")
+            ->assertJsonPath('data.message', 'Stok Pulpen akan berkurang 4.');
+        $this->patchJson("/api/supply-requests/{$returnable->id}/status", ['status' => 'Dikembalikan'])
             ->assertOk()
-            ->assertJsonPath('data.status', 'Dibatalkan')
-            ->assertJsonPath('data.received_quantity', 3);
+            ->assertJsonPath('data.status', 'Dikembalikan')
+            ->assertJsonPath('data.received_quantity', 4);
 
         $this->assertSame(4, $item->fresh()->quantity);
+        $this->getJson("/api/consumables/{$item->id}/transactions")
+            ->assertJsonPath('data.0.type', 'Koreksi')
+            ->assertJsonPath('data.0.quantity', -4)
+            ->assertJsonPath('data.0.note', "Permintaan #{$returnable->id} Dikembalikan");
         $this->assertBalanced($item);
     }
 

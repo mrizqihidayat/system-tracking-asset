@@ -67,13 +67,13 @@ class Consumable extends Model
     }
 
     /**
-     * Permintaan yang masih terbuka (Diajukan / Diterima sebagian) terbaru untuk barang ini (tautan di daftar stok).
+     * Permintaan yang masih terbuka (Diajukan) terbaru untuk barang ini (tautan di daftar stok). Diterima sebagian sudah selesai.
      *
      * @return HasOne<SupplyRequest, $this>
      */
     public function openRequest(): HasOne
     {
-        return $this->hasOne(SupplyRequest::class)->ofMany(['id' => 'max'], fn ($query) => $query->whereIn('status', [RequestStatus::Diajukan->value, RequestStatus::DiterimaSebagian->value]));
+        return $this->hasOne(SupplyRequest::class)->ofMany(['id' => 'max'], fn ($query) => $query->where('status', RequestStatus::Diajukan->value));
     }
 
     /**

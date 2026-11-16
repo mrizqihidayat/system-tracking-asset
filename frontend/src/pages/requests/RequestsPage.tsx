@@ -34,7 +34,7 @@ const PREFILL_PARAMS = ['room_id', 'catalog_id', 'consumable_id']
 
 const statusColor = {
   Diajukan: 'blue',
-  'Diterima sebagian': 'purple',
+  'Diterima sebagian': 'teal',
   Diterima: 'green',
   'Belum direspons': 'amber',
   Dikembalikan: 'slate',
@@ -52,8 +52,10 @@ type ModalState =
 
 /** Status tujuan yang tersedia di menu aksi baris permintaan. */
 function nextStatuses(request: SupplyRequest): TargetStatus[] {
-  if (request.status === 'Diajukan' || request.status === 'Diterima sebagian') return ['Diterima', 'Dibatalkan']
+  // Terbuka: Diajukan. Selesai: Diterima sebagian hanya bisa Dikembalikan (bila perlu dikembalikan), selain itu final.
+  if (request.status === 'Diajukan') return ['Diterima', 'Dibatalkan']
   if (request.status === 'Diterima') return request.must_return ? ['Dikembalikan', 'Dibatalkan'] : ['Dibatalkan']
+  if (request.status === 'Diterima sebagian') return request.must_return ? ['Dikembalikan'] : []
   return []
 }
 
@@ -65,7 +67,7 @@ function StatusModal({ request, status, onClose, onDone }: {
 }) {
   const toast = useToast()
   const [note, setNote] = useState('')
-  // Barang stok: staf mengisi jumlah yang benar-benar datang; kurang dari sisa = Diterima sebagian.
+  // Barang stok: staf mengisi jumlah yang benar-benar datang; kurang dari yang diminta = Diterima sebagian (selesai).
   const receivesStock = status === 'Diterima' && request.consumable_id !== null
   const remaining = request.quantity - request.received_quantity
   const [received, setReceived] = useState(String(remaining))
@@ -80,7 +82,7 @@ function StatusModal({ request, status, onClose, onDone }: {
       note: note.trim() || null,
       ...(receivesStock ? { received_quantity: receivedValue } : {}),
     })
-    toast.success(receivesStock && receivedValue < remaining ? `Diterima sebagian, sisa ${remaining - receivedValue}.` : `Permintaan ditandai ${status}.`)
+    toast.success(receivesStock && receivedValue < remaining ? `Diterima sebagian: ${receivedValue} dari ${request.quantity}.` : `Permintaan ditandai ${status}.`)
     if (res.data.meta.impact.clamped) toast.error(res.data.meta.impact.message)
     onDone()
   }
@@ -97,7 +99,7 @@ function StatusModal({ request, status, onClose, onDone }: {
         <>
           <p className="text-sm text-slate-600">
             {request.item_name} × {request.quantity} dari {request.provider_department?.name ?? '-'}.
-            {request.received_quantity > 0 && ` Sudah diterima ${request.received_quantity}, sisa ${remaining}.`}
+            {request.received_quantity > 0 && ` Diterima ${request.received_quantity} dari ${request.quantity}.`}
           </p>
           {receivesStock ? (
             <>
@@ -107,7 +109,7 @@ function StatusModal({ request, status, onClose, onDone }: {
               {receivedValid && (
                 <p className="rounded-lg bg-slate-100 px-3 py-2.5 text-sm text-slate-700">
                   Stok {request.item_name} akan bertambah {receivedValue}.
-                  {receivedValue < remaining && ` Status menjadi Diterima sebagian, sisa ${remaining - receivedValue} bisa diterima kemudian.`}
+                  {receivedValue < remaining && ` Status menjadi Diterima sebagian (selesai): sisa ${remaining - receivedValue} tidak bisa diterima lagi, ajukan ulang lewat Saran permintaan.`}
                 </p>
               )}
             </>
@@ -293,12 +295,11 @@ export default function RequestsPage() {
       header: 'Jumlah',
       sortKey: 'quantity',
       cell: (r) =>
-        r.received_quantity > 0 && r.received_quantity < r.quantity ? (
-          <span className="inline-block min-w-16">
-            <span className="tabular-nums">{r.received_quantity} / {r.quantity}</span>
-            <span className="mt-1 block h-1 overflow-hidden rounded-full bg-slate-100" aria-hidden>
-              <span className="block h-full rounded-full bg-plum-700" style={{ width: `${(r.received_quantity / r.quantity) * 100}%` }} />
-            </span>
+        // Diterima sebagian = selesai (bukan proses berjalan): tampil "4 dari 8" + keterangan, tanpa bilah progres.
+        r.status === 'Diterima sebagian' ? (
+          <span className="whitespace-nowrap">
+            <span className="tabular-nums">{r.received_quantity} dari {r.quantity}</span>
+            <span className="block text-xs text-slate-500">diterima</span>
           </span>
         ) : (
           <span className="tabular-nums">{r.quantity}</span>
@@ -321,13 +322,7 @@ export default function RequestsPage() {
             { label: 'Tandai Dibatalkan', danger: true, onClick: () => setModal({ kind: 'status', request: r, status: 'Dibatalkan' }) },
           )
         }
-        if (r.status === 'Diterima sebagian') {
-          items.push(
-            { label: 'Catat barang diterima', onClick: () => setModal({ kind: 'status', request: r, status: 'Diterima' }) },
-            { label: 'Batalkan sisa', danger: true, onClick: () => setModal({ kind: 'status', request: r, status: 'Dibatalkan' }) },
-          )
-        }
-        if (r.status === 'Diterima' && r.must_return) {
+        if ((r.status === 'Diterima' || r.status === 'Diterima sebagian') && r.must_return) {
           items.push({ label: 'Tandai Dikembalikan', onClick: () => setModal({ kind: 'status', request: r, status: 'Dikembalikan' }) })
         }
         if (r.status === 'Diterima') {

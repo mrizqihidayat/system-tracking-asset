@@ -180,8 +180,8 @@ Konvensi: **Langkah** → **Hasil yang diharapkan**.
 - [ ] **TC-RQ-04 Penanda permintaan terbuka** — Setelah TC-RQ-03 → Di Stok tautan berganti "Diajukan · tanggal" yang membuka permintaan itu.
 - [ ] **TC-RQ-05 Pratinjau dampak status** — Menu aksi → Catat barang diterima → Popup menampilkan dampak, mis. "Stok … akan bertambah N".
 - [ ] **TC-RQ-06 Diterima penuh** — Terima semua jumlah → Status Diterima; stok bertambah lewat Barang Masuk (cek kartu stok).
-- [ ] **TC-RQ-07 Diterima sebagian** — Terima 3 dari 5 → Status Diterima sebagian ("diterima 3 dari 5"); bisa diterima lagi untuk sisanya.
-- [ ] **TC-RQ-08 Batalkan sisa** — Dari Diterima sebagian → Batalkan sisa → Stok yang sudah masuk tetap.
+- [ ] **TC-RQ-07 Diterima sebagian (selesai)** — Terima 3 dari 5 → Status Diterima sebagian (kolom Jumlah "3 dari 5" + "diterima", tanpa bilah progres, lencana teal); stok bertambah 3; tidak ada aksi menerima sisa atau membatalkan; barang muncul lagi di Saran permintaan jika stok masih di bawah minimum.
+- [ ] **TC-RQ-08 Dikembalikan dari Diterima sebagian** — Permintaan "perlu dikembalikan" yang Diterima sebagian (4 dari 8) → Tandai Dikembalikan → Stok berkurang 4 (bukan 8). Jika tidak perlu dikembalikan, menu aksi kosong.
 - [ ] **TC-RQ-09 Dikembalikan** — Permintaan "Dikembalikan" yang sudah Diterima → Tandai Dikembalikan → Stok berkurang lewat Koreksi.
 - [ ] **TC-RQ-10 Dibatalkan setelah Diterima** — Tandai Dibatalkan → Stok berkurang (tidak sampai negatif).
 - [ ] **TC-RQ-11 Barang tidak masuk ke ruangan** — Permintaan dengan ruangan terkait Diterima → Stok gudang bertambah; jumlah di Kelengkapan Ruangan tidak berubah (isi lewat Isi dari stok).
@@ -252,7 +252,7 @@ Jalankan setelah fitur per bagian lolos. Tiap alur menyambung beberapa fitur.
   1. Stok: catat Pemakaian sampai barang ≤ minimum → status Menipis.
   2. Dashboard: kartu & panel stok menipis menampilkan barang itu.
   3. Permintaan → Saran: barang muncul di bawah departemen penyedianya → Buat permintaan.
-  4. Terima sebagian (TC-RQ-07), lalu terima sisanya → status Diterima, stok Aman lagi.
+  4. Terima sebagian (TC-RQ-07) → status Diterima sebagian (selesai); barang muncul lagi di Saran permintaan bila stok masih kurang → ajukan ulang → terima penuh → stok Aman lagi.
 
 - [ ] **ALUR-06 Data master berubah, data lain ikut**
   1. Ganti nama ruangan di Data Master (TC-MST-05).

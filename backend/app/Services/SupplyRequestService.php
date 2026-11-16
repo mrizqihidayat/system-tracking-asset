@@ -80,9 +80,11 @@ class SupplyRequestService
     }
 
     /**
-     * Diajukan → Diterima | Dibatalkan; Diterima sebagian → Diterima | Dibatalkan (sisa saja, stok yang masuk tetap);
-     * Diterima → Dikembalikan (hanya jika snapshot "perlu dikembalikan") | Dibatalkan.
-     * Barang stok: Diterima dengan jumlah yang datang (bawaan: semua sisa); kurang dari sisa → Diterima sebagian.
+     * Terbuka: Diajukan (termasuk "Belum direspons") → Diterima | Dibatalkan.
+     * Selesai: Diterima → Dikembalikan (hanya jika snapshot "perlu dikembalikan") | Dibatalkan;
+     * Diterima sebagian → Dikembalikan saja (hanya jika "perlu dikembalikan"), selain itu final: sisa yang belum datang
+     * tidak bisa diterima lagi dan diajukan ulang lewat saran permintaan.
+     * Barang stok: Diterima dengan jumlah yang datang (bawaan: semua sisa); kurang dari sisa → Diterima sebagian (final).
      */
     public function changeStatus(SupplyRequest $request, RequestStatus $to, ?string $note, User $user, ?int $received = null): SupplyRequest
     {
@@ -127,8 +129,9 @@ class SupplyRequestService
     private function ensureTransition(SupplyRequest $request, RequestStatus $to): void
     {
         $allowed = match ($request->status) {
-            RequestStatus::Diajukan, RequestStatus::DiterimaSebagian => [RequestStatus::Diterima, RequestStatus::Dibatalkan],
+            RequestStatus::Diajukan => [RequestStatus::Diterima, RequestStatus::Dibatalkan],
             RequestStatus::Diterima => [RequestStatus::Dikembalikan, RequestStatus::Dibatalkan],
+            RequestStatus::DiterimaSebagian => [RequestStatus::Dikembalikan],
             default => [],
         };
 
@@ -143,7 +146,8 @@ class SupplyRequestService
 
     /**
      * Sasaran & jumlah perubahan stok. null = tidak mengubah stok.
-     * Dikembalikan/Dibatalkan setelah Diterima: kurangi jumlah yang sudah masuk, tidak sampai di bawah 0.
+     * Dikembalikan/Dibatalkan setelah Diterima atau Diterima sebagian: kurangi jumlah yang benar-benar sudah masuk
+     * (bukan jumlah yang diajukan), tidak sampai di bawah 0.
      *
      * @return array{target: Consumable, adding: bool, amount: int, current: int, clamped: bool, status?: RequestStatus}|null
      */
@@ -169,7 +173,7 @@ class SupplyRequestService
             ];
         }
 
-        if ($request->status !== RequestStatus::Diterima || $request->received_quantity === 0) {
+        if (! in_array($request->status, [RequestStatus::Diterima, RequestStatus::DiterimaSebagian], true) || $request->received_quantity === 0) {
             return null;
         }
 
@@ -228,9 +232,7 @@ class SupplyRequestService
     private function impact(SupplyRequest $request, ?array $effect): array
     {
         if ($effect === null) {
-            return ['message' => $request->status === RequestStatus::DiterimaSebagian
-                ? "Sisa permintaan dibatalkan. Stok yang sudah masuk ({$request->received_quantity}) tetap."
-                : 'Tidak mengubah stok.', 'clamped' => false];
+            return ['message' => 'Tidak mengubah stok.', 'clamped' => false];
         }
 
         $subject = "Stok {$effect['target']->name}";
@@ -281,7 +283,8 @@ class SupplyRequestService
 
     /**
      * Saran permintaan per departemen penyedia: hanya dari stok Menipis/Habis.
-     * has_open_request = sudah ada permintaan Diajukan / Diterima sebagian untuk barang itu.
+     * has_open_request = sudah ada permintaan terbuka (Diajukan, termasuk Belum direspons) untuk barang itu.
+     * Diterima sebagian sudah selesai: barang yang stoknya masih kurang muncul lagi agar bisa diminta ulang.
      *
      * @return list<array{provider_department: array{id: int, name: string}, items: list<array<string, mixed>>}>
      */
@@ -295,7 +298,7 @@ class SupplyRequestService
      */
     private function buildSuggestions(): array
     {
-        $open = SupplyRequest::query()->whereIn('status', [RequestStatus::Diajukan->value, RequestStatus::DiterimaSebagian->value])->get();
+        $open = SupplyRequest::query()->where('status', RequestStatus::Diajukan->value)->get();
 
         $items = $this->stockSuggestions()
             ->map(function (array $item) use ($open) {

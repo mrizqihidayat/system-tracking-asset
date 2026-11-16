@@ -16,7 +16,7 @@ class UpdateSupplyRequestStatusRequest extends FormRequest
     }
 
     /**
-     * Status tujuan saja; Diajukan (status awal) tidak bisa dipilih kembali dan Diterima sebagian ditentukan dari jumlah.
+     * Status tujuan saja; Diajukan (status awal) tidak bisa dipilih kembali dan Diterima sebagian (status final) ditentukan dari jumlah yang diterima.
      * received_quantity: jumlah yang benar-benar datang (barang stok); kosong = semua sisa.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
