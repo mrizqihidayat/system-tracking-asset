@@ -4,7 +4,6 @@ import { useCallback, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AssetCode, Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import { PageHeader } from '../../components/ui/Page'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { skeletonWidth } from '../../components/ui/skeleton-width'
 import { invalidate } from '../../lib/queries/invalidate'
@@ -78,12 +77,13 @@ function Group({ title, meta, open, onToggle, actions, children }: {
   )
 }
 
+/** Isi tab Data Master di halaman Pengaturan (T40). Bagian yang dibuka disimpan di parameter `bagian`. */
 export default function MasterDataPage() {
   const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
-  // Tab Akun hanya untuk akun pegawai SHD; akun bersama tidak melihatnya (API juga menolak 403).
+  // Bagian Akun hanya untuk akun pegawai SHD; akun bersama tidak melihatnya (API juga menolak 403).
   const tabs = getUser()?.source === 'api' ? TABS : TABS.filter((t) => t.key !== 'akun')
-  const tab = (tabs.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'gedung') as Tab
+  const tab = (tabs.some((t) => t.key === params.get('bagian')) ? params.get('bagian') : 'gedung') as Tab
   const queries = [useBuildings(), useRooms(), useDepartments(), useCategories(), useAssetTypes(), useConsumableCategories()] as const
   useErrorToast(...queries.map((q) => q.error))
   const [buildings, rooms, departments, categories, types, consumableCategories] = queries
@@ -258,21 +258,18 @@ export default function MasterDataPage() {
   if (tab === 'akun') body = <AccountsTab />
 
   return (
-    <div className="max-w-4xl space-y-5">
-      <PageHeader
-        title="Data Master"
-        description="Kelola gedung, ruangan, departemen, kategori dan jenis aset, kategori stok, serta akun pengguna. Data yang masih digunakan tidak dapat dihapus."
-      />
+    <div className="space-y-4">
+      <p className="text-sm text-slate-500">Data yang masih digunakan tidak dapat dihapus.</p>
 
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist">
+      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Bagian data master">
         {tabs.map((t) => (
           <button
             key={t.key}
             role="tab"
             aria-selected={tab === t.key}
-            onClick={() => setParams({ tab: t.key }, { replace: true })}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
-              tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-900'
+            onClick={() => setParams({ tab: 'data-master', bagian: t.key }, { replace: true })}
+            className={`min-h-10 whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors ${
+              tab === t.key ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
             }`}
           >
             {t.label}
@@ -280,7 +277,7 @@ export default function MasterDataPage() {
         ))}
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">{body}</section>
+      <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">{body}</section>
 
       {form && (
         <MasterFormModal

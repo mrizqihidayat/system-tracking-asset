@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios'
 import type { ApiErrorBody } from '../types/api'
-import { clearSession, getToken } from './auth'
+import { clearSession, getToken, getUser, setUser } from './auth'
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -21,6 +21,16 @@ api.interceptors.response.use(
       clearSession()
       if (location.pathname !== '/login') {
         location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`)
+      }
+    }
+    // Akun wajib ganti password / isi email dulu (T40): arahkan ke halamannya.
+    const code = error.response?.data?.code
+    if (error.response?.status === 403 && (code === 'password_change_required' || code === 'email_required')) {
+      const user = getUser()
+      if (user) setUser({ ...user, [code === 'email_required' ? 'email_required' : 'must_change_password']: true })
+      const target = code === 'email_required' ? '/isi-email' : '/ganti-password'
+      if (location.pathname !== target) {
+        location.assign(`${target}?next=${encodeURIComponent(location.pathname + location.search)}`)
       }
     }
     return Promise.reject(error)

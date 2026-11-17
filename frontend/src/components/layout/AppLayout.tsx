@@ -1,15 +1,17 @@
 import {
-  Boxes, ClipboardCheck, HandHelping, LayoutDashboard, Menu, PackageOpen, Send, Settings, X,
+  Boxes, ChevronsUpDown, ClipboardCheck, HandHelping, LayoutDashboard, Menu, PackageOpen, Send, Settings, X,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { api } from '../../lib/api'
 import DropdownMenu from '../ui/DropdownMenu'
 import { cancelRoutePrefetch, prefetchRouteOnDwell } from '../../lib/queries/prefetch'
-import { clearSession, getUser, loginId } from '../../lib/auth'
+import { getUser, loginId } from '../../lib/auth'
+import { usePublicSettings } from '../../lib/settings'
+import { useLogout } from '../../lib/useLogout'
 
 // Isi modul mengikuti SPEC §3. Scan QR dibuka dari tombol di Dashboard (keputusan pengguna), tidak di menu.
+// Pengaturan (T40) terbuka untuk semua akun; tab di dalamnya yang dibatasi.
 const menu = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/daftar-aset', label: 'Daftar Aset', icon: Boxes },
@@ -17,22 +19,26 @@ const menu = [
   { to: '/kelengkapan-ruangan', label: 'Kelengkapan Ruangan', icon: ClipboardCheck },
   { to: '/permintaan', label: 'Permintaan ke Unit Lain', icon: Send },
   { to: '/stok', label: 'Stok Habis Pakai', icon: PackageOpen },
+  { to: '/pengaturan', label: 'Pengaturan', icon: Settings },
 ]
 
 const itemClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-    isActive ? 'bg-white font-semibold text-brand-800' : 'font-medium text-[#d3e2ee] hover:bg-white/10 hover:text-white'
+    isActive ? 'bg-white font-semibold text-brand-800' : 'font-medium text-white/85 hover:bg-white/10 hover:text-white'
   }`
 
+/** Logo kecil + judul web dari Pengaturan (T40). */
 export function Brand({ compact = false }: { compact?: boolean }) {
+  const settings = usePublicSettings()
+
   return (
     <div className="flex items-center gap-3">
       <span className={`flex shrink-0 items-center justify-center rounded-lg bg-white ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
-        <img src="/icon.png" alt="INALUM" className={compact ? 'w-5' : 'w-7'} />
+        <img src={settings.favicon_url ?? '/icon.png'} alt="" className={compact ? 'w-5' : 'w-7'} />
       </span>
       <span className="min-w-0 leading-tight">
-        <span className={`block font-bold ${compact ? 'text-base' : 'text-[17px]'}`}>Aset SHD</span>
-        {!compact && <span className="block text-xs text-[#b5cadb]">Sistem Informasi Aset</span>}
+        <span className={`block truncate font-bold ${compact ? 'text-base' : 'text-[17px]'}`}>{settings.site_title}</span>
+        {!compact && <span className="block text-xs text-white/70">Sistem Informasi Aset</span>}
       </span>
     </div>
   )
@@ -52,15 +58,7 @@ export default function AppLayout() {
     onBlur: cancelRoutePrefetch,
   })
 
-  const logout = async () => {
-    try {
-      await api.post('/logout')
-    } catch {
-      // token tetap dihapus lokal walau server tidak terjangkau
-    }
-    clearSession()
-    navigate('/login', { replace: true })
-  }
+  const logout = useLogout()
 
   return (
     <div className="min-h-screen lg:pl-60">
@@ -73,7 +71,7 @@ export default function AppLayout() {
         <div className="flex items-center justify-between pb-6">
           <Brand />
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-[#d3e2ee] hover:bg-white/10 lg:hidden"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white/85 hover:bg-white/10 lg:hidden"
             onClick={() => setOpen(false)}
             aria-label="Tutup menu"
           >
@@ -95,17 +93,6 @@ export default function AppLayout() {
               <span>{label}</span>
             </NavLink>
           ))}
-
-          <p className="px-3 pb-1 pt-5 text-xs font-semibold text-[#b5cadb]">Pengaturan</p>
-          <NavLink
-            to="/pengaturan/data-master"
-            onClick={() => setOpen(false)}
-            {...prefetchProps('/pengaturan/data-master')}
-            className={itemClass}
-          >
-            <Settings size={18} className="shrink-0" />
-            <span>Data Master</span>
-          </NavLink>
         </nav>
 
         <div className="mt-4 border-t border-white/15 pt-4">
@@ -115,14 +102,14 @@ export default function AppLayout() {
             </span>
             <div className="min-w-0 flex-1 leading-tight">
               <p className="truncate text-sm font-semibold">{user?.name ?? '-'}</p>
-              <p className="truncate text-xs text-[#b5cadb]">
+              <p className="truncate text-xs text-white/70">
                 {user ? (user.source === 'api' ? loginId(user) : `Akun bersama ${loginId(user)}`) : 'Admin Aset SHD'}
               </p>
             </div>
-            {/* Pengaturan akun: Ganti password atau Keluar. */}
+            {/* Menu akun: Ganti password atau Keluar. */}
             <DropdownMenu
-              label="Pengaturan akun"
-              trigger={<Settings size={18} />}
+              label="Menu akun"
+              trigger={<ChevronsUpDown size={18} />}
               items={[
                 {
                   label: 'Ganti password',
@@ -133,7 +120,7 @@ export default function AppLayout() {
                 },
                 { label: 'Keluar', onClick: logout, danger: true },
               ]}
-              triggerClassName="min-h-9! w-9 px-0! border-0! bg-transparent! text-[#d3e2ee]! hover:bg-white/10! hover:text-white!"
+              triggerClassName="min-h-10! w-10 shrink-0 px-0! border-0! bg-transparent! text-white/85! hover:bg-white/10! hover:text-white!"
             />
           </div>
         </div>

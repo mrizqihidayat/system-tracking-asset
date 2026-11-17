@@ -1,22 +1,30 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import logo from '../assets/logo.png'
+import AuthShell, { ErrorBox } from '../components/AuthShell'
 import Button from '../components/ui/Button'
 import { FormField } from '../components/ui/FormField'
 import PasswordInput from '../components/ui/PasswordInput'
 import { useToast } from '../components/ui/toast-context'
 import { api, errorMessage, fieldErrors } from '../lib/api'
 import { getUser, loginId, setUser, type AuthUser } from '../lib/auth'
-import { PASSWORD_MIN, passwordErrors } from '../lib/password'
+import { passwordErrors } from '../lib/password'
 import { safeNext } from '../lib/safe-next'
+import { usePasswordMin } from '../lib/settings'
+import { useLogout } from '../lib/useLogout'
 
-/** Ganti password sendiri, opsional, dibuka dari menu akun di sidebar (SPEC §15, T33 R2). */
+/**
+ * Ganti password sendiri (SPEC §15): opsional dari menu akun di sidebar, atau wajib setelah password direset
+ * staf SHD (T40) sebelum halaman lain bisa dibuka.
+ */
 export default function ChangePasswordPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const [params] = useSearchParams()
   const user = getUser()
   const isEmployee = user?.source === 'api'
+  const forced = user?.must_change_password === true
+  const passwordMin = usePasswordMin()
+  const logout = useLogout()
   const next = safeNext(params.get('next'), location.origin)
 
   const [form, setForm] = useState({ current_password: '', password: '', password_confirmation: '' })
@@ -29,7 +37,7 @@ export default function ChangePasswordPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setMessage('')
-    const local = passwordErrors(form.password, form.password_confirmation, user ? loginId(user) : '', isEmployee ? 'NIK' : 'username')
+    const local = passwordErrors(form.password, form.password_confirmation, user ? loginId(user) : '', isEmployee ? 'NIK' : 'username', passwordMin)
     setErrors(local)
     if (Object.keys(local).length > 0) return
 
@@ -49,19 +57,18 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-5">
-        <div>
-          <img src={logo} alt="INALUM" className="h-10 w-auto" />
-          <h1 className="mt-6 text-2xl font-bold tracking-tight">Ganti password</h1>
-          <p className="mt-1 text-sm text-slate-500">{`${user?.name ?? ''} · ${user ? loginId(user) : ''}`}</p>
-        </div>
-
-        {message && (
-          <div role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
-            {message}
-          </div>
+    <AuthShell
+      title={forced ? 'Buat password baru' : 'Ganti password'}
+      description={`${user?.name ?? ''} · ${user ? loginId(user) : ''}`}
+    >
+      <form onSubmit={submit} className="space-y-5">
+        {forced && (
+          <p className="rounded-lg bg-info-50 px-3 py-2.5 text-sm text-info-700">
+            Password Anda baru direset staf SHD. Buat password baru dulu untuk melanjutkan.
+            {isEmployee && ' Password saat ini adalah NIK Anda.'}
+          </p>
         )}
+        <ErrorBox message={message} />
 
         <FormField label="Password saat ini" required error={errors.current_password}>
           <PasswordInput
@@ -75,7 +82,7 @@ export default function ChangePasswordPage() {
         <FormField label="Password baru" required error={errors.password}>
           <PasswordInput value={form.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" error={errors.password} required />
           {!errors.password && (
-            <span className="block text-xs text-slate-500">Minimal {PASSWORD_MIN} karakter.</span>
+            <span className="block text-xs text-slate-500">Minimal {passwordMin} karakter.</span>
           )}
         </FormField>
         <FormField label="Konfirmasi password baru" required error={errors.password_confirmation}>
@@ -90,9 +97,13 @@ export default function ChangePasswordPage() {
 
         <div className="flex flex-col gap-2">
           <Button type="submit" loading={saving} className="w-full">Simpan password</Button>
-          <Button variant="secondary" className="w-full" onClick={() => navigate(-1)}>Batal</Button>
+          {forced ? (
+            <Button variant="secondary" className="w-full" onClick={logout}>Keluar</Button>
+          ) : (
+            <Button variant="secondary" className="w-full" onClick={() => navigate(-1)}>Batal</Button>
+          )}
         </div>
       </form>
-    </main>
+    </AuthShell>
   )
 }

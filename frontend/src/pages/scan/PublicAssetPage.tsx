@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Brand } from '../../components/layout/AppLayout'
+import { usePublicSettings } from '../../lib/settings'
 import { AssetCode, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { skeletonWidth } from '../../components/ui/skeleton-width'
@@ -52,6 +53,7 @@ export default function PublicAssetPage() {
   }, [token])
 
   const loc = asset?.current_location
+  const footer = usePublicSettings().footer_text
 
   return (
     <div className="min-h-screen">
@@ -113,6 +115,7 @@ export default function PublicAssetPage() {
             </p>
           </>
         )}
+        {footer && <p className="text-center text-xs text-slate-500">{footer}</p>}
       </main>
     </div>
   )

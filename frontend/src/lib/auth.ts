@@ -10,6 +10,11 @@ export interface AuthUser {
   nik: string | null
   username: string | null
   department: string | null
+  email: string | null
+  /** Akun belum punya email dan wajib mengisinya dulu (T40). */
+  email_required: boolean
+  /** Password baru direset staf SHD: wajib diganti dulu (T40). */
+  must_change_password: boolean
   source: 'api' | 'manual'
 }
 

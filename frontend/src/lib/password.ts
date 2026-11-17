@@ -1,4 +1,4 @@
-/** Panjang minimal password baru (sama dengan backend, SPEC §15). */
+/** Panjang minimal password bawaan; nilai yang berlaku dibaca dari Pengaturan > Keamanan (`usePasswordMin`, T40). */
 export const PASSWORD_MIN = 8
 
 /**
@@ -11,8 +11,9 @@ export function passwordErrors(
   confirmation: string,
   loginId: string,
   idLabel: 'NIK' | 'username' = 'username',
+  min: number = PASSWORD_MIN,
 ): { password?: string; password_confirmation?: string } {
-  if (password.length < PASSWORD_MIN) return { password: `Password minimal ${PASSWORD_MIN} karakter.` }
+  if (password.length < min) return { password: `Password minimal ${min} karakter.` }
   if (loginId.trim() !== '' && password.toLowerCase() === loginId.trim().toLowerCase()) {
     return { password: `Password tidak boleh sama dengan ${idLabel}.` }
   }

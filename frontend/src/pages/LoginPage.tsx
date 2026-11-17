@@ -1,17 +1,19 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import bgInalum from '../assets/bg_inalum.webp'
-import logo from '../assets/logo.png'
+import { SiteLogo } from '../components/AuthShell'
 import Button from '../components/ui/Button'
 import { FormField, Input } from '../components/ui/FormField'
 import PasswordInput from '../components/ui/PasswordInput'
 import { api, errorMessage, fieldErrors } from '../lib/api'
 import { getToken, setSession, type AuthUser } from '../lib/auth'
 import { safeNext } from '../lib/safe-next'
+import { usePublicSettings } from '../lib/settings'
 
 export default function LoginPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
+  const settings = usePublicSettings()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -48,16 +50,16 @@ export default function LoginPage() {
           <p className="text-3xl font-bold leading-tight tracking-tight text-balance">
             Aset, peminjaman, dan kelengkapan ruangan pelatihan dalam satu catatan.
           </p>
-          <p className="mt-3 text-sm text-[#c4d6e4]">Departemen SHD · PT INALUM</p>
+          {settings.footer_text && <p className="mt-3 text-sm text-white/80">{settings.footer_text}</p>}
         </div>
       </aside>
 
       <main className="flex items-center justify-center px-4 py-10">
         <form onSubmit={submit} className="w-full max-w-sm space-y-5">
           <div>
-            <img src={logo} alt="INALUM" className="h-10 w-auto" />
+            <SiteLogo />
             <h1 className="mt-6 text-2xl font-bold tracking-tight">Selamat Datang Kembali</h1>
-            <p className="mt-1 text-sm text-slate-500">Masuk untuk melanjutkan ke Sistem Informasi Aset</p>
+            {settings.site_description && <p className="mt-1 text-sm text-slate-500">{settings.site_description}</p>}
           </div>
           {message && (
             <div role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
@@ -71,6 +73,10 @@ export default function LoginPage() {
             <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
           </FormField>
           <Button type="submit" loading={loading} className="w-full">Masuk</Button>
+          <p className="text-center text-sm">
+            <Link to="/lupa-password" className="tap font-semibold text-brand-700 hover:underline">Lupa password?</Link>
+          </p>
+          {settings.footer_text && <p className="text-center text-xs text-slate-500 lg:hidden">{settings.footer_text}</p>}
         </form>
       </main>
     </div>

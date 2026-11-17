@@ -15,14 +15,16 @@ import { getUser, loginId } from '../../lib/auth'
 import { useAccounts, type Account } from '../../lib/queries/accounts'
 import { queryKeys } from '../../lib/queries/keys'
 import { useDepartments } from '../../lib/queries/master'
-import { PASSWORD_MIN, passwordErrors } from '../../lib/password'
+import { passwordErrors } from '../../lib/password'
+import { usePasswordMin } from '../../lib/settings'
 import { useErrorToast } from '../../lib/useErrorToast'
 
-type Action = { kind: 'reset' | 'deactivate' | 'restore'; account: Account } | { kind: 'password'; account: Account } | { kind: 'create' }
+type Action = { kind: 'reset' | 'deactivate' | 'restore'; account: Account } | { kind: 'password' | 'email'; account: Account } | { kind: 'create' }
 
 /**
  * Data Master > Akun (T33, SPEC §15). Akun pegawai SHD dibuat otomatis saat login pertama dengan NIK;
- * di sini staf menambah akun bersama, reset/ubah password, serta menonaktifkan/mengaktifkan kembali.
+ * di sini staf menambah akun bersama, mengubah email, reset/ubah password, serta menonaktifkan/mengaktifkan
+ * kembali. Email (T40) menjadi tujuan kode lupa password.
  */
 export default function AccountsTab() {
   const queryClient = useQueryClient()
@@ -77,10 +79,16 @@ export default function AccountsTab() {
                     <span className="font-mono">{loginId(a)}</span>
                     {a.department ? ` · ${a.department}` : ''}
                   </p>
+                  <p className="mt-0.5 break-all text-xs text-slate-500">
+                    {a.email ?? (a.email_required ? 'Belum ada email (akan diminta saat akun ini masuk)' : 'Tanpa email')}
+                  </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap gap-3">
+                <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-2">
                   {a.is_active ? (
                     <>
+                      <button className="tap font-semibold text-brand-700 hover:underline" onClick={() => setAction({ kind: 'email', account: a })}>
+                        Ubah email
+                      </button>
                       {a.source === 'api' && !isMe && (
                         <button className="tap font-semibold text-brand-700 hover:underline" onClick={() => setAction({ kind: 'reset', account: a })}>
                           Reset password
@@ -117,6 +125,7 @@ export default function AccountsTab() {
       )}
 
       {action?.kind === 'create' && <SharedAccountModal onClose={() => setAction(null)} onDone={done} />}
+      {action?.kind === 'email' && <EmailModal account={action.account} onClose={() => setAction(null)} onDone={done} />}
       {action?.kind === 'password' && <SharedPasswordModal account={action.account} onClose={() => setAction(null)} onDone={done} />}
       {action && (action.kind === 'reset' || action.kind === 'deactivate' || action.kind === 'restore') && (
         <AccountConfirm kind={action.kind} account={action.account} onClose={() => setAction(null)} onDone={done} />
@@ -129,7 +138,7 @@ const CONFIRM = {
   reset: {
     title: 'Reset password',
     label: 'Reset password',
-    text: (a: Account) => `${a.name} (NIK ${a.nik}) akan keluar dari semua perangkat. Password kembali ke NIK.`,
+    text: (a: Account) => `${a.name} (NIK ${a.nik}) akan keluar dari semua perangkat. Password kembali ke NIK, dan saat masuk berikutnya ia wajib membuat password baru.`,
     request: (a: Account) => api.post(`/accounts/${a.id}/reset`),
     done: 'Password direset.',
   },
@@ -178,11 +187,13 @@ function PasswordFields({ form, errors, set }: {
   errors: Record<string, string>
   set: (key: 'password' | 'password_confirmation', value: string) => void
 }) {
+  const passwordMin = usePasswordMin()
+
   return (
     <>
       <FormField label="Password" required error={errors.password}>
         <PasswordInput value={form.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" error={errors.password} />
-        {!errors.password && <span className="block text-xs text-slate-500">Minimal {PASSWORD_MIN} karakter, tidak sama dengan username.</span>}
+        {!errors.password && <span className="block text-xs text-slate-500">Minimal {passwordMin} karakter, tidak sama dengan username.</span>}
       </FormField>
       <FormField label="Konfirmasi password" required error={errors.password_confirmation}>
         <PasswordInput
@@ -231,19 +242,20 @@ function ErrorBox({ message }: { message: string }) {
   )
 }
 
-/** Tambah akun bersama: password ditentukan staf pembuat, tidak wajib ganti saat login pertama. */
+/** Tambah akun bersama: email wajib (T40); password ditentukan staf pembuat, tidak wajib ganti saat login pertama. */
 function SharedAccountModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const departments = useDepartments()
-  const [form, setForm] = useState({ username: '', name: '', department: '', password: '', password_confirmation: '' })
+  const passwordMin = usePasswordMin()
+  const [form, setForm] = useState({ username: '', name: '', department: '', email: '', password: '', password_confirmation: '' })
   const { errors, message, saving, run } = useFormSubmit(onDone, 'Akun bersama ditambahkan.')
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }))
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const username = form.username.trim().toLowerCase()
-    const local: Record<string, string> = { ...passwordErrors(form.password, form.password_confirmation, username) }
+    const local: Record<string, string> = { ...passwordErrors(form.password, form.password_confirmation, username, 'username', passwordMin) }
     if (/^\d+$/.test(username)) local.username = 'Username tidak boleh angka saja (format NIK).'
-    run(local, () => api.post('/accounts', { ...form, username, name: form.name.trim() }))
+    run(local, () => api.post('/accounts', { ...form, username, name: form.name.trim(), email: form.email.trim() }))
   }
 
   return (
@@ -276,21 +288,59 @@ function SharedAccountModal({ onClose, onDone }: { onClose: () => void; onDone: 
             error={errors.department}
           />
         </FormField>
+        <FormField label="Email" required error={errors.email}>
+          <Input type="email" inputMode="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="nama@contoh.com" autoComplete="off" maxLength={150} error={errors.email} />
+          {!errors.email && <span className="block text-xs text-slate-500">Kode lupa password dikirim ke email ini.</span>}
+        </FormField>
         <PasswordFields form={form} errors={errors} set={set} />
       </form>
     </Modal>
   )
 }
 
-/** Ubah password akun bersama oleh staf (tanpa wajib ganti). */
+/** Ubah email akun mana pun: tujuan kode lupa password (T40). */
+function EmailModal({ account, onClose, onDone }: { account: Account; onClose: () => void; onDone: () => void }) {
+  const [email, setEmail] = useState(account.email ?? '')
+  const { errors, message, saving, run } = useFormSubmit(onDone, 'Email akun disimpan.')
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    run({}, () => api.put(`/accounts/${account.id}`, { email: email.trim() }))
+  }
+
+  return (
+    <Modal
+      open
+      title={`Ubah email ${account.name}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Batal</Button>
+          <Button type="submit" form="account-email-form" loading={saving}>Simpan</Button>
+        </>
+      }
+    >
+      <form id="account-email-form" onSubmit={submit} className="space-y-4">
+        <p className="text-sm text-slate-500">Kode lupa password untuk akun ini dikirim ke email berikut. Pastikan email milik pemakai akun.</p>
+        <ErrorBox message={message} />
+        <FormField label="Email" required error={errors.email}>
+          <Input type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@contoh.com" autoComplete="off" maxLength={150} error={errors.email} autoFocus required />
+        </FormField>
+      </form>
+    </Modal>
+  )
+}
+
+/** Ubah password akun bersama oleh staf; pemakai akun wajib membuat password baru saat masuk berikutnya (T40). */
 function SharedPasswordModal({ account, onClose, onDone }: { account: Account; onClose: () => void; onDone: () => void }) {
+  const passwordMin = usePasswordMin()
   const [form, setForm] = useState({ password: '', password_confirmation: '' })
   const { errors, message, saving, run } = useFormSubmit(onDone, 'Password akun bersama diubah.')
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }))
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    run(passwordErrors(form.password, form.password_confirmation, account.username ?? ''), () => api.put(`/accounts/${account.id}/password`, form))
+    run(passwordErrors(form.password, form.password_confirmation, account.username ?? '', 'username', passwordMin), () => api.put(`/accounts/${account.id}/password`, form))
   }
 
   return (
@@ -307,7 +357,7 @@ function SharedPasswordModal({ account, onClose, onDone }: { account: Account; o
     >
       <form id="shared-password-form" onSubmit={submit} className="space-y-4">
         <p className="text-sm text-slate-500">
-          Username <span className="font-mono">{account.username}</span>. Perangkat lain yang memakai akun ini akan keluar.
+          Username <span className="font-mono">{account.username}</span>. Perangkat yang memakai akun ini akan keluar, dan saat masuk berikutnya pemakainya wajib membuat password baru.
         </p>
         <ErrorBox message={message} />
         <PasswordFields form={form} errors={errors} set={set} />

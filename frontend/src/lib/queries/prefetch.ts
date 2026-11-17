@@ -21,7 +21,7 @@ const routes: Record<string, (qc: QueryClient) => unknown> = {
   '/kelengkapan-ruangan': (qc) => qc.prefetchQuery(listQueries.readiness()),
   '/permintaan': (qc) => qc.prefetchQuery(listQueries.supplyRequests(buildListParams(empty(), listConfigs.supplyRequests))),
   '/stok': (qc) => qc.prefetchQuery(listQueries.consumables(buildListParams(empty(), listConfigs.consumables))),
-  '/pengaturan/data-master': (qc) => qc.prefetchQuery(masterQueries.buildings()),
+  '/pengaturan': (qc) => qc.prefetchQuery(masterQueries.buildings()),
 }
 
 /** Gedung & ruangan di latar belakang agar dropdown lokasi langsung terisi saat form dibuka. */

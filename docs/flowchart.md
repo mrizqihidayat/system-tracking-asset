@@ -262,11 +262,13 @@ flowchart TD
 
 ## 9. Data Master
 
+Tab **Data Master** di halaman Pengaturan (§12), terbuka untuk semua akun. Bagian Akun hanya untuk akun pegawai SHD.
+
 ```mermaid
 flowchart TD
-    A([Mulai]) --> B[Tab Gedung & Ruangan, Departemen, Kategori & Jenis aset, Kategori stok, Akun]
+    A([Mulai: Pengaturan > Data Master]) --> B[Bagian Gedung & Ruangan, Departemen, Kategori & Jenis aset, Kategori stok, Akun]
     B --> C{Pilih aksi}
-    C -- Tab Akun --> AK[[Login & Akun]]
+    C -- Bagian Akun, khusus pegawai SHD --> AK[[Kelola akun]]
     C -- Departemen SHD --> C1[Tidak dapat diubah atau dihapus] --> B
     C -- Tambah / Ubah --> T1[Nama; ruangan: tanda gudang; jenis aset: kategori wajib & kode singkat] --> T2{Data valid?}
     T2 -- Tidak --> T3[Pesan, mis. nama sudah ada, kode pernah dipakai jenis lain, gudang masih dipakai stok] --> T1
@@ -279,12 +281,20 @@ flowchart TD
 
 ## 10. Login & Akun
 
+### 10a. Login, penguncian, wajib ganti password, wajib isi email
+
 ```mermaid
 flowchart TD
     A([Mulai]) --> B[Input username atau NIK & password]
-    B --> C{Angka saja?}
+    B -- Lupa password? --> LP[[Lupa password via OTP]]
+    B --> L0{NIK/username sedang dikunci?}
+    L0 -- Ya --> L1[Pesan: Akun dikunci sementara, coba lagi dalam N menit; password benar pun ditolak] --> B
+    L0 -- Tidak --> C{Angka saja?}
     C -- Tidak: username --> M1{Akun bersama ada & password benar?}
-    M1 -- Tidak --> X[Pesan: NIK/Username atau password salah; lebih dari 5 percobaan per menit harus menunggu] --> B
+    M1 -- Tidak --> X[(Catat satu kali salah)]
+    X --> X1{Sudah mencapai batas salah dari Pengaturan? bawaan 5}
+    X1 -- Belum --> X2[Pesan: NIK/Username atau password salah] --> B
+    X1 -- Ya --> X3[(Kunci NIK/username selama lama kunci dari Pengaturan, bawaan 15 menit)] --> L1
     M1 -- Ya --> AKT{Akun aktif?}
     C -- Ya: NIK --> N1{Akun pegawai sudah ada?}
     N1 -- Ya --> N2{Password tersimpan benar? awalnya NIK}
@@ -298,19 +308,63 @@ flowchart TD
     F3 -- Tidak --> X
     F3 -- Ya --> SHD{Pegawai ada & departemen SHD?}
     SHD -- Tidak: tidak ada, nonaktif, atau bukan SHD --> S1[Pesan: Hanya pegawai Departemen SHD] --> B
-    SHD -- Ya --> S2[(Buat akun pegawai bila belum ada, password = NIK; sinkron nama & departemen dari salinan pegawai)] --> AKT
+    SHD -- Ya --> S2[(Buat akun pegawai bila belum ada, password = NIK; sinkron nama & departemen; isi email dari salinan pegawai bila email akun kosong)] --> AKT
     AKT -- Tidak --> AK1[Pesan: Akun dinonaktifkan] --> B
-    AKT -- Ya --> D[[Dashboard, tanpa wajib ganti password]]
-    D -- Menu Ganti password, opsional --> G1[Password saat ini + password baru 2x] --> G2{Valid: min. 8, bukan NIK / username, konfirmasi sama?}
+    AKT -- Ya --> OK[(Hapus hitungan salah password, buat token)]
+    OK --> W1{Password baru direset staf SHD?}
+    W1 -- Ya --> W2[Halaman Buat password baru: password saat ini + password baru 2x; hanya bisa Simpan atau Keluar]
+    W2 --> W3{Valid: panjang minimal dari Pengaturan, bukan NIK / username, konfirmasi sama?}
+    W3 -- Tidak --> W2
+    W3 -- Ya --> W4[(Simpan password, kewajiban ganti selesai, sesi lain dicabut)] --> E1
+    W1 -- Tidak: termasuk login pertama dengan password = NIK --> E1{Akun punya email, atau dikecualikan seperti staf1?}
+    E1 -- Tidak --> E2[Halaman Isi email Anda: hanya bisa Simpan atau Keluar]
+    E2 --> E3{Format valid & belum dipakai akun lain?}
+    E3 -- Tidak --> E2
+    E3 -- Ya --> E4[(Simpan email; setelah terisi hanya staf SHD yang bisa mengubahnya)] --> D
+    E1 -- Ya --> D[[Dashboard]]
+    D -- Menu akun: Ganti password, opsional --> G1[Password saat ini + password baru 2x] --> G2{Valid?}
     G2 -- Tidak --> G1
     G2 -- Ya --> G3[(Simpan password, sesi lain dicabut)] --> D
+    D -- Menu akun: Keluar --> B
+```
 
-    D -- Buka Data Master --> AKUN{Akun pegawai SHD?}
-    AKUN -- Tidak: akun bersama --> AK2[Tab Akun tidak tampil; API menolak 403]
+### 10b. Lupa password via OTP
+
+```mermaid
+flowchart TD
+    A([Mulai: tautan Lupa password di halaman masuk]) --> B[Isi email]
+    B --> C{Format email valid?}
+    C -- Tidak --> B
+    C -- Ya --> D[Jawaban selalu sama: jika email terdaftar, kode sudah dikirim]
+    D -. setelah jawaban terkirim .-> S1{Email milik akun aktif & kiriman terakhir sudah lewat 60 detik?}
+    S1 -- Tidak --> S2[Tidak ada email dikirim]
+    S1 -- Ya --> S3[(Simpan hash OTP 6 angka, hitungan salah 0, masa berlaku dari Pengaturan)] --> S4[Kirim email OTP: judul web, logo, masa berlaku]
+    D --> E[Halaman Masukkan kode: 6 angka; Kirim ulang aktif setelah 60 detik; teks Tidak menerima email? Hubungi staf SHD untuk reset password]
+    E -- Kirim ulang kode --> D
+    E -- Ganti email --> B
+    E --> F{Kode benar, belum dipakai, belum kedaluwarsa, salah belum 5 kali?}
+    F -- Tidak --> F1[(Tambah hitungan salah bila kodenya salah)] --> F2[Pesan: Kode OTP salah atau sudah tidak berlaku] --> E
+    F -- Ya --> G[(OTP hangus; buat token reset sekali pakai, berlaku 10 menit)]
+    G --> H[Halaman Buat password baru: password baru 2x]
+    H --> I{Token reset masih berlaku?}
+    I -- Tidak --> I1[Pesan: Sesi reset sudah tidak berlaku, minta kode OTP baru] --> B
+    I -- Ya --> J{Password valid?}
+    J -- Tidak --> H
+    J -- Ya --> K[(Simpan password; cabut semua sesi; buka kunci akun; kewajiban ganti password selesai)]
+    K --> L([Selesai: masuk dengan password baru])
+```
+
+### 10c. Kelola akun (Pengaturan > Data Master > Akun, khusus akun pegawai SHD)
+
+```mermaid
+flowchart TD
+    A([Mulai]) --> AKUN{Akun pegawai SHD?}
+    AKUN -- Tidak: akun bersama --> AK2[Bagian Akun tidak tampil; API menolak 403]
     AKUN -- Ya --> K{Aksi akun}
-    K -- Tambah akun bersama --> K1[Username bukan angka saja, nama, departemen, password 2x] --> K2[(Simpan, tidak wajib ganti)]
-    K -- Reset akun pegawai --> K3[(Password kembali ke NIK, sesi dicabut)]
-    K -- Ubah password akun bersama --> K4[(Simpan, sesi lain dicabut)]
+    K -- Tambah akun bersama --> K1[Username bukan angka saja, nama, departemen, email wajib & unik, password 2x] --> K2[(Simpan, tidak wajib ganti password)]
+    K -- Ubah email akun mana pun --> K7[Email valid & belum dipakai akun lain] --> K8[(Simpan email: tujuan kode lupa password)]
+    K -- Reset akun pegawai --> K3[(Password kembali ke NIK, sesi dicabut, kunci dibuka, wajib ganti password saat masuk berikutnya)]
+    K -- Ubah password akun bersama --> K4[(Simpan, sesi dicabut, kunci dibuka, wajib ganti password saat masuk berikutnya)]
     K -- Nonaktifkan, bukan akun sendiri --> K5[(Soft delete, sesi dicabut)]
     K -- Aktifkan kembali --> K6[(Restore)]
 ```
@@ -333,3 +387,36 @@ flowchart TD
     J --> K[(Catat run berhasil + jumlah; kosongkan cache master)] --> Z
     Z --> V[Data Master > Departemen menampilkan Sinkron terakhir, hanya baca]
 ```
+
+## 12. Pengaturan
+
+Menu **Pengaturan** terbuka untuk semua akun; tab yang tampil dan izin di backend berbeda per jenis akun.
+
+```mermaid
+flowchart TD
+    A([Mulai: menu Pengaturan]) --> B{Akun pegawai SHD?}
+    B -- Tidak: akun bersama --> M[Hanya tab Data Master tanpa bagian Akun; API pengaturan & akun menolak 403] --> DM[[Data Master]]
+    B -- Ya --> C{Pilih tab}
+    C -- Data Master --> DM
+    C -- Tampilan --> T1[Pilih paket warna atau warna utama & warna sidebar sendiri]
+    T1 --> T2[Contoh tampilan berubah; aplikasi belum berubah]
+    T2 --> T3{Tulisan sulit dibaca dengan warna itu?}
+    T3 -- Ya --> T4[Peringatan kontras; tetap boleh disimpan] --> T5
+    T3 -- Tidak --> T5{Aksi}
+    T5 -- Kembalikan ke default --> T1
+    T5 -- Simpan --> S
+    C -- Konten --> K1{Yang diubah}
+    K1 -- Logo / ikon tab browser --> K2{PNG, JPG, atau WebP & paling besar 1 MB?}
+    K2 -- Tidak --> K3[Pesan kesalahan] --> K1
+    K2 -- Ya --> K4[(Simpan gambar ke penyimpanan file, gambar lama dihapus)] --> S2
+    K1 -- Pakai bawaan --> K5[(Hapus gambar)] --> S2
+    K1 -- Judul web, deskripsi halaman masuk, footer, kop laporan Excel, teks label QR maks. 40 huruf --> S
+    C -- Keamanan --> X1[Batas salah password 3-10, lama akun dikunci 1-1440 menit, panjang password 8-32, masa berlaku OTP 5-60 menit] --> S
+    S{Nilai valid?}
+    S -- Tidak --> S1[Pesan per kolom] --> C
+    S -- Ya --> S2[(Simpan nilai yang berubah; catat siapa, apa, kapan; kosongkan cache pengaturan)]
+    S2 --> S3[Warna, judul, logo, dan ikon langsung berlaku tanpa build ulang; kop & teks label dipakai laporan dan label berikutnya; aturan keamanan dipakai login dan OTP berikutnya]
+    S3 --> Z([Selesai])
+```
+
+Ikon dan nama aplikasi yang sudah dipasang di HP (PWA) tidak ikut berubah dari Pengaturan; keduanya hanya berubah lewat build ulang frontend.
