@@ -11,19 +11,16 @@ import { useAssetTypes, useBuildings, useCategories, useConsumableCategories, us
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { AssetType, Building, Category, Department, Room } from '../../types/asset'
 import type { ConsumableCategory } from '../../types/supply'
-import { getUser } from '../../lib/auth'
-import AccountsTab from './AccountsTab'
 import DepartmentsTab from './DepartmentsTab'
 import { MasterDeleteModal, MasterFormModal, type MasterTarget } from './MasterModals'
 
-type Tab = 'gedung' | 'departemen' | 'jenis' | 'kategori-stok' | 'akun'
+type Tab = 'gedung' | 'departemen' | 'jenis' | 'kategori-stok'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'gedung', label: 'Gedung & Ruangan' },
   { key: 'departemen', label: 'Departemen' },
   { key: 'jenis', label: 'Kategori & Jenis aset' },
   { key: 'kategori-stok', label: 'Kategori stok' },
-  { key: 'akun', label: 'Akun' },
 ]
 
 type FormState = {
@@ -81,8 +78,7 @@ function Group({ title, meta, open, onToggle, actions, children }: {
 export default function MasterDataPage() {
   const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
-  // Bagian Akun hanya untuk akun pegawai SHD; akun bersama tidak melihatnya (API juga menolak 403).
-  const tabs = getUser()?.source === 'api' ? TABS : TABS.filter((t) => t.key !== 'akun')
+  const tabs = TABS
   const tab = (tabs.some((t) => t.key === params.get('bagian')) ? params.get('bagian') : 'gedung') as Tab
   const queries = [useBuildings(), useRooms(), useDepartments(), useCategories(), useAssetTypes(), useConsumableCategories()] as const
   useErrorToast(...queries.map((q) => q.error))
@@ -254,8 +250,6 @@ export default function MasterDataPage() {
       </>
     )
   }
-
-  if (tab === 'akun') body = <AccountsTab />
 
   return (
     <div className="space-y-4">

@@ -20,7 +20,7 @@ File ini punya tiga bagian. Fasilitator memakai Bagian A dan D; peserta cukup me
    | P2 | `90100002` | `90100002` |
    | P3 | `90100003` | `90100003` |
 
-   Peserta ke-4 dan seterusnya memakai `staf1` / `inalum2026` (akun bersama; tab Akun di Data Master tidak tersedia untuknya). Jika password sebuah akun sudah diganti, minta pegawai SHD lain mereset akun itu di **Data Master > Akun**.
+   Peserta ke-4 dan seterusnya memakai `staf1` / `inalum2026` (akun eksternal; tab Akun di Pengaturan tidak tersedia untuknya). Jika password sebuah akun sudah diganti, minta pegawai SHD lain mereset akun itu di **Pengaturan > Akun**.
 5. Data demo sebaiknya masih segar. Jika sudah berantakan, minta pengembang mereset database demo (perintahnya dijalankan pengembang sendiri) lalu ulangi langkah 2.
 
 ### Cara memandu
@@ -101,7 +101,11 @@ Hasil: ☐ Lancar ☐ Ada kendala ☐ Gagal  Catatan: __________________________
 - Tambahkan sebuah **gedung** dan sebuah **ruangan** di dalamnya.
 - Di bagian **Departemen**, ubah nama lengkap satu departemen, dan lihat informasi sinkron terakhir di atasnya.
 - Tambahkan sebuah **jenis aset** baru beserta kategorinya.
-- (Hanya akun pegawai) Tambahkan satu **akun** baru di bagian Akun.
+
+(Hanya akun pegawai) Buka **Pengaturan > Akun**:
+- Cari seorang pegawai dengan nama atau NIK, lalu coba filter **Jenis** dan **Status**.
+- Tambahkan satu **akun eksternal** lewat tombol "+ Tambah akun eksternal".
+- Lewat menu ⋮, buka **Lihat riwayat** pada sebuah akun.
 
 Hasil: ☐ Lancar ☐ Ada kendala ☐ Gagal  Catatan: ______________________________________
 

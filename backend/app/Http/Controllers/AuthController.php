@@ -53,6 +53,7 @@ class AuthController extends Controller
 
         $this->lockout->clear($loginId);
 
+        $user->forceFill(['last_login_at' => now()])->saveQuietly();
         $token = $user->createToken('web')->plainTextToken;
 
         Log::channel('security')->info('login.success', ['user_id' => $user->id, 'username' => $user->loginId(), 'ip' => $request->ip()]);
@@ -85,14 +86,14 @@ class AuthController extends Controller
 
     /**
      * Isi email akun sendiri (T40): hanya selama email masih kosong. Mengubah email yang sudah terisi lewat staf
-     * SHD di Data Master > Akun, supaya sesi yang dibajak tidak bisa mengalihkan OTP ke email lain.
+     * SHD di Pengaturan > Akun, supaya sesi yang dibajak tidak bisa mengalihkan OTP ke email lain.
      */
     public function updateEmail(UpdateEmailRequest $request): JsonResponse
     {
         $user = $request->user();
 
         if ($user->email !== null) {
-            throw ValidationException::withMessages(['email' => 'Email sudah terisi. Minta staf SHD mengubahnya di Data Master > Akun.']);
+            throw ValidationException::withMessages(['email' => 'Email sudah terisi. Minta staf SHD mengubahnya di Pengaturan > Akun.']);
         }
 
         $user->update(['email' => $request->validated('email')]);

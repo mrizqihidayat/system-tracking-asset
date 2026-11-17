@@ -103,7 +103,7 @@ export default function AppLayout() {
             <div className="min-w-0 flex-1 leading-tight">
               <p className="truncate text-sm font-semibold">{user?.name ?? '-'}</p>
               <p className="truncate text-xs text-white/70">
-                {user ? (user.source === 'api' ? loginId(user) : `Akun bersama ${loginId(user)}`) : 'Admin Aset SHD'}
+                {user ? (user.source === 'api' ? loginId(user) : `Akun eksternal ${loginId(user)}`) : 'Admin Aset SHD'}
               </p>
             </div>
             {/* Menu akun: Ganti password atau Keluar. */}

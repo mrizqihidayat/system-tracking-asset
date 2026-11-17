@@ -17,7 +17,7 @@ Lalu isi salinan pegawai dan departemen dari API pegawai (tiruan) **satu kali**:
 ```
 cd backend && php artisan employees:sync
 ```
-Tanpa langkah ini pegawai SHD belum bisa login dengan NIK untuk pertama kali (seeder tidak memanggil API). Akun contoh `staf1` / `inalum2026` (akun bersama) tetap bisa dipakai.
+Tanpa langkah ini pegawai SHD belum bisa login dengan NIK untuk pertama kali (seeder tidak memanggil API). Akun contoh `staf1` / `inalum2026` (akun eksternal) tetap bisa dipakai.
 
 ## Deploy
 - Isi `EMPLOYEE_API_URL` (URL lengkap endpoint API pegawai asli, tanpa path tambahan), `EMPLOYEE_API_KEY`, dan bila perlu `EMPLOYEE_API_KEY_HEADER` (bawaan `X-API-Key`) dan `EMPLOYEE_API_DATA_KEY` (kosong = respons array langsung) di `.env`.

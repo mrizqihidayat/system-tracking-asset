@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * Data Master > Akun dan saran pegawai (T33, SPEC §15).
+ * Pengaturan > Akun (API) dan saran pegawai (T33, SPEC §15).
  */
 class AccountTest extends TestCase
 {
@@ -60,6 +60,16 @@ class AccountTest extends TestCase
             ->assertJsonPath('user.department', 'HRM');
     }
 
+    public function test_external_account_takes_free_text_unit_and_optional_note(): void
+    {
+        $this->postJson('/api/accounts', $this->payload(['department' => 'Unit Di Luar SIMHC', 'note' => 'Akun untuk Departemen SGA']))->assertCreated()
+            ->assertJsonPath('data.department', 'Unit Di Luar SIMHC');
+        $this->postJson('/api/accounts', $this->payload(['username' => 'tanpa.keterangan', 'email' => 'lain@contoh.test']))->assertCreated();
+
+        $this->assertSame('Akun untuk Departemen SGA', User::where('username', 'bersama.hrm')->value('note'));
+        $this->assertNull(User::where('username', 'tanpa.keterangan')->value('note'));
+    }
+
     public function test_shared_account_validation(): void
     {
         User::factory()->create(['username' => 'staf1']);
@@ -70,7 +80,9 @@ class AccountTest extends TestCase
             ->assertUnprocessable()->assertJsonPath('errors.password.0', 'Password tidak boleh sama dengan username.');
         $this->postJson('/api/accounts', $this->payload(['password_confirmation' => 'Lain-Uji-2']))->assertUnprocessable()->assertJsonValidationErrors('password');
         $this->postJson('/api/accounts', $this->payload(['password' => 'pendek', 'password_confirmation' => 'pendek']))->assertUnprocessable()->assertJsonValidationErrors('password');
-        $this->postJson('/api/accounts', $this->payload(['department' => 'Tidak Ada']))->assertUnprocessable()->assertJsonValidationErrors('department');
+        $this->postJson('/api/accounts', $this->payload(['department' => '']))->assertUnprocessable()->assertJsonValidationErrors('department');
+        $this->postJson('/api/accounts', $this->payload(['department' => str_repeat('a', 101)]))->assertUnprocessable()->assertJsonValidationErrors('department');
+        $this->postJson('/api/accounts', $this->payload(['note' => str_repeat('a', 151)]))->assertUnprocessable()->assertJsonValidationErrors('note');
 
         $this->assertSame(2, User::count());
     }
@@ -85,7 +97,8 @@ class AccountTest extends TestCase
             ->assertJsonPath('data.0.name', 'Akun Pegawai')
             ->assertJsonPath('data.0.source', 'api')
             ->assertJsonPath('data.2.name', 'Zulu Nonaktif')
-            ->assertJsonPath('data.2.is_active', false);
+            ->assertJsonPath('data.2.status', 'nonaktif')
+            ->assertJsonPath('data.2.is_deactivated', true);
     }
 
     public function test_staff_updates_shared_account_password_and_revokes_its_sessions(): void

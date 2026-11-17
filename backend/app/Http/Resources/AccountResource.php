@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Akun staf (T33): akun pegawai SHD (source api, login NIK) atau akun bersama (source manual, login username).
+ * Akun staf (T33): akun pegawai SHD (source api, login NIK) atau akun eksternal (source manual, login username).
  *
  * @mixin User
  */

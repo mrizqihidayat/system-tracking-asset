@@ -53,6 +53,8 @@ export const queryKeys = {
   },
   accounts: {
     all: ['accounts'] as const,
+    list: (params: ListParams) => ['accounts', 'list', params] as const,
+    events: (id: number) => ['accounts', 'events', id] as const,
   },
   /** Sinkron terakhir pegawai & departemen dari API pegawai (T34). */
   employeeSync: ['employee-sync'] as const,

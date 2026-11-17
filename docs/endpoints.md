@@ -10,7 +10,7 @@ Disusun pada 4 November 2026 (diperbarui 17 November 2026, T37) dari `php artisa
 - **6 route non-API:** tidak ada yang dipakai frontend.
 - **Alamat:** semua endpoint API berawalan `/api`. Frontend web mengambil alamat API dari `VITE_API_URL`.
 - **Akses "Token":** wajib header `Authorization: Bearer {token}` dari `POST /api/login`. Tanpa token sah dijawab 401.
-- **Akses "akun pegawai SHD" (T33 R1):** endpoint `/api/accounts*` hanya untuk akun pegawai SHD (login NIK); akun bersama dijawab 403 `code: employee_account_required`.
+- **Akses "akun pegawai SHD" (T33 R1):** endpoint `/api/accounts*` hanya untuk akun pegawai SHD (login NIK); akun eksternal dijawab 403 `code: employee_account_required`.
 - **Format:** semua respons error berbentuk JSON. Path file di kolom "Dipakai frontend" relatif terhadap `frontend/src/`.
 
 | Modul | Total | Dipakai | Tidak dipakai |
@@ -68,7 +68,7 @@ Di balik reverse proxy, batas per IP hanya benar jika `TRUSTED_PROXIES` diisi. T
 | `username` pada login (isian berlabel "Username", diisi NIK atau username; angka saja = NIK) | Teks UTF-8 tanpa karakter NUL, maks. 50 karakter | 422 |
 | `search` pada `/api/employees` | Wajib, 2–100 karakter | 422 |
 | Password baru (`/api/user/password`, `/api/accounts`) | 8–72 karakter, dikonfirmasi, tidak sama dengan NIK/username | 422 |
-| `username` akun bersama | Huruf kecil, angka, titik, garis bawah, strip; minimal satu huruf; 3–50 karakter; unik | 422 |
+| `username` akun eksternal | Huruf kecil, angka, titik, garis bawah, strip; minimal satu huruf; 3–50 karakter; unik | 422 |
 | `{token}` halaman publik | Tepat 12 karakter huruf dan angka | 404, tanpa query ke database |
 | `search` pada `/api/lookups/*` | Teks, maks. 100 karakter | 422 |
 | `quantity`, `min_quantity`, `standard_quantity`, `actual_quantity` | Maks. 2147483647 | 422 |
@@ -94,12 +94,13 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 |---|---|---|---|---|
 | GET | `/api/employees` | Saran pegawai aktif dari salinan lokal (maks. 10): nama, departemen, jabatan (tanpa NIK); tidak memanggil API pegawai | Token | Ya: Nama peminjam & PIC (`components/EmployeeCombobox.tsx`) |
 | GET | `/api/employees/sync-status` | Sinkron terakhir salinan pegawai & departemen (hanya baca; tidak ada endpoint sinkronisasi) | Token | Ya: Data Master > Departemen (`pages/master/DepartmentsTab.tsx`) |
-| GET | `/api/accounts` | Daftar akun, termasuk nonaktif | Token, akun pegawai SHD | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
-| POST | `/api/accounts` | Tambah akun bersama | Token, akun pegawai SHD | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
-| PUT | `/api/accounts/{id}/password` | Ubah password akun bersama | Token, akun pegawai SHD | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
-| POST | `/api/accounts/{id}/reset` | Reset akun pegawai SHD (password kembali ke NIK) | Token, akun pegawai SHD | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
-| DELETE | `/api/accounts/{id}` | Nonaktifkan akun (soft delete), bukan akun sendiri | Token, akun pegawai SHD | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
-| POST | `/api/accounts/{id}/restore` | Aktifkan kembali akun | Token, akun pegawai SHD | Ya: Data Master > Akun (`pages/master/AccountsTab.tsx`) |
+| GET | `/api/accounts` | Daftar akses: akun (termasuk nonaktif) + pegawai SHD yang belum pernah masuk; `search`, `type`, `status`, paginasi | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
+| GET | `/api/accounts/{id}/events` | 10 aktivitas terakhir akun (aksi, pelaku, waktu) | Token, akun pegawai SHD | Ya: Pengaturan > Akun, Lihat riwayat (`pages/settings/AccountsTab.tsx`) |
+| POST | `/api/accounts` | Tambah akun eksternal (`name`, `department` teks bebas, `note` opsional, `username`, `email`, `password`) | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
+| PUT | `/api/accounts/{id}/password` | Ubah password akun eksternal | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
+| POST | `/api/accounts/{id}/reset` | Reset akun pegawai SHD (password kembali ke NIK) | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
+| DELETE | `/api/accounts/{id}` | Nonaktifkan akun (soft delete), bukan akun sendiri | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
+| POST | `/api/accounts/{id}/restore` | Aktifkan kembali akun | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
 
 ### Halaman publik QR
 

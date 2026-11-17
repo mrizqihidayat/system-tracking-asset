@@ -176,7 +176,7 @@ class AuthService
      */
     public function setPassword(User $user, string $password, User $actor): void
     {
-        $user->forceFill(['password' => $password, 'must_change_password' => ! $user->is($actor)])->save();
+        $user->forceFill(['password' => $password, 'must_change_password' => ! $user->is($actor), 'password_changed_at' => now()])->save();
 
         $current = $actor->currentAccessToken();
         $keepId = $current instanceof PersonalAccessToken ? $current->getKey() : null;
@@ -189,7 +189,7 @@ class AuthService
      */
     public function resetEmployeePassword(User $user): void
     {
-        $user->forceFill(['password' => (string) $user->nik, 'must_change_password' => true])->save();
+        $user->forceFill(['password' => (string) $user->nik, 'must_change_password' => true, 'password_changed_at' => null])->save();
         $user->tokens()->delete();
     }
 }

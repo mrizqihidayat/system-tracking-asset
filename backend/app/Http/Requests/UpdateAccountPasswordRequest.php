@@ -7,7 +7,7 @@ use App\Services\AuthService;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
-/** Staf mengubah password akun bersama (tanpa wajib ganti). */
+/** Staf mengubah password akun eksternal (tanpa wajib ganti). */
 class UpdateAccountPasswordRequest extends FormRequest
 {
     public function authorize(): bool

@@ -3,7 +3,7 @@ import { queryClient } from './query-client'
 const TOKEN_KEY = 'asset_token'
 const USER_KEY = 'asset_user'
 
-/** Akun staf (T33): `api` = pegawai SHD (login NIK), `manual` = akun bersama (login username). */
+/** Akun staf (T33): `api` = pegawai SHD (login NIK), `manual` = akun eksternal (login username). */
 export interface AuthUser {
   id: number
   name: string
@@ -18,7 +18,7 @@ export interface AuthUser {
   source: 'api' | 'manual'
 }
 
-/** NIK untuk akun pegawai, username untuk akun bersama. */
+/** NIK untuk akun pegawai, username untuk akun eksternal. */
 export const loginId = (user: Pick<AuthUser, 'source' | 'nik' | 'username'>) =>
   (user.source === 'api' ? user.nik : user.username) ?? ''
 

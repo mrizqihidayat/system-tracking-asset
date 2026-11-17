@@ -12,6 +12,7 @@ export const listConfigs = {
   activeLoans: { prefix: 'aktif_', perPage: 10, fixed: { status: 'Dipinjam' } },
   loanHistory: { filters: ['status'], perPage: 10 },
   consumables: { filters: ['status', 'building_id', 'room_id'], perPage: 20 },
+  accounts: { filters: ['type', 'status'], perPage: 15 },
   supplyRequests: {
     filters: ['status', 'id', 'provider_department_id'],
     perPage: 10,

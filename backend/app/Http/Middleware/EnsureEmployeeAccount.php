@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Kelola akun dan Pengaturan (tampilan, konten, keamanan; T40) hanya untuk akun pegawai SHD (source api); akun bersama ditolak 403 (SPEC §15).
+ * Kelola akun dan Pengaturan (tampilan, konten, keamanan; T40) hanya untuk akun pegawai SHD (source api); akun eksternal ditolak 403 (SPEC §15).
  */
 class EnsureEmployeeAccount
 {

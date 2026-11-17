@@ -167,7 +167,7 @@ class PasswordOtpService
     {
         DB::transaction(function () use ($user, $password): void {
             PasswordOtp::query()->where('user_id', $user->id)->delete();
-            $user->forceFill(['password' => $password, 'must_change_password' => false])->save();
+            $user->forceFill(['password' => $password, 'must_change_password' => false, 'password_changed_at' => now()])->save();
             $user->tokens()->delete();
         });
 

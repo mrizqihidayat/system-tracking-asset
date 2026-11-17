@@ -148,7 +148,7 @@ class AccountEmailTest extends TestCase
     {
         $this->actingAs($this->staff)->putJson('/api/user/email', ['email' => 'lain@contoh.test'])
             ->assertUnprocessable()
-            ->assertJsonPath('errors.email.0', 'Email sudah terisi. Minta staf SHD mengubahnya di Data Master > Akun.');
+            ->assertJsonPath('errors.email.0', 'Email sudah terisi. Minta staf SHD mengubahnya di Pengaturan > Akun.');
 
         $this->assertSame('staf@contoh.test', $this->staff->fresh()->email);
     }

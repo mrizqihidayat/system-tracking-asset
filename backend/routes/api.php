@@ -69,6 +69,7 @@ Route::middleware(['auth:sanctum', 'account.ready'])->group(function () {
     // Kelola akun & Pengaturan: hanya akun pegawai SHD (akun bersama 403).
     Route::middleware('employee.account')->group(function () {
         Route::get('/accounts', [AccountController::class, 'index']);
+        Route::get('/accounts/{account}/events', [AccountController::class, 'events'])->whereNumber('account')->withTrashed();
         Route::post('/accounts', [AccountController::class, 'store']);
         Route::put('/accounts/{account}', [AccountController::class, 'update'])->whereNumber('account')->withTrashed();
         Route::put('/accounts/{account}/password', [AccountController::class, 'updatePassword'])->whereNumber('account')->withTrashed();

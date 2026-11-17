@@ -290,7 +290,7 @@ flowchart TD
     B --> L0{NIK/username sedang dikunci?}
     L0 -- Ya --> L1[Pesan: Akun dikunci sementara, coba lagi dalam N menit; password benar pun ditolak] --> B
     L0 -- Tidak --> C{Angka saja?}
-    C -- Tidak: username --> M1{Akun bersama ada & password benar?}
+    C -- Tidak: username --> M1{Akun eksternal ada & password benar?}
     M1 -- Tidak --> X[(Catat satu kali salah)]
     X --> X1{Sudah mencapai batas salah dari Pengaturan? bawaan 5}
     X1 -- Belum --> X2[Pesan: NIK/Username atau password salah] --> B
@@ -354,19 +354,20 @@ flowchart TD
     K --> L([Selesai: masuk dengan password baru])
 ```
 
-### 10c. Kelola akun (Pengaturan > Data Master > Akun, khusus akun pegawai SHD)
+### 10c. Kelola akun (Pengaturan > Akun, khusus akun pegawai SHD)
 
 ```mermaid
 flowchart TD
     A([Mulai]) --> AKUN{Akun pegawai SHD?}
-    AKUN -- Tidak: akun bersama --> AK2[Bagian Akun tidak tampil; API menolak 403]
-    AKUN -- Ya --> K{Aksi akun}
-    K -- Tambah akun bersama --> K1[Username bukan angka saja, nama, departemen, email wajib & unik, password 2x] --> K2[(Simpan, tidak wajib ganti password)]
+    AKUN -- Tidak: akun eksternal --> AK2[Bagian Akun tidak tampil; API menolak 403]
+    AKUN -- Ya --> L[Daftar akses: akun + pegawai SHD yang belum pernah masuk; cari, filter Jenis & Status; urut Aktif, Belum pernah masuk, Nonaktif] --> K{Aksi akun}
+    K -- Lihat riwayat --> K9[10 aktivitas terakhir: aksi, pelaku, waktu]
+    K -- Tambah akun eksternal --> K1[Username bukan angka saja, nama, departemen, email wajib & unik, password 2x] --> K2[(Simpan, tidak wajib ganti password)]
     K -- Ubah email akun mana pun --> K7[Email valid & belum dipakai akun lain] --> K8[(Simpan email: tujuan kode lupa password)]
-    K -- Reset akun pegawai --> K3[(Password kembali ke NIK, sesi dicabut, kunci dibuka, wajib ganti password saat masuk berikutnya)]
-    K -- Ubah password akun bersama --> K4[(Simpan, sesi dicabut, kunci dibuka, wajib ganti password saat masuk berikutnya)]
-    K -- Nonaktifkan, bukan akun sendiri --> K5[(Soft delete, sesi dicabut)]
-    K -- Aktifkan kembali --> K6[(Restore)]
+    K -- Reset akun pegawai, bukan akun sendiri, dialog konfirmasi --> K3[(Password kembali ke NIK, sesi dicabut, kunci dibuka, wajib ganti password saat masuk berikutnya; catat riwayat)]
+    K -- Ubah password akun eksternal --> K4[(Simpan, sesi dicabut, kunci dibuka, wajib ganti password saat masuk berikutnya)]
+    K -- Nonaktifkan, bukan akun sendiri, dialog konfirmasi --> K5[(Soft delete, sesi dicabut; catat riwayat)]
+    K -- Aktifkan kembali, kecuali pegawai nonaktif di data pegawai --> K6[(Restore; catat riwayat)]
 ```
 
 ## 11. Sinkronisasi pegawai & departemen
@@ -395,8 +396,9 @@ Menu **Pengaturan** terbuka untuk semua akun; tab yang tampil dan izin di backen
 ```mermaid
 flowchart TD
     A([Mulai: menu Pengaturan]) --> B{Akun pegawai SHD?}
-    B -- Tidak: akun bersama --> M[Hanya tab Data Master tanpa bagian Akun; API pengaturan & akun menolak 403] --> DM[[Data Master]]
+    B -- Tidak: akun eksternal --> M[Hanya tab Data Master; tab Akun tidak tampil; API pengaturan & akun menolak 403] --> DM[[Data Master]]
     B -- Ya --> C{Pilih tab}
+    C -- Akun --> AK[[Kelola akun, bagian 10c]]
     C -- Data Master --> DM
     C -- Tampilan --> T1[Pilih paket warna atau warna utama & warna sidebar sendiri]
     T1 --> T2[Contoh tampilan berubah; aplikasi belum berubah]

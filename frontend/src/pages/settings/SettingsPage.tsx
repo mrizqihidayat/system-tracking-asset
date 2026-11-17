@@ -2,20 +2,22 @@ import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/Page'
 import { getUser } from '../../lib/auth'
 import MasterDataPage from '../master/MasterDataPage'
+import AccountsTab from './AccountsTab'
 import { AppearanceTab, ContentTab, SecurityTab } from './SettingsTabs'
 
-type Tab = 'tampilan' | 'konten' | 'keamanan' | 'data-master'
+type Tab = 'tampilan' | 'konten' | 'keamanan' | 'akun' | 'data-master'
 
 const TABS: { key: Tab; label: string; employeeOnly: boolean }[] = [
   { key: 'tampilan', label: 'Tampilan', employeeOnly: true },
   { key: 'konten', label: 'Konten', employeeOnly: true },
   { key: 'keamanan', label: 'Keamanan', employeeOnly: true },
+  { key: 'akun', label: 'Akun', employeeOnly: true },
   { key: 'data-master', label: 'Data Master', employeeOnly: false },
 ]
 
 /**
- * Pengaturan (T40, SPEC §15). Semua akun bisa membuka halaman ini, tetapi tab Tampilan, Konten, dan Keamanan
- * hanya untuk akun pegawai SHD (API juga menolak 403). Akun bersama hanya melihat Data Master tanpa bagian Akun.
+ * Pengaturan (T40, SPEC §15). Semua akun bisa membuka halaman ini, tetapi tab Tampilan, Konten, Keamanan, dan Akun
+ * hanya untuk akun pegawai SHD (API juga menolak 403). Akun eksternal hanya melihat Data Master tanpa bagian Akun.
  */
 export default function SettingsPage() {
   const [params, setParams] = useSearchParams()
@@ -24,12 +26,12 @@ export default function SettingsPage() {
   const tab = (tabs.find((t) => t.key === params.get('tab')) ?? tabs[0]).key
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className={`${tab === 'akun' ? 'max-w-6xl' : 'max-w-4xl'} space-y-5`}>
       <PageHeader
         title="Pengaturan"
         description={
           isEmployee
-            ? 'Atur tampilan, tulisan, keamanan akun, dan data master aplikasi.'
+            ? 'Atur tampilan, tulisan, keamanan, akses akun, dan data master aplikasi.'
             : 'Kelola data master: gedung, ruangan, departemen, kategori dan jenis aset, serta kategori stok.'
         }
       />
@@ -55,6 +57,7 @@ export default function SettingsPage() {
       {tab === 'tampilan' && <AppearanceTab />}
       {tab === 'konten' && <ContentTab />}
       {tab === 'keamanan' && <SecurityTab />}
+      {tab === 'akun' && <AccountsTab />}
       {tab === 'data-master' && <MasterDataPage />}
     </div>
   )

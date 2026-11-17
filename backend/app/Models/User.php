@@ -12,9 +12,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 /**
  * Akun staf (T33). source "api" = pegawai SHD dari API pegawai, login dengan NIK;
- * source "manual" = akun bersama buatan staf, login dengan username. Nonaktif = soft delete.
+ * source "manual" = akun eksternal buatan staf (pengguna yang tidak terdaftar di SIMHC), login dengan username. Nonaktif = soft delete.
  */
-#[Fillable(['nik', 'name', 'username', 'department', 'email', 'email_exempt', 'source', 'password'])]
+#[Fillable(['nik', 'name', 'username', 'department', 'note', 'email', 'email_exempt', 'source', 'password', 'password_changed_at'])]
 #[Hidden(['password'])]
 class User extends Authenticatable
 {
@@ -31,6 +31,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'email_exempt' => 'boolean',
             'must_change_password' => 'boolean',
+            'last_login_at' => 'datetime',
+            'password_changed_at' => 'datetime',
         ];
     }
 
@@ -39,7 +41,7 @@ class User extends Authenticatable
         return $this->source === self::SOURCE_API;
     }
 
-    /** Akun tanpa email wajib mengisinya setelah login (T40), kecuali yang dikecualikan (akun bersama staf1). */
+    /** Akun tanpa email wajib mengisinya setelah login (T40), kecuali yang dikecualikan (akun eksternal staf1). */
     public function needsEmail(): bool
     {
         return $this->email === null && ! $this->email_exempt;
