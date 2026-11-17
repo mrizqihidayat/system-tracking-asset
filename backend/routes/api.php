@@ -48,10 +48,12 @@ Route::middleware('throttle:public-settings')->group(function () {
     Route::get('/settings/files/{type}', [SettingController::class, 'file'])->whereIn('type', array_keys(SettingService::FILE_KEYS))->name('settings.file');
 });
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', [AuthController::class, 'me']);
-    Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:password');
+// `account.ready` (T40): akun tanpa email wajib mengisinya dulu; hanya empat rute pertama yang tetap terbuka.
+Route::middleware(['auth:sanctum', 'account.ready'])->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout'])->withoutMiddleware('account.ready');
+    Route::get('/user', [AuthController::class, 'me'])->withoutMiddleware('account.ready');
+    Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:password')->withoutMiddleware('account.ready');
+    Route::put('/user/email', [AuthController::class, 'updateEmail'])->middleware('throttle:password')->withoutMiddleware('account.ready');
 
     // Direktori pegawai & akun (T33, SPEC §15)
     Route::get('/employees', [EmployeeController::class, 'index']);
@@ -60,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('employee.account')->group(function () {
         Route::get('/accounts', [AccountController::class, 'index']);
         Route::post('/accounts', [AccountController::class, 'store']);
+        Route::put('/accounts/{account}', [AccountController::class, 'update'])->whereNumber('account')->withTrashed();
         Route::put('/accounts/{account}/password', [AccountController::class, 'updatePassword'])->whereNumber('account')->withTrashed();
         Route::post('/accounts/{account}/reset', [AccountController::class, 'reset'])->whereNumber('account')->withTrashed();
         Route::post('/accounts/{account}/restore', [AccountController::class, 'restore'])->whereNumber('account')->withTrashed();

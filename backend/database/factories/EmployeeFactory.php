@@ -23,7 +23,7 @@ class EmployeeFactory extends Factory
             'department_code' => 'DEP',
             'section' => null,
             'position' => 'Staf',
-            'email' => null,
+            'email' => fake()->unique()->safeEmail(),
             'is_active' => true,
             'synced_at' => now(),
         ];

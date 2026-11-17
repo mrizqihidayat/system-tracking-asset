@@ -85,51 +85,6 @@ class AuthTest extends TestCase
         $this->getJson('/api/user')->assertUnauthorized();
     }
 
-    public function test_login_is_limited_to_5_attempts_per_minute_per_username_and_ip(): void
-    {
-        foreach (range(1, 5) as $attempt) {
-            $this->login('staf.shd', 'salah')->assertUnauthorized();
-        }
-
-        $blocked = $this->login('staf.shd', 'salah')->assertStatus(429);
-
-        $this->assertMatchesRegularExpression('/^Terlalu banyak percobaan login\. Coba lagi dalam \d+ detik\.$/', $blocked->json('message'));
-        $this->assertNotNull($blocked->headers->get('Retry-After'));
-        $this->assertStringContainsString($blocked->headers->get('Retry-After'), $blocked->json('message'));
-
-        // Password benar pun ditolak selama diblokir; username berbeda tidak terpengaruh.
-        $this->login('staf.shd', 'password')->assertStatus(429);
-        User::factory()->create(['username' => 'lain']);
-        $this->login('lain')->assertOk();
-    }
-
-    public function test_login_limit_ignores_username_case_and_is_per_ip(): void
-    {
-        foreach (['staf.shd', 'STAF.SHD', ' Staf.Shd ', 'staf.shd', 'STAF.shd'] as $username) {
-            $this->login($username, 'salah')->assertUnauthorized();
-        }
-
-        $this->login('Staf.SHD', 'salah')->assertStatus(429);
-
-        // IP yang sama tetap diblokir; IP lain dengan username yang sama tidak terpengaruh.
-        $this->login('staf.shd', 'password')->assertStatus(429);
-        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.9'])
-            ->postJson('/api/login', ['username' => 'staf.shd', 'password' => 'password'])
-            ->assertOk();
-    }
-
-    public function test_login_limit_resets_after_a_minute(): void
-    {
-        foreach (range(1, 5) as $attempt) {
-            $this->login('staf.shd', 'salah')->assertUnauthorized();
-        }
-        $this->login('staf.shd', 'password')->assertStatus(429);
-
-        $this->travel(61)->seconds();
-
-        $this->login('staf.shd', 'password')->assertOk();
-    }
-
     /**
      * @return array<string, array{0: mixed}>
      */
@@ -201,18 +156,21 @@ class AuthTest extends TestCase
             ->assertUnauthorized();
     }
 
+    /** Username berbeda setiap percobaan supaya yang teruji batas per IP, bukan penguncian akun. */
     private function loginThroughProxy(string $proxy, string $forwardedFor)
     {
+        static $attempt = 0;
+
         return $this->withServerVariables(['REMOTE_ADDR' => $proxy])
             ->withHeader('X-Forwarded-For', $forwardedFor)
-            ->postJson('/api/login', ['username' => 'staf.shd', 'password' => 'salah']);
+            ->postJson('/api/login', ['username' => 'tamu'.++$attempt, 'password' => 'salah']);
     }
 
     public function test_login_limit_reads_visitor_ip_behind_trusted_proxy(): void
     {
         config(['trustedproxy.proxies' => ['10.0.0.1']]);
 
-        foreach (range(1, 5) as $attempt) {
+        foreach (range(1, 20) as $attempt) {
             $this->loginThroughProxy('10.0.0.1', '203.0.113.5')->assertUnauthorized();
         }
 
@@ -224,7 +182,7 @@ class AuthTest extends TestCase
     {
         config(['trustedproxy.proxies' => ['10.0.0.1']]);
 
-        foreach (range(1, 5) as $attempt) {
+        foreach (range(1, 20) as $attempt) {
             $this->loginThroughProxy('10.0.0.1', "198.51.100.{$attempt}, 203.0.113.5")->assertUnauthorized();
         }
 
@@ -235,7 +193,7 @@ class AuthTest extends TestCase
     {
         config(['trustedproxy.proxies' => ['10.0.0.1']]);
 
-        foreach (range(1, 5) as $attempt) {
+        foreach (range(1, 20) as $attempt) {
             $this->loginThroughProxy('10.0.0.2', "203.0.113.{$attempt}")->assertUnauthorized();
         }
 

@@ -41,6 +41,7 @@ class AccountTest extends TestCase
             'username' => 'bersama.hrm',
             'name' => 'Akun Bersama HRM',
             'department' => 'HRM',
+            'email' => 'bersama.hrm@contoh.test',
             'password' => 'Bersama-Uji-1',
             'password_confirmation' => 'Bersama-Uji-1',
             ...$overrides,

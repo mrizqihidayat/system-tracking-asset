@@ -18,6 +18,8 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Staf SHD',
                 'department' => 'SHD',
                 'source' => User::SOURCE_MANUAL,
+                // Akun demo tanpa email: dikecualikan dari kewajiban mengisi email (T40).
+                'email_exempt' => true,
                 'password' => Hash::make('inalum2026'),
             ]
         );

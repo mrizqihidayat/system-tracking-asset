@@ -67,6 +67,8 @@ Table users {
   name varchar(100) [not null, note: 'akun api: disinkronkan dari salinan pegawai (employees) setiap login']
   username varchar(50) [unique, note: 'akun bersama (source manual), login username']
   department varchar(100) [note: 'akun api: dari salinan pegawai (departemen/divisi/grup); akun manual: nama dari master departments']
+  email varchar(150) [unique, note: 'T40: tujuan OTP lupa password; huruf kecil; akun api terisi dari employees.email bila kosong']
+  email_exempt boolean [not null, default: false, note: 'T40: true = tidak wajib mengisi email (akun bersama staf1)']
   source varchar(10) [not null, default: 'manual', note: 'api | manual (CHECK); api wajib nik, manual wajib username (CHECK)']
   password varchar(255) [not null, note: 'akun api: hash NIK sampai pegawai mengganti sendiri (opsional); reset mengembalikan ke NIK (T33 R2)']
   created_at timestamp

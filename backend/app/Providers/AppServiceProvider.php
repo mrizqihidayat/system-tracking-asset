@@ -55,22 +55,14 @@ class AppServiceProvider extends ServiceProvider
         // Pengaturan publik + logo/favicon dimuat setiap halaman dibuka; satu kantor bisa berbagi satu IP.
         RateLimiter::for('public-settings', fn (Request $request) => Limit::perMinute(120)->by($request->ip()));
 
-        // Login: maks. 5 percobaan per menit per username + IP, dan 20 per menit per IP (SPEC §15).
-        // Username bukan teks tidak dipakai sebagai kunci; validasi yang menjawab 422.
-        RateLimiter::for('login', function (Request $request) {
-            $username = $request->input('username');
-            $key = (is_string($username) ? mb_strtolower(trim($username)) : '').'|'.$request->ip();
-            $tooMany = function (Request $request, array $headers) {
+        // Login: maks. 20 percobaan per menit per IP. Salah password berulang pada satu NIK/username ditangani
+        // LoginLockout (batas dan lama kunci dari Pengaturan > Keamanan, T40, SPEC §15).
+        RateLimiter::for('login', fn (Request $request) => Limit::perMinute(20)->by($request->ip())
+            ->response(function (Request $request, array $headers) {
                 $seconds = (int) ($headers['Retry-After'] ?? 60);
 
                 return response()->json(['message' => "Terlalu banyak percobaan login. Coba lagi dalam {$seconds} detik."], 429, $headers);
-            };
-
-            return [
-                Limit::perMinute(5)->by($key)->response($tooMany),
-                Limit::perMinute(20)->by($request->ip())->response($tooMany),
-            ];
-        });
+            }));
 
         // Ganti password sendiri: maks. 10 per menit per akun.
         RateLimiter::for('password', fn (Request $request) => Limit::perMinute(10)->by((string) $request->user()?->id));

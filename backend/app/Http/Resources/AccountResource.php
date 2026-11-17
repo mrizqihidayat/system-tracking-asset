@@ -24,6 +24,8 @@ class AccountResource extends JsonResource
             'nik' => $this->nik,
             'username' => $this->username,
             'department' => $this->department,
+            'email' => $this->email,
+            'email_required' => $this->needsEmail(),
             'source' => $this->source,
             'is_active' => ! $this->trashed(),
             'deactivated_at' => $this->deleted_at?->toIso8601String(),

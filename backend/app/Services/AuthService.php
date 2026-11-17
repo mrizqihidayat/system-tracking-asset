@@ -20,6 +20,8 @@ use Laravel\Sanctum\PersonalAccessToken;
  */
 class AuthService
 {
+    public function __construct(private SettingService $settings) {}
+
     /**
      * Hash bcrypt dari teks acak yang tidak disimpan, cost sama dengan BCRYPT_ROUNDS production. Dicek saat
      * akun tidak ada agar waktu respons sama dengan password salah.
@@ -108,7 +110,11 @@ class AuthService
         $name = mb_substr($employee->name, 0, 100);
 
         if ($user) {
-            $user->update(['name' => $name, 'department' => $employee->departmentLabel()]);
+            $user->update([
+                'name' => $name,
+                'department' => $employee->departmentLabel(),
+                'email' => $user->email ?? $this->employeeEmail($employee, $user),
+            ]);
 
             return $user;
         }
@@ -117,9 +123,27 @@ class AuthService
             'nik' => $employee->nik,
             'name' => $name,
             'department' => $employee->departmentLabel(),
+            'email' => $this->employeeEmail($employee, null),
             'source' => User::SOURCE_API,
             'password' => $employee->nik,
         ]);
+    }
+
+    /**
+     * Email dari salinan pegawai untuk mengisi email akun yang masih kosong (T40). Null bila API tidak membawa
+     * email, formatnya tidak valid, atau sudah dipakai akun lain; akun itu lalu wajib mengisi email sendiri.
+     */
+    private function employeeEmail(Employee $employee, ?User $user): ?string
+    {
+        $email = mb_strtolower(trim((string) $employee->email));
+
+        if ($email === '' || mb_strlen($email) > 150 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            return null;
+        }
+
+        $taken = User::withTrashed()->where('email', $email)->when($user, fn ($query) => $query->whereKeyNot($user->getKey()))->exists();
+
+        return $taken ? null : $email;
     }
 
     public function checkCurrentPassword(User $user, string $password): bool
@@ -128,14 +152,14 @@ class AuthService
     }
 
     /**
-     * Aturan password baru: minimal 8, terkonfirmasi, tidak sama dengan NIK/username (tanpa beda huruf besar/kecil).
+     * Aturan password baru: panjang minimal dari Pengaturan > Keamanan (bawaan 8), terkonfirmasi, tidak sama dengan NIK/username (tanpa beda huruf besar/kecil).
      *
      * @return list<mixed>
      */
     public function newPasswordRules(?User $user, ?string $username = null): array
     {
         return [
-            'required', 'string', 'min:8', 'max:72', 'confirmed',
+            'required', 'string', 'min:'.$this->settings->int('password_min_length'), 'max:72', 'confirmed',
             function (string $attribute, mixed $value, Closure $fail) use ($user, $username): void {
                 $loginId = $user?->loginId() ?? (string) $username;
                 if ($loginId !== '' && mb_strtolower((string) $value) === mb_strtolower($loginId)) {
