@@ -22,6 +22,9 @@ class ApiAccessTest extends TestCase
         // T38: dijaga CRON_SECRET / EMPLOYEE_MOCK_ENABLED + API key (lihat CronEmployeesSyncTest), 404 bila env kosong.
         'GET api/internal/cron/employees-sync',
         'GET api/mock/employees',
+        // T40: tampilan & teks halaman login, logo/favicon (lihat SettingTest).
+        'GET api/settings/public',
+        'GET api/settings/files/{type}',
     ];
 
     /**
@@ -43,7 +46,7 @@ class ApiAccessTest extends TestCase
     private function sampleUri(LaravelRoute $route): string
     {
         return preg_replace_callback('/\{(\w+)\}/', fn (array $match) => match ($match[1]) {
-            'type' => 'assets',
+            'type' => str_contains($route->uri(), 'settings/files') ? 'logo' : 'assets',
             'value', 'token' => 'abc',
             default => '1',
         }, $route->uri());

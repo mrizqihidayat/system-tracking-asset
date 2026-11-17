@@ -27,7 +27,9 @@ use App\Http\Controllers\RequestCatalogController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\RoomReadinessController;
 use App\Http\Controllers\RoomStandardController;
+use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SupplyRequestController;
+use App\Services\SettingService;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -40,6 +42,12 @@ Route::get('/mock/employees', MockEmployeeApiController::class);
 // Halaman publik QR: tanpa auth, read-only, rate limit per IP (SPEC §6)
 Route::get('/public/assets/{token}', [PublicAssetController::class, 'show'])->middleware('throttle:public-assets');
 
+// Pengaturan publik (T40): warna, judul, logo untuk halaman login & publik QR. Tanpa auth, rate limit per IP.
+Route::middleware('throttle:public-settings')->group(function () {
+    Route::get('/settings/public', [SettingController::class, 'publicIndex']);
+    Route::get('/settings/files/{type}', [SettingController::class, 'file'])->whereIn('type', array_keys(SettingService::FILE_KEYS))->name('settings.file');
+});
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
@@ -48,7 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Direktori pegawai & akun (T33, SPEC §15)
     Route::get('/employees', [EmployeeController::class, 'index']);
     Route::get('/employees/sync-status', [EmployeeController::class, 'syncStatus']);
-    // Kelola akun: hanya akun pegawai SHD (akun bersama 403).
+    // Kelola akun & Pengaturan: hanya akun pegawai SHD (akun bersama 403).
     Route::middleware('employee.account')->group(function () {
         Route::get('/accounts', [AccountController::class, 'index']);
         Route::post('/accounts', [AccountController::class, 'store']);
@@ -56,6 +64,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/accounts/{account}/reset', [AccountController::class, 'reset'])->whereNumber('account')->withTrashed();
         Route::post('/accounts/{account}/restore', [AccountController::class, 'restore'])->whereNumber('account')->withTrashed();
         Route::delete('/accounts/{account}', [AccountController::class, 'destroy'])->whereNumber('account')->withTrashed();
+
+        // Pengaturan (T40): tampilan, konten, keamanan.
+        Route::get('/settings', [SettingController::class, 'index']);
+        Route::put('/settings', [SettingController::class, 'update']);
+        Route::post('/settings/files/{type}', [SettingController::class, 'storeFile'])->whereIn('type', array_keys(SettingService::FILE_KEYS))->middleware('throttle:uploads');
+        Route::delete('/settings/files/{type}', [SettingController::class, 'destroyFile'])->whereIn('type', array_keys(SettingService::FILE_KEYS));
     });
 
     // Dashboard per kelompok widget (SPEC §11), masing-masing di-cache

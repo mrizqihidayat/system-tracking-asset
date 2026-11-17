@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 
 /**
  * PDF label QR aset: QR 5×5 cm berisi link halaman publik + kode, grid 3 kolom × 4 baris per A4.
+ * Teks label dari Pengaturan (T40, maks. 40 karakter) dicetak di bawah kode; kosong = tidak tampil.
  */
 class AssetLabelService
 {
@@ -18,15 +19,23 @@ class AssetLabelService
 
     public const MAX_LABELS = 120;
 
-    public function __construct(private QrCodeService $qr) {}
+    public function __construct(private QrCodeService $qr, private SettingService $settings) {}
 
     /**
      * @param  Collection<int, Asset>  $assets
      */
     public function pdf(Collection $assets): DomPdf
     {
-        return Pdf::loadView('pdf.asset-labels', ['pages' => $this->pages($assets)])
-            ->setPaper('a4', 'portrait');
+        return Pdf::loadView('pdf.asset-labels', $this->viewData($assets))->setPaper('a4', 'portrait');
+    }
+
+    /**
+     * @param  Collection<int, Asset>  $assets
+     * @return array{pages: Collection<int, mixed>, text: string}
+     */
+    public function viewData(Collection $assets): array
+    {
+        return ['pages' => $this->pages($assets), 'text' => $this->settings->text('label_text')];
     }
 
     /**

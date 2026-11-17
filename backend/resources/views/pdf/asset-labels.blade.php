@@ -14,6 +14,7 @@
         .label { width: 50mm; padding: 1mm; border: 0.2mm dashed #888; text-align: center; }
         .label img { display: block; margin: 0 auto; width: 50mm; height: 50mm; }
         .code { margin-top: 1mm; font-size: 9pt; font-weight: bold; letter-spacing: 0.3mm; }
+        .text { margin-top: 0.5mm; font-size: 6pt; line-height: 1.1; }
     </style>
 </head>
 <body>
@@ -27,6 +28,9 @@
                             <div class="label">
                                 <img src="{{ $label['qr'] }}" alt="QR {{ $label['code'] }}">
                                 <div class="code">{{ $label['code'] }}</div>
+                                @if (($text ?? '') !== '')
+                                    <div class="text">{{ $text }}</div>
+                                @endif
                             </div>
                         </td>
                     @endforeach

@@ -106,6 +106,28 @@ Table employee_sync_runs {
   updated_at timestamp
 }
 
+Table settings {
+  id bigint [pk, increment]
+  key varchar(50) [not null, unique, note: 'T40: theme_primary, site_title, max_login_attempts, logo_path, dst. (SettingService::DEFAULTS)']
+  value json [note: 'nilai terkini; key tanpa baris memakai nilai bawaan']
+  updated_by bigint [ref: > users.id, note: 'ON DELETE SET NULL']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table setting_changes {
+  id bigint [pk, increment]
+  key varchar(50) [not null]
+  old_value json
+  new_value json
+  user_id bigint [ref: > users.id, note: 'pelaku; ON DELETE SET NULL']
+  created_at timestamp [not null]
+
+  indexes {
+    (key, created_at)
+  }
+}
+
 Table departments {
   id bigint [pk, increment]
   code varchar(100) [unique, note: 'kode dari API pegawai (kunci sinkronisasi); baris lama: code = name (T34)']

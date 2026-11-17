@@ -52,6 +52,9 @@ class AppServiceProvider extends ServiceProvider
         // Halaman publik QR (tanpa login): batasi per IP.
         RateLimiter::for('public-assets', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
 
+        // Pengaturan publik + logo/favicon dimuat setiap halaman dibuka; satu kantor bisa berbagi satu IP.
+        RateLimiter::for('public-settings', fn (Request $request) => Limit::perMinute(120)->by($request->ip()));
+
         // Login: maks. 5 percobaan per menit per username + IP, dan 20 per menit per IP (SPEC §15).
         // Username bukan teks tidak dipakai sebagai kunci; validasi yang menjawab 422.
         RateLimiter::for('login', function (Request $request) {

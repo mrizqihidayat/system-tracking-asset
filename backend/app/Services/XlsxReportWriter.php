@@ -21,12 +21,17 @@ use OpenSpout\Writer\XLSX\Writer;
  */
 class XlsxReportWriter
 {
-    /** Baris judul (1), filter (2), dicetak (3), kosong (4), header (5); data mulai baris 6. */
+    /**
+     * Baris judul (1), filter (2), dicetak (3), kosong (4), header (5); data mulai baris 6. Bila kop laporan
+     * diisi di Pengaturan (T40), kop menjadi baris 1 dan semuanya turun satu baris.
+     */
     private const HEADER_ROW = 5;
 
     private const DATE_FORMAT = 'dd/mm/yyyy';
 
     private const DATETIME_FORMAT = 'dd/mm/yyyy hh:mm';
+
+    public function __construct(private SettingService $settings) {}
 
     /**
      * @return string path file sementara (hapus setelah dipakai)
@@ -37,17 +42,18 @@ class XlsxReportWriter
         $writer = new Writer;
         $writer->setCreator(config('app.name'));
         $writer->openToFile($path);
+        $letterhead = $this->settings->text('report_header');
 
         foreach ($report->sheets as $index => $sheet) {
             $worksheet = $index === 0 ? $writer->getCurrentSheet() : $writer->addNewSheetAndMakeItCurrent();
             $worksheet->setName($sheet->name);
-            $worksheet->setSheetView((new SheetView)->setFreezeRow(self::HEADER_ROW + 1));
+            $worksheet->setSheetView((new SheetView)->setFreezeRow(self::HEADER_ROW + 1 + ($letterhead === '' ? 0 : 1)));
 
             foreach ($sheet->columns as $column => $definition) {
                 $worksheet->setColumnWidth($definition->width, $column + 1);
             }
 
-            $this->writeSheet($writer, $report, $sheet, $user);
+            $this->writeSheet($writer, $report, $sheet, $user, $letterhead);
         }
 
         $writer->close();
@@ -55,11 +61,14 @@ class XlsxReportWriter
         return $path;
     }
 
-    private function writeSheet(Writer $writer, Report $report, ReportSheet $sheet, User $user): void
+    private function writeSheet(Writer $writer, Report $report, ReportSheet $sheet, User $user, string $letterhead): void
     {
         $title = (new Style)->setFontBold()->setFontSize(14);
         $header = (new Style)->setFontBold()->setBackgroundColor('D9E2F3')->setShouldWrapText();
 
+        if ($letterhead !== '') {
+            $writer->addRow($this->textRow([$letterhead], (new Style)->setFontBold()->setFontSize(12)));
+        }
         $writer->addRow($this->textRow([$report->title().' — '.$sheet->name], $title));
         $writer->addRow($this->textRow([$report->filterSummary]));
         $writer->addRow($this->textRow(['Dicetak '.now()->format('d/m/Y H:i').' oleh '.$user->name]));

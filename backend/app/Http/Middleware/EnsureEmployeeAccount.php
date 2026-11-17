@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Kelola akun hanya untuk akun pegawai SHD (source api); akun bersama ditolak 403 (SPEC §15).
+ * Kelola akun dan Pengaturan (tampilan, konten, keamanan; T40) hanya untuk akun pegawai SHD (source api); akun bersama ditolak 403 (SPEC §15).
  */
 class EnsureEmployeeAccount
 {
@@ -15,7 +15,7 @@ class EnsureEmployeeAccount
     {
         if (! $request->user()?->isApi()) {
             return response()->json([
-                'message' => 'Hanya akun pegawai SHD yang bisa mengelola akun.',
+                'message' => 'Hanya akun pegawai SHD yang bisa membuka bagian ini.',
                 'code' => 'employee_account_required',
             ], 403);
         }

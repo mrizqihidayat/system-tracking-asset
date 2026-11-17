@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call([
+            SettingSeeder::class,
             MasterDataSeeder::class,
             AssetSeeder::class,
             RequestSeeder::class,
