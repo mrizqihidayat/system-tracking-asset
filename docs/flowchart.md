@@ -106,7 +106,7 @@ flowchart TD
     A1 -- Kamera HP biasa --> Q1[Buka link QR /aset/token tanpa login]
     Q1 --> Q2{Token valid & aset masih ada?}
     Q2 -- Tidak --> Q2a[Pesan Aset tidak ditemukan] --> Z
-    Q2 -- Ya --> Q3[Halaman publik read-only + tombol aksi Khusus staf SHD]
+    Q2 -- Ya --> Q3[Halaman publik read-only (tanpa tombol aksi)]
     Q3 -- Hanya melihat --> Z
     Q3 -- Menekan aksi --> Q4{Sudah login?}
     Q4 -- Belum --> Q5[Login, lalu kembali otomatis] --> Q6

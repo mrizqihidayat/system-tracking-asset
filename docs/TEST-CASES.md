@@ -102,8 +102,8 @@ Konvensi: **Langkah** → **Hasil yang diharapkan**.
 - [ ] **TC-QR-03 Scan kamera** — Menu Scan, arahkan label ke webcam → Hasil scan: nama, kode, jenis, lokasi, kondisi, status, dan tombol aksi sesuai status.
 - [ ] **TC-QR-04 Scan ketik kode** — Ketik kode aset di halaman Scan → Hasil sama dengan TC-QR-03; kode tidak dikenal → "Aset tidak ditemukan."
 - [ ] **TC-QR-05 Aksi per status** — Scan aset Tersedia/Dipinjam/Perbaikan/Hilang/Tidak Layak Pakai → Tombol aksi sesuai SPEC §6 (mis. Hilang hanya Tandai ditemukan & Pindah lokasi).
-- [ ] **TC-QR-06 Halaman publik tanpa login** — Logout, buka URL QR `/aset/{token}` → Data aset tampil tanpa file & tanpa data peminjam; tombol aksi berlabel "Khusus staf SHD".
-- [ ] **TC-QR-07 Aksi dari halaman publik** — Dari halaman publik klik Pinjam saat belum login → Diarahkan login, lalu otomatis ke form pinjam dengan aset terisi.
+- [ ] **TC-QR-06 Halaman publik tanpa login** — Logout, buka URL QR `/aset/{token}` → Data aset (termasuk spesifikasi) tampil tanpa file & tanpa data peminjam; tidak ada tombol aksi.
+- [ ] **TC-QR-07 Aksi dari hasil scan staf** — Login, scan QR dari Dashboard, pilih Pinjam → Form pinjam terbuka dengan aset terisi. Halaman publik (tanpa login) tidak menampilkan tombol aksi.
 - [ ] **TC-QR-08 Terima kembali dari scan** — Scan aset Dipinjam → Terima kembali → Modal terima kembali langsung terbuka untuk peminjaman aktifnya.
 
 ## 6. Peminjaman

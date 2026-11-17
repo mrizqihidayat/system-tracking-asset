@@ -1,21 +1,19 @@
-import { Lock } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { Brand } from '../../components/layout/AppLayout'
 import { AssetCode, ConditionBadge, StatusBadge } from '../../components/ui/Badge'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { skeletonWidth } from '../../components/ui/skeleton-width'
 import { api, errorMessage } from '../../lib/api'
-import { getToken } from '../../lib/auth'
 import { formatDate } from '../../lib/format'
 import type { Condition, Status } from '../../types/asset'
-import { SCAN_ACTIONS } from './scanActions'
 
 interface PublicAsset {
   code: string
   name: string
   category: string
   asset_type: string
+  specification: string | null
   source: { name: string; is_internal: boolean }
   building: string
   room: string
@@ -29,7 +27,6 @@ interface PublicAsset {
   room_standard: { is_standard: boolean; item_name: string | null }
   /** Pemesanan terdekat, tanpa data peminjam. */
   upcoming_booking: { borrow_date: string } | null
-  actions: string[]
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -41,10 +38,9 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** Halaman publik QR (tanpa login): data aset read-only + aksi khusus staf SHD. */
+/** Halaman publik QR (tanpa login): data aset read-only. Aksi dilakukan staf lewat hasil scan setelah login. */
 export default function PublicAssetPage() {
   const { token = '' } = useParams()
-  const navigate = useNavigate()
   const [asset, setAsset] = useState<PublicAsset | null>(null)
   const [error, setError] = useState('')
 
@@ -55,15 +51,7 @@ export default function PublicAssetPage() {
       .catch((e) => setError(errorMessage(e)))
   }, [token])
 
-  // Sudah login → langsung ke form; belum → login dulu, lalu kembali otomatis ke form yang sama.
-  const goAction = (key: string) => {
-    const target = `/scan/${encodeURIComponent(token)}?aksi=${key}`
-    navigate(getToken() ? target : `/login?next=${encodeURIComponent(target)}`)
-  }
-
   const loc = asset?.current_location
-  const buttons = (asset?.actions ?? []).filter((a) => a in SCAN_ACTIONS && a !== 'terima_kembali')
-  const allActions = [...buttons, ...(asset?.actions.includes('terima_kembali') ? ['terima_kembali'] : [])]
 
   return (
     <div className="min-h-screen">
@@ -97,6 +85,7 @@ export default function PublicAssetPage() {
               <p className="mt-0.5 text-sm text-slate-500">{asset.asset_type}</p>
               <dl className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
                 <Row label="Kategori">{asset.category}</Row>
+                <Row label="Spesifikasi">{asset.specification && <span className="whitespace-pre-line break-words">{asset.specification}</span>}</Row>
                 <Row label="Sumber">{asset.source.name}</Row>
                 <Row label="Lokasi asal">{asset.room}, {asset.building}</Row>
                 <Row label="Lokasi saat ini">
@@ -119,27 +108,6 @@ export default function PublicAssetPage() {
               </dl>
             </section>
 
-            {allActions.length > 0 && (
-              <section className="rounded-xl border border-slate-200 bg-white p-5">
-                <h2 className="font-semibold">Aksi</h2>
-                <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
-                  <Lock size={12} /> Khusus staf SHD, Anda akan diminta login.
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {allActions.map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => goAction(key)}
-                      className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-800 transition-colors hover:border-brand-600 hover:bg-brand-50"
-                    >
-                      {SCAN_ACTIONS[key]}
-                      <span className="block text-[11px] font-normal text-slate-500">Khusus staf SHD</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
             <p className="text-center text-sm">
               <Link to="/login" className="font-semibold text-brand-700 hover:underline">Masuk staf SHD</Link>
             </p>

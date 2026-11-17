@@ -44,6 +44,7 @@ class PublicAssetTest extends TestCase
             'source_department_id' => Department::factory()->internal()->create(['name' => 'SHD'])->id,
             'pic_name' => 'Staf SHD',
             'finance_code' => 'FIN-001',
+            'specification' => '3600 lumen, HDMI',
             'acquisition_date' => '2024-01-15',
             'next_service_date' => '2026-12-01',
         ]);
@@ -58,6 +59,7 @@ class PublicAssetTest extends TestCase
             'name' => 'Proyektor Epson EB-X51',
             'category' => 'Elektronik',
             'asset_type' => 'Proyektor',
+            'specification' => '3600 lumen, HDMI',
             'source' => ['name' => 'SHD', 'is_internal' => true],
             'building' => 'Gedung IHS',
             'room' => 'Ruang Kelas 1',

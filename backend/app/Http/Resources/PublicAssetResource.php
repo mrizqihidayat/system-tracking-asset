@@ -28,6 +28,7 @@ class PublicAssetResource extends JsonResource
             'name' => $this->name,
             'category' => $this->assetType->category->name,
             'asset_type' => $this->assetType->name,
+            'specification' => $this->specification,
             'source' => [
                 'name' => $this->sourceDepartment->name,
                 'is_internal' => $this->sourceDepartment->is_internal,
