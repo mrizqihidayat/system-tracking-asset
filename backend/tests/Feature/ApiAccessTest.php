@@ -25,6 +25,10 @@ class ApiAccessTest extends TestCase
         // T40: tampilan & teks halaman login, logo/favicon (lihat SettingTest).
         'GET api/settings/public',
         'GET api/settings/files/{type}',
+        // T40: lupa password via OTP (lihat PasswordOtpTest).
+        'POST api/password/forgot',
+        'POST api/password/verify-otp',
+        'POST api/password/reset',
     ];
 
     /**

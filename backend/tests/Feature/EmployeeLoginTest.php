@@ -76,7 +76,7 @@ class EmployeeLoginTest extends TestCase
             ->assertJsonPath('user.name', 'ANDI PRATAMA SIREGAR')
             ->assertJsonPath('user.department', 'SHD')
             ->assertJsonPath('user.source', 'api')
-            ->assertJsonMissingPath('user.must_change_password');
+            ->assertJsonPath('user.must_change_password', false);
 
         $this->assertStringNotContainsString('1990-03-14', $response->getContent());
         $user = User::where('nik', self::SHD_NIK)->firstOrFail();

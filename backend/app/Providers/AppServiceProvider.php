@@ -64,6 +64,14 @@ class AppServiceProvider extends ServiceProvider
                 return response()->json(['message' => "Terlalu banyak percobaan login. Coba lagi dalam {$seconds} detik."], 429, $headers);
             }));
 
+        // Lupa password via OTP (tanpa login): maks. 10 per menit per IP untuk ketiga langkahnya.
+        RateLimiter::for('password-reset', fn (Request $request) => Limit::perMinute(10)->by($request->ip())
+            ->response(function (Request $request, array $headers) {
+                $seconds = (int) ($headers['Retry-After'] ?? 60);
+
+                return response()->json(['message' => "Terlalu banyak permintaan. Coba lagi dalam {$seconds} detik."], 429, $headers);
+            }));
+
         // Ganti password sendiri: maks. 10 per menit per akun.
         RateLimiter::for('password', fn (Request $request) => Limit::perMinute(10)->by((string) $request->user()?->id));
 

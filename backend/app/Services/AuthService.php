@@ -171,21 +171,25 @@ class AuthService
 
     /**
      * Simpan password baru dan cabut token akun itu kecuali token yang sedang dipakai oleh pelaku (`$actor`),
-     * agar sesi yang mengganti tidak ikut keluar.
+     * agar sesi yang mengganti tidak ikut keluar. Password yang diubah orang lain (staf SHD) wajib diganti
+     * pemiliknya saat login berikutnya; mengganti password sendiri memenuhi kewajiban itu (T40).
      */
     public function setPassword(User $user, string $password, User $actor): void
     {
-        $user->forceFill(['password' => $password])->save();
+        $user->forceFill(['password' => $password, 'must_change_password' => ! $user->is($actor)])->save();
 
         $current = $actor->currentAccessToken();
         $keepId = $current instanceof PersonalAccessToken ? $current->getKey() : null;
         $user->tokens()->when($keepId, fn ($query) => $query->whereKeyNot($keepId))->delete();
     }
 
-    /** Reset akun pegawai SHD: password kembali ke NIK, semua sesinya dicabut. */
+    /**
+     * Reset akun pegawai SHD: password kembali ke NIK, semua sesinya dicabut, dan pegawai wajib mengganti
+     * password saat login berikutnya (T40). Login pertama dengan password = NIK tetap tidak wajib ganti.
+     */
     public function resetEmployeePassword(User $user): void
     {
-        $user->forceFill(['password' => (string) $user->nik])->save();
+        $user->forceFill(['password' => (string) $user->nik, 'must_change_password' => true])->save();
         $user->tokens()->delete();
     }
 }

@@ -30,6 +30,7 @@ class User extends Authenticatable
         return [
             'password' => 'hashed',
             'email_exempt' => 'boolean',
+            'must_change_password' => 'boolean',
         ];
     }
 

@@ -21,6 +21,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LookupController;
 use App\Http\Controllers\MockEmployeeApiController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PublicAssetController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RequestCatalogController;
@@ -33,6 +34,13 @@ use App\Services\SettingService;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+// Lupa password via OTP (T40, SPEC §15): tanpa auth, rate limit per IP.
+Route::middleware('throttle:password-reset')->group(function () {
+    Route::post('/password/forgot', [PasswordResetController::class, 'forgot']);
+    Route::post('/password/verify-otp', [PasswordResetController::class, 'verify']);
+    Route::post('/password/reset', [PasswordResetController::class, 'reset']);
+});
 
 // Uji coba di Vercel (T38): sinkronisasi pegawai via Vercel Cron (dijaga CRON_SECRET) dan API pegawai tiruan (dijaga
 // EMPLOYEE_MOCK_ENABLED + API key). Keduanya 404 bila env-nya kosong.
