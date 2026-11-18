@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import AuthShell, { ErrorBox } from '../components/AuthShell'
 import Button from '../components/ui/Button'
@@ -8,6 +8,7 @@ import PasswordInput from '../components/ui/PasswordInput'
 import { api, errorMessage, fieldErrors } from '../lib/api'
 import { passwordErrors } from '../lib/password'
 import { usePasswordMin } from '../lib/settings'
+import { useCountdown } from '../lib/useCountdown'
 
 type Step = 'email' | 'otp' | 'password' | 'done'
 
@@ -15,19 +16,6 @@ interface ForgotResponse {
   message: string
   resend_after_seconds: number
   expires_in_minutes: number
-}
-
-/** Hitung mundur detik sampai kode boleh dikirim ulang. */
-function useCountdown() {
-  const [seconds, setSeconds] = useState(0)
-
-  useEffect(() => {
-    if (seconds <= 0) return
-    const timer = setTimeout(() => setSeconds((s) => s - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [seconds])
-
-  return [seconds, setSeconds] as const
 }
 
 /**

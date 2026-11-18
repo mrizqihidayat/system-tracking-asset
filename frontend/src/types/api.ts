@@ -17,4 +17,6 @@ export interface ApiErrorBody {
   errors?: Record<string, string[]>
   /** Kode mesin, mis. `employee_account_required` (403). */
   code?: string
+  /** 429 `otp_resend_wait`: sisa detik sebelum kode boleh dikirim ulang. */
+  resend_after_seconds?: number
 }

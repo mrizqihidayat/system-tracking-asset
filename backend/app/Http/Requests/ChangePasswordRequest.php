@@ -20,8 +20,16 @@ class ChangePasswordRequest extends FormRequest
     {
         return [
             'current_password' => ['required', 'string', 'max:72'],
-            'password' => app(AuthService::class)->newPasswordRules($this->user()),
+            'password' => [...app(AuthService::class)->newPasswordRules($this->user()), 'different:current_password'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['password.different' => 'Password baru tidak boleh sama dengan password saat ini.'];
     }
 
     /**

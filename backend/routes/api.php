@@ -30,6 +30,7 @@ use App\Http\Controllers\RoomReadinessController;
 use App\Http\Controllers\RoomStandardController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SupplyRequestController;
+use App\Http\Controllers\UserPasswordOtpController;
 use App\Services\SettingService;
 use Illuminate\Support\Facades\Route;
 
@@ -62,6 +63,11 @@ Route::middleware(['auth:sanctum', 'account.ready'])->group(function () {
     Route::get('/user', [AuthController::class, 'me'])->withoutMiddleware('account.ready');
     Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:password')->withoutMiddleware('account.ready');
     Route::put('/user/email', [AuthController::class, 'updateEmail'])->middleware('throttle:password')->withoutMiddleware('account.ready');
+
+    // "Lupa password?" di halaman Ganti password (T42): OTP ke email akun yang login, rate limit sama dengan lupa password.
+    Route::post('/user/password/otp', [UserPasswordOtpController::class, 'send'])->middleware('throttle:password-reset')->withoutMiddleware('account.ready');
+    Route::post('/user/password/otp/verify', [UserPasswordOtpController::class, 'verify'])->middleware('throttle:password-reset')->withoutMiddleware('account.ready');
+    Route::post('/user/password/otp/reset', [UserPasswordOtpController::class, 'reset'])->middleware('throttle:password-reset')->withoutMiddleware('account.ready');
 
     // Direktori pegawai & akun (T33, SPEC §15)
     Route::get('/employees', [EmployeeController::class, 'index']);

@@ -87,6 +87,9 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | POST | `/api/logout` | Logout, mencabut token yang dipakai | Token | Ya: Tombol Keluar (`components/layout/AppLayout.tsx`) |
 | GET | `/api/user` | Data akun yang sedang login | Token | Ya: Pemeriksaan sesi (`components/RequireAuth.tsx`) |
 | PUT | `/api/user/password` | Ganti password sendiri (opsional); token lain dicabut | Token, maks. 10/menit per pengguna | Ya: Halaman Ganti password (`pages/ChangePasswordPage.tsx`) |
+| POST | `/api/user/password/otp` | "Lupa password?" (T42): kirim OTP ke email akun yang login; 429 bila belum 60 detik, 422 `no_email` bila akun tanpa email | Token, maks. 10/menit per IP | Ya: Ganti password > Lupa password (`components/PasswordOtpFlow.tsx`) |
+| POST | `/api/user/password/otp/verify` | Cek OTP (`otp`), mengembalikan `reset_token`; alasan gagal dijawab jelas | Token, maks. 10/menit per IP | Ya: `components/PasswordOtpFlow.tsx` |
+| POST | `/api/user/password/otp/reset` | Password baru tanpa password lama (`reset_token`, `password`, `password_confirmation`); sesi saat ini tetap, sesi lain dicabut | Token, maks. 10/menit per IP | Ya: `components/PasswordOtpFlow.tsx` |
 
 ### Akun & pegawai
 

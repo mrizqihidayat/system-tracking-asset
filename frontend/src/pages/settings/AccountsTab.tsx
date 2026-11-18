@@ -40,6 +40,7 @@ const EVENT_LABEL: Record<string, string> = {
   created: 'Akun dibuat',
   email_updated: 'Email diubah',
   password_updated: 'Password diubah',
+  password_changed_via_otp: 'Password diganti lewat kode email',
   reset: 'Password direset ke bawaan',
   deactivated: 'Akun dinonaktifkan',
   restored: 'Akun diaktifkan kembali',
