@@ -8,6 +8,5 @@
     }
   },
   "rewrites": [{ "source": "/(.*)", "destination": { "service": "app" } }],
-  "regions": ["sin1"],
-  "crons": [{ "path": "/api/internal/cron/employees-sync", "schedule": "0 19 * * *" }]
+  "regions": ["sin1"]
 }

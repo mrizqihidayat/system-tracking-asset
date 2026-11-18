@@ -75,6 +75,14 @@ class AppServiceProvider extends ServiceProvider
         // Ganti password sendiri: maks. 10 per menit per akun.
         RateLimiter::for('password', fn (Request $request) => Limit::perMinute(10)->by((string) $request->user()?->id));
 
+        // Agen sinkron pegawai (T44): normalnya satu kiriman per malam (+ coba ulang); batas ini hanya pengaman.
+        RateLimiter::for('employee-push', fn (Request $request) => Limit::perMinute(10)->by($request->ip())
+            ->response(function (Request $request, array $headers) {
+                $seconds = (int) ($headers['Retry-After'] ?? 60);
+
+                return response()->json(['message' => "Terlalu banyak kiriman. Coba lagi dalam {$seconds} detik."], 429, $headers);
+            }));
+
         // Endpoint berat per pengguna (SPEC §14).
         foreach (['reports' => 10, 'labels' => 20, 'uploads' => 30] as $name => $perMinute) {
             RateLimiter::for($name, fn (Request $request) => Limit::perMinute($perMinute)

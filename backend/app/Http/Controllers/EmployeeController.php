@@ -38,6 +38,7 @@ class EmployeeController extends Controller
 
         return response()->json(['data' => $run ? [
             'status' => $run->status,
+            'source' => $run->source,
             'started_at' => $run->started_at->toIso8601String(),
             'finished_at' => $run->finished_at?->toIso8601String(),
             'total' => $run->total,

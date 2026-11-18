@@ -349,6 +349,7 @@ class EmployeeSyncTest extends TestCase
 
         $this->getJson('/api/employees/sync-status')->assertOk()
             ->assertJsonPath('data.status', 'gagal')
+            ->assertJsonPath('data.source', 'api')
             ->assertJsonPath('data.message', 'API pegawai menjawab HTTP 500.');
         $this->assertSame(2, EmployeeSyncRun::count());
     }
@@ -367,14 +368,19 @@ class EmployeeSyncTest extends TestCase
         $this->postJson('/api/employees/sync')->assertNotFound();
     }
 
-    public function test_sync_is_scheduled_daily_at_two_wib(): void
+    public function test_sync_is_scheduled_daily_at_2359_wib_only_when_the_api_url_is_set(): void
     {
         $event = collect(app(Schedule::class)->events())
             ->first(fn ($event) => str_contains($event->command, 'employees:sync'));
 
         $this->assertNotNull($event);
-        $this->assertSame('0 2 * * *', $event->expression);
+        $this->assertSame('59 23 * * *', $event->expression);
         $this->assertSame('Asia/Jakarta', (string) $event->timezone);
         $this->assertTrue($event->withoutOverlapping);
+        $this->assertTrue($event->filtersPass($this->app));
+
+        // Mode agen (T44): tanpa EMPLOYEE_API_URL jadwal tidak jalan, jadi tidak ada run "gagal" tiap malam.
+        config(['employees.api_url' => null]);
+        $this->assertFalse($event->filtersPass($this->app));
     }
 }

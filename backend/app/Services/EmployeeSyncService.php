@@ -15,6 +15,8 @@ use Throwable;
 
 /**
  * Sinkronisasi salinan lokal pegawai & departemen dari API pegawai (T34, `employees:sync`).
+ * Sumber data: ditarik sendiri dari API pegawai (`run()`), atau dikirim agen sinkron di server perusahaan (`import()`, T44)
+ * karena backend di internet tidak bisa menjangkau API pegawai internal. Aturan di bawah sama untuk keduanya.
  * - Upsert per nik; pegawai yang hilang dari API → is_active = false (tidak dihapus, riwayat tetap utuh).
  * - API gagal → data lama dipakai; API mengembalikan daftar kosong → sinkronisasi dibatalkan (tidak menonaktifkan semua).
  * - Departemen dibentuk dari nilai unik `departemen` (kecuali "-"), kuncinya kode; nama lengkap tidak ditimpa.
@@ -27,11 +29,45 @@ class EmployeeSyncService
     public function __construct(private EmployeeApiClient $api) {}
 
     /**
-     * Jalankan satu sinkronisasi dan catat hasilnya di employee_sync_runs.
+     * Tarik dari API pegawai (EMPLOYEE_API_URL), sinkronkan, dan catat hasilnya di employee_sync_runs.
      *
      * @throws RuntimeException jika sinkronisasi lain sedang berjalan
      */
     public function run(): EmployeeSyncRun
+    {
+        return $this->sync(EmployeeSyncRun::SOURCE_API, fn () => $this->api->fetchAll());
+    }
+
+    /**
+     * Sinkronkan daftar pegawai kiriman agen sinkron (T44). Baris memakai nama kolom API pegawai (nik, nama, ...);
+     * baris yang bukan objek diabaikan seperti pada `run()`.
+     *
+     * @param  list<mixed>  $rows
+     *
+     * @throws RuntimeException jika sinkronisasi lain sedang berjalan
+     */
+    public function import(array $rows): EmployeeSyncRun
+    {
+        return $this->sync(EmployeeSyncRun::SOURCE_AGENT, fn () => array_values(array_filter($rows, 'is_array')));
+    }
+
+    /**
+     * Agen sinkron gagal mengambil data dari API pegawai (T44): catat run gagal agar terlihat di Data Master;
+     * data lama tetap dipakai.
+     *
+     * @throws RuntimeException jika sinkronisasi lain sedang berjalan
+     */
+    public function recordAgentFailure(string $message): EmployeeSyncRun
+    {
+        return $this->sync(EmployeeSyncRun::SOURCE_AGENT, fn () => throw new RuntimeException('Agen sinkron: '.mb_substr(trim($message), 0, 200)));
+    }
+
+    /**
+     * @param  callable(): list<array<string, mixed>>  $fetch  pengambil baris mentah; exception = run gagal dengan pesannya
+     *
+     * @throws RuntimeException jika sinkronisasi lain sedang berjalan
+     */
+    private function sync(string $source, callable $fetch): EmployeeSyncRun
     {
         $lock = Cache::lock('employees-sync', 600);
 
@@ -42,26 +78,26 @@ class EmployeeSyncService
         $startedAt = now();
 
         try {
-            $rows = $this->api->fetchAll();
+            $rows = $fetch();
         } catch (Throwable $e) {
-            return $this->finish($lock, $startedAt, EmployeeSyncRun::FAILED, [], $e->getMessage());
+            return $this->finish($lock, $source, $startedAt, EmployeeSyncRun::FAILED, [], $e->getMessage());
         }
 
         $employees = $this->normalize($rows, $skipped);
 
         if ($employees === []) {
-            return $this->finish($lock, $startedAt, EmployeeSyncRun::CANCELLED, ['skipped' => $skipped], 'API mengembalikan daftar pegawai kosong; data lama dipertahankan.');
+            return $this->finish($lock, $source, $startedAt, EmployeeSyncRun::CANCELLED, ['skipped' => $skipped], 'API mengembalikan daftar pegawai kosong; data lama dipertahankan.');
         }
 
         try {
             $counts = DB::transaction(fn () => $this->apply($employees, $startedAt));
         } catch (Throwable $e) {
-            return $this->finish($lock, $startedAt, EmployeeSyncRun::FAILED, ['skipped' => $skipped], 'Gagal menyimpan: '.mb_substr($e->getMessage(), 0, 200));
+            return $this->finish($lock, $source, $startedAt, EmployeeSyncRun::FAILED, ['skipped' => $skipped], 'Gagal menyimpan: '.mb_substr($e->getMessage(), 0, 200));
         }
 
         AppCache::flush(AppCache::GROUP_MASTER, AppCache::GROUP_OPS);
 
-        return $this->finish($lock, $startedAt, EmployeeSyncRun::SUCCESS, $counts + ['skipped' => $skipped]);
+        return $this->finish($lock, $source, $startedAt, EmployeeSyncRun::SUCCESS, $counts + ['skipped' => $skipped]);
     }
 
     /**
@@ -179,19 +215,20 @@ class EmployeeSyncService
     /**
      * @param  array<string, int>  $counts
      */
-    private function finish(Lock $lock, \DateTimeInterface $startedAt, string $status, array $counts, ?string $message = null): EmployeeSyncRun
+    private function finish(Lock $lock, string $source, \DateTimeInterface $startedAt, string $status, array $counts, ?string $message = null): EmployeeSyncRun
     {
         $run = EmployeeSyncRun::create([
             'status' => $status,
+            'source' => $source,
             'started_at' => $startedAt,
             'finished_at' => now(),
             'message' => $message,
-        ] + $counts);
+        ] + $counts + ['total' => 0, 'created' => 0, 'updated' => 0, 'deactivated' => 0, 'skipped' => 0]);
 
         $lock->release();
 
-        // Hanya jumlah dan pesan; API key dan data pegawai tidak pernah dicatat.
-        Log::log($status === EmployeeSyncRun::SUCCESS ? 'info' : 'warning', 'employees.sync', ['status' => $status, 'message' => $message] + $counts);
+        // Hanya jumlah dan pesan; API key, token agen, dan data pegawai tidak pernah dicatat.
+        Log::log($status === EmployeeSyncRun::SUCCESS ? 'info' : 'warning', 'employees.sync', ['status' => $status, 'source' => $source, 'message' => $message] + $counts);
 
         return $run;
     }

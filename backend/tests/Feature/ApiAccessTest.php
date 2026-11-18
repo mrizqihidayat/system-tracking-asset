@@ -22,6 +22,8 @@ class ApiAccessTest extends TestCase
         // T38: dijaga CRON_SECRET / EMPLOYEE_MOCK_ENABLED + API key (lihat CronEmployeesSyncTest), 404 bila env kosong.
         'GET api/internal/cron/employees-sync',
         'GET api/mock/employees',
+        // T44: agen sinkron pegawai, dijaga EMPLOYEE_PUSH_TOKEN (lihat EmployeePushTest), 404 bila env kosong.
+        'POST api/internal/employees/push',
         // T40: tampilan & teks halaman login, logo/favicon (lihat SettingTest).
         'GET api/settings/public',
         'GET api/settings/files/{type}',

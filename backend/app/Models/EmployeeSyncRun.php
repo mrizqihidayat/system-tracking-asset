@@ -6,9 +6,10 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Riwayat satu kali `employees:sync` (T34). status: berhasil | gagal | dibatalkan.
+ * Riwayat satu kali sinkronisasi pegawai (T34). status: berhasil | gagal | dibatalkan.
+ * source (T44): api = `employees:sync` menarik dari API pegawai; agen = kiriman agen sinkron dari jaringan perusahaan.
  */
-#[Fillable(['status', 'started_at', 'finished_at', 'total', 'created', 'updated', 'deactivated', 'skipped', 'message'])]
+#[Fillable(['status', 'source', 'started_at', 'finished_at', 'total', 'created', 'updated', 'deactivated', 'skipped', 'message'])]
 class EmployeeSyncRun extends Model
 {
     public const SUCCESS = 'berhasil';
@@ -16,6 +17,10 @@ class EmployeeSyncRun extends Model
     public const FAILED = 'gagal';
 
     public const CANCELLED = 'dibatalkan';
+
+    public const SOURCE_API = 'api';
+
+    public const SOURCE_AGENT = 'agen';
 
     /**
      * @return array<string, string>

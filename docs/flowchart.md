@@ -374,18 +374,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([Jadwal harian 02.00 WIB, atau admin menjalankan employees:sync di server]) --> L{Sinkronisasi lain sedang berjalan?}
-    L -- Ya --> L1[Ditolak: sedang berjalan] --> Z([Selesai])
-    L -- Tidak --> B[GET EMPLOYEE_API_URL dengan API key di header]
-    B --> C{API menjawab dengan benar?}
-    C -- Tidak: mati, 401, timeout, bentuk salah --> F[(Catat run gagal + pesan; data lama tetap dipakai)] --> Z
+    A0([Agen sinkron di server jaringan INALUM, harian 23.59]) --> A1[Agen: GET API pegawai dengan API key, ambil hanya kolom EMPLOYEE_FIELDS]
+    A1 --> A2{Agen berhasil mengambil daftar?}
+    A2 -- Ya --> P[POST /api/internal/employees/push dengan Bearer EMPLOYEE_PUSH_TOKEN, isi employees]
+    A2 -- Tidak --> P2[POST push berisi error] --> L
+    P --> T{Token benar?}
+    T -- Tidak: 401, atau 404 bila token backend kosong --> Z([Selesai])
+    T -- Ya --> L
+    A([Mode tarik: jadwal harian 23.59 WIB bila EMPLOYEE_API_URL diisi, atau employees:sync di server]) --> L{Sinkronisasi lain sedang berjalan?}
+    L -- Ya --> L1[Ditolak: sedang berjalan, 503 untuk agen] --> Z
+    L -- Tidak --> B[Daftar dari kiriman agen, atau GET EMPLOYEE_API_URL dengan API key di header]
+    B --> C{Daftar didapat dengan benar?}
+    C -- Tidak: agen melapor error, API mati, 401, timeout, bentuk salah --> F[(Catat run gagal + pesan + sumber; data lama tetap dipakai)] --> Z
     C -- Ya --> D[Baca nik, nama, grup, divisi, departemen, seksi, jabatan, email; lewati baris tanpa nik/nama]
     D --> E{Ada pegawai valid?}
     E -- Tidak: daftar kosong --> G[(Catat run dibatalkan; tidak ada yang dinonaktifkan)] --> Z
     E -- Ya --> H[(Satu transaksi: upsert pegawai per nik, aktifkan kembali yang muncul lagi)]
     H --> I[(Pegawai yang tidak ada di API jadi tidak aktif, tidak dihapus)]
     I --> J[(Departemen dari nilai unik departemen kecuali tanda hubung: buat yang baru, aktifkan kembali, nonaktifkan yang hilang kecuali SHD; nama lengkap lokal tidak ditimpa)]
-    J --> K[(Catat run berhasil + jumlah; kosongkan cache master)] --> Z
+    J --> K[(Catat run berhasil + jumlah + sumber api/agen; kosongkan cache master)] --> Z
     Z --> V[Data Master > Departemen menampilkan Sinkron terakhir, hanya baca]
 ```
 

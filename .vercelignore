@@ -1,0 +1,5 @@
+# Cadangan bila project Vercel di-deploy dari root repo. Project backend (Root Directory = backend) memakai
+# backend/.vercelignore dan tidak pernah memuat file di luar backend/.
+# Agen sinkron pegawai (T44) dipasang di server perusahaan, bukan di Vercel.
+/employee-sync-agent
+/employee-sync-agent*.zip

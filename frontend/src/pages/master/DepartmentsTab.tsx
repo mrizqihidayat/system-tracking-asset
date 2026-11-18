@@ -7,7 +7,7 @@ import type { Department } from '../../types/asset'
 
 /**
  * Sinkron terakhir daftar pegawai & departemen dari API pegawai (hanya baca). Kegagalan tetap terlihat di sini;
- * sinkronisasi berjalan otomatis tiap hari pukul 02.00 WIB (T34).
+ * sinkronisasi berjalan otomatis tiap hari pukul 23.59 WIB lewat agen sinkron di jaringan INALUM (T34, T44).
  */
 function SyncStatusStrip() {
   const status = useEmployeeSyncStatus()

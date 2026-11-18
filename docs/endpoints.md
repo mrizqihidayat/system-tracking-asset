@@ -2,7 +2,7 @@
 
 Daftar seluruh endpoint backend dan pemakaiannya di frontend web. Parameter dan bentuk respons ada di `docs/SPEC.md` §14.
 
-Disusun pada 4 November 2026 (diperbarui 17 November 2026, T37) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
+Disusun pada 4 November 2026 (diperbarui 18 November 2026, T44) dari `php artisan route:list` dan kode frontend. Kolom "Dipakai frontend" berasal dari penelusuran kode, bukan dari pemantauan trafik.
 
 ## Ringkasan
 
@@ -57,6 +57,7 @@ Melewati batas dijawab 429 dengan pesan Bahasa Indonesia dan header `Retry-After
 | `GET /api/reports/{type}` | 10/menit | Pengguna |
 | `GET /api/assets/{id}/label`, `POST /api/assets/labels` | 20/menit, jatah bersama | Pengguna |
 | `POST /api/assets/{id}/files` | 30/menit | Pengguna |
+| `POST /api/internal/employees/push` (agen sinkron, T44) | 10/menit | IP |
 
 Di balik reverse proxy, batas per IP hanya benar jika `TRUSTED_PROXIES` diisi. Tanpa itu semua pengunjung terbaca satu IP dan berbagi jatah.
 
@@ -96,7 +97,7 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
 | GET | `/api/employees` | Saran pegawai aktif dari salinan lokal (maks. 10): nama, departemen, jabatan (tanpa NIK); tidak memanggil API pegawai | Token | Ya: Nama peminjam & PIC (`components/EmployeeCombobox.tsx`) |
-| GET | `/api/employees/sync-status` | Sinkron terakhir salinan pegawai & departemen (hanya baca; tidak ada endpoint sinkronisasi) | Token | Ya: Data Master > Departemen (`pages/master/DepartmentsTab.tsx`) |
+| GET | `/api/employees/sync-status` | Sinkron terakhir salinan pegawai & departemen, termasuk `source` (`api`/`agen`) (hanya baca; tidak ada endpoint sinkronisasi) | Token | Ya: Data Master > Departemen (`pages/master/DepartmentsTab.tsx`) |
 | GET | `/api/accounts` | Daftar akses: akun (termasuk nonaktif) + pegawai SHD yang belum pernah masuk; `search`, `type`, `status`, paginasi | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
 | GET | `/api/accounts/{id}/events` | 10 aktivitas terakhir akun (aksi, pelaku, waktu) | Token, akun pegawai SHD | Ya: Pengaturan > Akun, Lihat riwayat (`pages/settings/AccountsTab.tsx`) |
 | POST | `/api/accounts` | Tambah akun eksternal (`name`, `department` teks bebas, `note` opsional, `username`, `email`, `password`) | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
@@ -265,6 +266,14 @@ Departemen dibentuk dari API pegawai (`php artisan employees:sync`), jadi tidak 
 | GET | `/api/consumables/{id}/transactions` | Kartu stok: riwayat transaksi barang | Token | Ya: Stok (`pages/consumables/StockCardModal.tsx`) |
 | POST | `/api/consumables/{id}/transactions` | Catat transaksi stok | Token | Ya: Stok (`pages/consumables/StockTransactionModal.tsx`) |
 | DELETE | `/api/consumables/{id}` | Hapus barang permanen jika hanya punya saldo awal | Token | Ya: Stok (`pages/consumables/ConsumablesPage.tsx`) |
+
+### Agen sinkron pegawai (T44, bukan untuk frontend)
+
+Tidak dihitung di ringkasan di atas. Dipanggil oleh `employee-sync-agent/sync.php` dari server di jaringan INALUM. Kontrak lengkap ada di SPEC §15.
+
+| Method | Endpoint | Fungsi | Akses | Dipakai frontend |
+|---|---|---|---|---|
+| POST | `/api/internal/employees/push` | Terima daftar pegawai (`employees`) atau laporan gagal (`error`) dari agen, lalu sinkron dengan aturan yang sama seperti `employees:sync`. Selalu 200 bila diproses (hasil di `status`); `{}` → 422 (cek token oleh `--dry-run`); 503 bila sinkron lain berjalan | `Authorization: Bearer {EMPLOYEE_PUSH_TOKEN}` (bukan token login); 404 bila token backend kosong, 401 bila salah; maks. 10/menit per IP | **Tidak** |
 
 ## Route non-API
 

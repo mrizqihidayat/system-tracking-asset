@@ -2,8 +2,17 @@
 
 return [
     /*
-     * API pegawai INALUM (T34). Hanya satu URL: GET {api_url} langsung mengembalikan SEMUA pegawai
-     * (tanpa path tambahan). Dipanggil oleh `php artisan employees:sync` (terjadwal harian), bukan per permintaan.
+     * Agen sinkron pegawai (T44, folder `employee-sync-agent/` di root repo). API pegawai hanya bisa diakses dari
+     * jaringan perusahaan, jadi agen di server perusahaan mengambil datanya tiap 23.59 lalu mengirim ke
+     * POST /api/internal/employees/push dengan `Authorization: Bearer {EMPLOYEE_PUSH_TOKEN}`. Kosong = endpoint mati (404).
+     * Token yang sama diisi di .env agen.
+     */
+    'push_token' => env('EMPLOYEE_PUSH_TOKEN'),
+
+    /*
+     * Mode tarik: API pegawai INALUM (T34), hanya bila backend berada di dalam jaringan perusahaan. Satu URL:
+     * GET {api_url} langsung mengembalikan SEMUA pegawai (tanpa path tambahan). Dipanggil oleh
+     * `php artisan employees:sync` (terjadwal harian bila api_url diisi), bukan per permintaan.
      */
     'api_url' => env('EMPLOYEE_API_URL'),
 
@@ -25,7 +34,7 @@ return [
     // API pegawai tiruan di aplikasi ini (GET /api/mock/employees), hanya untuk uji coba. Hapus saat produksi.
     'mock_enabled' => (bool) env('EMPLOYEE_MOCK_ENABLED', false),
 
-    // Jadwal sinkronisasi harian (zona waktu WIB).
-    'sync_time' => env('EMPLOYEE_SYNC_TIME', '02:00'),
+    // Jadwal `employees:sync` harian di mode tarik (zona waktu WIB), sama dengan jadwal agen sinkron.
+    'sync_time' => env('EMPLOYEE_SYNC_TIME', '23:59'),
     'sync_timezone' => 'Asia/Jakarta',
 ];

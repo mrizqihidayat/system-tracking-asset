@@ -126,6 +126,7 @@ Table employees {
 Table employee_sync_runs {
   id bigint [pk, increment]
   status varchar [not null, note: 'berhasil | gagal | dibatalkan (API mengembalikan daftar kosong)']
+  source varchar(10) [not null, default: 'api', note: 'T44: api = employees:sync (mode tarik) | agen = kiriman agen sinkron (POST /api/internal/employees/push)']
   started_at timestamp [not null]
   finished_at timestamp
   total int [not null, default: 0]

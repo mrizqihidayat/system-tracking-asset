@@ -14,7 +14,8 @@ use RuntimeException;
 class SyncEmployees extends Command
 {
     /**
-     * Terjadwal harian pukul 02.00 WIB; juga dijalankan manual untuk setup awal dan keadaan darurat lewat server.
+     * Mode tarik: terjadwal harian pukul 23.59 WIB bila EMPLOYEE_API_URL diisi; juga dijalankan manual untuk setup awal
+     * dan keadaan darurat lewat server. Di Vercel data pegawai dikirim agen sinkron (T44), bukan lewat command ini.
      */
     public function handle(EmployeeSyncService $sync): int
     {

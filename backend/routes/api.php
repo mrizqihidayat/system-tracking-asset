@@ -18,6 +18,7 @@ use App\Http\Controllers\CronController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeePushController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LookupController;
 use App\Http\Controllers\MockEmployeeApiController;
@@ -43,8 +44,11 @@ Route::middleware('throttle:password-reset')->group(function () {
     Route::post('/password/reset', [PasswordResetController::class, 'reset']);
 });
 
-// Uji coba di Vercel (T38): sinkronisasi pegawai via Vercel Cron (dijaga CRON_SECRET) dan API pegawai tiruan (dijaga
-// EMPLOYEE_MOCK_ENABLED + API key). Keduanya 404 bila env-nya kosong.
+// Agen sinkron pegawai dari jaringan perusahaan (T44, employee-sync-agent/): dijaga EMPLOYEE_PUSH_TOKEN, 404 bila kosong.
+Route::post('/internal/employees/push', EmployeePushController::class)->middleware('throttle:employee-push');
+
+// Mode tarik (T38): sinkronisasi pegawai lewat cron HTTP (dijaga CRON_SECRET; Vercel Cron tidak dipakai lagi sejak T44)
+// dan API pegawai tiruan (dijaga EMPLOYEE_MOCK_ENABLED + API key). Keduanya 404 bila env-nya kosong.
 Route::get('/internal/cron/employees-sync', [CronController::class, 'employeesSync']);
 Route::get('/mock/employees', MockEmployeeApiController::class);
 

@@ -11,6 +11,11 @@ frontend/dist/
 # Cache
 backend/.phpunit.result.cache
 
+# Agen sinkron pegawai (T44): rahasia & log lokal, dan paket zip hasil `composer agent:package`
+employee-sync-agent/.env
+employee-sync-agent/*.log
+employee-sync-agent*.zip
+
 # AI tools (lokal)
 .claude/
 backend/.claude/
