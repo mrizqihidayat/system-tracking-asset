@@ -15,30 +15,47 @@ interface Props {
   onCreated: (type: AssetType) => void
 }
 
+/** id sementara untuk kategori baru yang belum disimpan. */
+const NEW_ID = -1
+
 /** Tambah jenis aset dari form aset: cukup pilih kategori (wajib); kode jenis dibuat otomatis oleh server. */
 export default function NewAssetTypeModal({ name, onClose, onCreated }: Props) {
   const toast = useToast()
   const [categoryId, setCategoryId] = useState<number | null>(null)
+  // Kategori baru belum disimpan ke server: baru dibuat bersamaan dengan jenis saat "Simpan jenis".
+  const [newCategory, setNewCategory] = useState('')
+  const [typed, setTyped] = useState('')
   const { data: categories, error } = useCategories()
   useErrorToast(error)
 
-  const addCategory = async (categoryName: string) => {
-    try {
-      const c = await createCategory(categoryName)
-      return { id: c.id, label: c.name }
-    } catch (e) {
-      toast.error(fieldErrors(e).name ?? errorMessage(e))
-      throw e
+  const options = categories.map((c) => ({ id: c.id, label: c.name }))
+  if (newCategory) options.push({ id: NEW_ID, label: newCategory })
+
+  // Nama kategori yang akan dipakai: pilihan baru, atau ketikan yang belum dipilih (otomatis dibuat bila belum ada).
+  const pendingName = categoryId === NEW_ID ? newCategory : categoryId === null ? typed.trim() : ''
+  const canSubmit = (categoryId !== null && categoryId !== NEW_ID) || !!pendingName
+
+  const submit = async () => {
+    let id = categoryId
+    if (id === null || id === NEW_ID) {
+      const existing = categories.find((c) => c.name.toLowerCase() === pendingName.toLowerCase())
+      try {
+        id = existing ? existing.id : (await createCategory(pendingName)).id
+      } catch (e) {
+        toast.error(fieldErrors(e).name ?? errorMessage(e))
+        throw e
+      }
     }
+    onCreated(await createAssetType(id, name))
   }
 
   return (
     <ActionModal
       title={`Tambah jenis '${name}'`}
       submitLabel="Simpan jenis"
-      submitDisabled={!categoryId}
+      submitDisabled={!canSubmit}
       onClose={onClose}
-      onSubmit={async () => onCreated(await createAssetType(categoryId!, name))}
+      onSubmit={submit}
     >
       {(errors) => (
         <>
@@ -46,9 +63,16 @@ export default function NewAssetTypeModal({ name, onClose, onCreated }: Props) {
           <FormField label="Kategori" required error={errors.category_id}>
             <EntityCombobox
               value={categoryId}
-              options={categories.map((c) => ({ id: c.id, label: c.name }))}
+              options={options}
               onChange={setCategoryId}
-              onCreate={addCategory}
+              onTextChange={(t) => {
+                setTyped(t)
+                if (t !== newCategory) setNewCategory('')
+              }}
+              onCreate={async (n) => {
+                setNewCategory(n)
+                return { id: NEW_ID, label: n }
+              }}
               placeholder="Ketik untuk mencari atau menambah kategori…"
               error={errors.category_id}
             />
