@@ -72,6 +72,7 @@ export interface Asset {
   public_url: string
   name: string
   brand: string | null
+  model: string | null
   serial_number: string | null
   specification: string | null
   asset_type?: AssetType

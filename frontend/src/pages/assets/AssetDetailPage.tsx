@@ -346,7 +346,7 @@ export default function AssetDetailPage() {
           <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-balance">{asset.name}</h1>
           <p className="mt-0.5 text-sm text-slate-500">
             {asset.asset_type?.name ?? '-'}
-            {asset.brand && ` · ${asset.brand}`} · S/N {asset.serial_number ?? '-'}
+            {asset.brand && ` · ${asset.brand}`}{asset.model && ` · ${asset.model}`} · S/N {asset.serial_number ?? '-'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

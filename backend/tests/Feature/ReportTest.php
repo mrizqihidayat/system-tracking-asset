@@ -125,7 +125,7 @@ class ReportTest extends TestCase
         $room = Room::factory()->create(['building_id' => $building->id, 'name' => 'Ruang 1']);
         $this->asset([
             'code' => 'SHD-PRJ-001', 'name' => 'Proyektor Epson', 'asset_type_id' => $type->id, 'room_id' => $room->id,
-            'brand' => 'Epson', 'next_service_date' => '2026-11-30', 'acquisition_date' => '2026-01-15',
+            'brand' => 'Epson', 'model' => 'EB-X51', 'next_service_date' => '2026-11-30', 'acquisition_date' => '2026-01-15',
         ]);
 
         $rows = $this->sheets($this->report('assets'))['Aset'];
@@ -134,7 +134,7 @@ class ReportTest extends TestCase
         $this->assertSame('Tanpa filter', $rows[1][0]);
         $this->assertStringContainsString('Staf SHD', $rows[2][0]);
         $this->assertSame('Kode', $rows[self::HEADER_INDEX][0]);
-        $this->assertCount(15, $rows[self::HEADER_INDEX]);
+        $this->assertCount(16, $rows[self::HEADER_INDEX]);
         $this->assertSame(['Kategori', 'Jenis'], array_slice($rows[self::HEADER_INDEX], 2, 2));
 
         $data = $this->dataRows($rows);
@@ -142,13 +142,16 @@ class ReportTest extends TestCase
         $this->assertSame('SHD-PRJ-001', $data[0][0]);
         $this->assertSame('Elektronik', $data[0][2]);
         $this->assertSame('Proyektor', $data[0][3]);
-        $this->assertSame('SHD', $data[0][6]);
-        $this->assertSame('IHS', $data[0][7]);
-        $this->assertSame('Ruang 1', $data[0][8]);
-        $this->assertSame('Baik', $data[0][10]);
-        $this->assertSame('Tersedia', $data[0][11]);
-        $this->assertInstanceOf(DateTimeInterface::class, $data[0][12]);
-        $this->assertSame('2026-11-30', $data[0][13]->format('Y-m-d'));
+        $this->assertSame(['Merek', 'Model'], array_slice($rows[self::HEADER_INDEX], 4, 2));
+        $this->assertSame('Epson', $data[0][4]);
+        $this->assertSame('EB-X51', $data[0][5]);
+        $this->assertSame('SHD', $data[0][7]);
+        $this->assertSame('IHS', $data[0][8]);
+        $this->assertSame('Ruang 1', $data[0][9]);
+        $this->assertSame('Baik', $data[0][11]);
+        $this->assertSame('Tersedia', $data[0][12]);
+        $this->assertInstanceOf(DateTimeInterface::class, $data[0][13]);
+        $this->assertSame('2026-11-30', $data[0][14]->format('Y-m-d'));
     }
 
     public function test_assets_report_filters_match_the_list_and_include_not_feasible(): void

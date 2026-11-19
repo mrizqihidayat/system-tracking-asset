@@ -28,6 +28,7 @@ class AssetFactory extends Factory
             'asset_type_id' => AssetType::factory(),
             'name' => fake()->words(3, true),
             'brand' => fake()->company(),
+            'model' => fake()->bothify('??-####'),
             'serial_number' => fake()->bothify('SN-########'),
             'source_department_id' => Department::factory(),
             'room_id' => Room::factory(),

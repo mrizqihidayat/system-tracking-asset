@@ -28,6 +28,7 @@ interface FormState {
   asset_type_id: number | null
   name: string
   brand: string
+  model: string
   serial_number: string
   specification: string
   source_department_id: number | null
@@ -43,7 +44,7 @@ interface FormState {
 }
 
 const empty: FormState = {
-  asset_type_id: null, name: '', brand: '', serial_number: '', specification: '', source_department_id: null,
+  asset_type_id: null, name: '', brand: '', model: '', serial_number: '', specification: '', source_department_id: null,
   building_id: null, room_id: null, pic_name: '', finance_code: '', acquisition_date: '', next_service_date: '',
   condition: 'Baik', status: 'Tersedia', note: '',
 }
@@ -102,6 +103,7 @@ export default function AssetFormPage() {
           asset_type_id: a.asset_type?.id ?? null,
           name: a.name,
           brand: a.brand ?? '',
+          model: a.model ?? '',
           serial_number: a.serial_number ?? '',
           specification: a.specification ?? '',
           source_department_id: a.source_department?.id ?? null,
@@ -205,6 +207,7 @@ export default function AssetFormPage() {
       asset_type_id: form.asset_type_id,
       name: form.name.trim(),
       brand: orNull(form.brand),
+      model: orNull(form.model),
       serial_number: orNull(form.serial_number),
       specification: orNull(form.specification),
       source_department_id: form.source_department_id,
@@ -314,6 +317,9 @@ export default function AssetFormPage() {
         </div>
         <FormField label="Merek" error={errors.brand}>
           <Input value={form.brand} onChange={(e) => set('brand', e.target.value)} error={errors.brand} maxLength={100} />
+        </FormField>
+        <FormField label="Model" error={errors.model}>
+          <Input value={form.model} onChange={(e) => set('model', e.target.value)} error={errors.model} maxLength={100} />
         </FormField>
         <FormField label="Nomor seri" error={errors.serial_number}>
           <Input value={form.serial_number} onChange={(e) => set('serial_number', e.target.value)} error={errors.serial_number} maxLength={100} />

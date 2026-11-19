@@ -50,6 +50,7 @@ class StoreAssetRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'brand' => ['nullable', 'string', 'max:100'],
+            'model' => ['nullable', 'string', 'max:100'],
             'serial_number' => ['nullable', 'string', 'max:100'],
             'specification' => ['nullable', 'string', 'max:5000'],
             'source_department_id' => ['required', 'integer', 'exists:departments,id'],

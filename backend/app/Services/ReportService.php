@@ -63,6 +63,7 @@ class ReportService
                 $asset->assetType->category->name,
                 $asset->assetType->name,
                 $asset->brand,
+                $asset->model,
                 $asset->serial_number,
                 $asset->sourceDepartment->name,
                 $asset->room->building->name,
@@ -77,7 +78,7 @@ class ReportService
 
         $columns = [
             ReportColumn::text('Kode', 16), ReportColumn::text('Nama', 30),
-            ReportColumn::text('Kategori', 16), ReportColumn::text('Jenis', 18), ReportColumn::text('Merek', 16), ReportColumn::text('No. Seri', 18),
+            ReportColumn::text('Kategori', 16), ReportColumn::text('Jenis', 18), ReportColumn::text('Merek', 16), ReportColumn::text('Model', 16), ReportColumn::text('No. Seri', 18),
             ReportColumn::text('Sumber', 14), ReportColumn::text('Gedung (asal)', 18), ReportColumn::text('Ruangan (asal)', 18),
             ReportColumn::text('PIC', 18), ReportColumn::text('Kondisi', 12), ReportColumn::text('Status', 16),
             ReportColumn::date('Tgl perolehan'), ReportColumn::date('Servis berikutnya'), ReportColumn::text('Kode aset keuangan', 20),

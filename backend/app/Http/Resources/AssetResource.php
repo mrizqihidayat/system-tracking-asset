@@ -40,6 +40,7 @@ class AssetResource extends JsonResource
             'public_url' => $this->publicUrl(),
             'name' => $this->name,
             'brand' => $this->brand,
+            'model' => $this->model,
             'serial_number' => $this->serial_number,
             'specification' => $this->specification,
             'asset_type' => AssetTypeResource::make($this->whenLoaded('assetType')),

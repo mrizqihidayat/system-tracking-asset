@@ -84,6 +84,7 @@ return [
         'search' => 'pencarian',
         'asset_type_id' => 'jenis aset',
         'brand' => 'merek',
+        'model' => 'model',
         'serial_number' => 'nomor seri',
         'specification' => 'spesifikasi',
         'source_department_id' => 'sumber',

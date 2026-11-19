@@ -14,6 +14,8 @@ interface PublicAsset {
   name: string
   category: string
   asset_type: string
+  brand: string | null
+  model: string | null
   specification: string | null
   source: { name: string; is_internal: boolean }
   building: string
@@ -87,6 +89,8 @@ export default function PublicAssetPage() {
               <p className="mt-0.5 text-sm text-slate-500">{asset.asset_type}</p>
               <dl className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
                 <Row label="Kategori">{asset.category}</Row>
+                <Row label="Merek">{asset.brand}</Row>
+                <Row label="Model">{asset.model}</Row>
                 <Row label="Spesifikasi">{asset.specification && <span className="whitespace-pre-line break-words">{asset.specification}</span>}</Row>
                 <Row label="Sumber">{asset.source.name}</Row>
                 <Row label="Lokasi asal">{asset.room}, {asset.building}</Row>

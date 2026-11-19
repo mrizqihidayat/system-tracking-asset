@@ -192,7 +192,7 @@ Departemen dibentuk dari API pegawai (`php artisan employees:sync`), jadi tidak 
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| GET | `/api/assets` | Daftar aset, filter dan pencarian; baris memuat `active_loan_due_date` (T45) | Token | Ya: Daftar Aset, pilih aset di form pinjam (`lib/queries/lists.ts`, `pages/loans/AssetPicker.tsx`) |
+| GET | `/api/assets` | Daftar aset, filter dan pencarian (nama, kode, nomor seri, merek, model, kode lama); baris memuat `active_loan_due_date` (T45) | Token | Ya: Daftar Aset, pilih aset di form pinjam (`lib/queries/lists.ts`, `pages/loans/AssetPicker.tsx`) |
 | POST | `/api/assets` | Tambah aset | Token | Ya: Form aset (`pages/assets/AssetFormPage.tsx`) |
 | GET | `/api/assets/{id}` | Detail aset dan aksi yang tersedia | Token | Ya: Detail aset, form ubah, form pinjam (`lib/queries/lists.ts`, `pages/loans/LoanForm.tsx`) |
 | GET | `/api/assets/{id}/delete-impact` | Dampak penghapusan aset | Token | Ya: Popup hapus (`pages/assets/modals/DeleteAssetModal.tsx`) |

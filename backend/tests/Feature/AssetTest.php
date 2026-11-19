@@ -59,6 +59,7 @@ class AssetTest extends TestCase
             'asset_type_id' => $this->projector->id,
             'name' => 'Proyektor Epson EB-X51',
             'brand' => 'Epson',
+            'model' => 'EB-X51',
             'source_department_id' => $this->shd->id,
             'room_id' => $this->room->id,
             'acquisition_date' => '2024-01-15',
@@ -191,6 +192,31 @@ class AssetTest extends TestCase
         $this->getJson('/api/assets?search=shd-prj')->assertJsonCount(1, 'data');
         $this->getJson('/api/assets?per_page=2')->assertJsonCount(2, 'data')->assertJsonPath('meta.last_page', 2);
         $this->getJson('/api/assets?status=Rusak')->assertUnprocessable()->assertJsonValidationErrors('status');
+    }
+
+    public function test_search_matches_brand_and_model(): void
+    {
+        $this->createAsset(['name' => 'Proyektor Ruang A', 'brand' => 'Epson', 'model' => 'EB-X51']);
+        $this->createAsset(['name' => 'Laptop Dosen', 'brand' => 'Lenovo', 'model' => 'ThinkPad T14']);
+
+        $this->getJson('/api/assets?search=thinkpad')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Laptop Dosen');
+        $this->getJson('/api/assets?search=eb-x5')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Proyektor Ruang A');
+        $this->getJson('/api/assets?search=lenovo')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Laptop Dosen');
+    }
+
+    public function test_model_is_saved_returned_and_logged_on_edit(): void
+    {
+        $asset = $this->createAsset(['model' => 'EB-X51']);
+        $this->assertSame('EB-X51', $asset->model);
+
+        $this->putJson("/api/assets/{$asset->id}", ['model' => 'EB-X52', 'acquisition_date' => '2024-01-15'])
+            ->assertOk()
+            ->assertJsonPath('data.model', 'EB-X52');
+        $this->assertStringContainsString('Model: EB-X51 → EB-X52', $asset->events()->latest('id')->first()->note);
+
+        $this->postJson('/api/assets', $this->payload(['model' => str_repeat('a', 101)]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['model' => 'Model']);
     }
 
     public function test_search_treats_special_characters_as_plain_text(): void

@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
-#[Fillable(['code', 'asset_type_id', 'name', 'brand', 'serial_number', 'specification', 'source_department_id', 'room_id', 'pic_name', 'finance_code', 'acquisition_date', 'next_service_date', 'condition', 'status', 'note', 'created_by'])]
+#[Fillable(['code', 'asset_type_id', 'name', 'brand', 'model', 'serial_number', 'specification', 'source_department_id', 'room_id', 'pic_name', 'finance_code', 'acquisition_date', 'next_service_date', 'condition', 'status', 'note', 'created_by'])]
 class Asset extends Model
 {
     public const SERVICE_WARNING_DAYS = 14;
@@ -279,7 +279,7 @@ class Asset extends Model
         Search::apply(
             $query,
             $filters['search'] ?? null,
-            ['assets.name', 'assets.code', 'assets.serial_number'],
+            ['assets.name', 'assets.code', 'assets.serial_number', 'assets.brand', 'assets.model'],
             fn ($query, string $pattern) => $query->orWhereHas(
                 'codeHistories',
                 fn ($history) => $history->whereRaw(Search::likeSql('asset_code_histories.code'), [$pattern]),

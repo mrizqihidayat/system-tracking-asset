@@ -36,6 +36,7 @@ class AssetService
     private const FIELD_LABELS = [
         'name' => 'Nama',
         'brand' => 'Merek',
+        'model' => 'Model',
         'serial_number' => 'Nomor seri',
         'specification' => 'Spesifikasi',
         'source_department_id' => 'Sumber',

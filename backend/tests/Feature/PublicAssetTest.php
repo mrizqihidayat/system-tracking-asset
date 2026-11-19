@@ -41,6 +41,8 @@ class PublicAssetTest extends TestCase
         $this->asset = Asset::factory()->for($type)->for($room)->create([
             'code' => 'SHD-PRJ-001',
             'name' => 'Proyektor Epson EB-X51',
+            'brand' => 'Epson',
+            'model' => 'EB-X51',
             'source_department_id' => Department::factory()->internal()->create(['name' => 'SHD'])->id,
             'pic_name' => 'Staf SHD',
             'finance_code' => 'FIN-001',
@@ -59,6 +61,8 @@ class PublicAssetTest extends TestCase
             'name' => 'Proyektor Epson EB-X51',
             'category' => 'Elektronik',
             'asset_type' => 'Proyektor',
+            'brand' => 'Epson',
+            'model' => 'EB-X51',
             'specification' => '3600 lumen, HDMI',
             'source' => ['name' => 'SHD', 'is_internal' => true],
             'building' => 'Gedung IHS',
