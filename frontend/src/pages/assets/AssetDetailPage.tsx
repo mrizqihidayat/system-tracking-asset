@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, CalendarClock, ChevronDown, ChevronRight, EllipsisVertical, FileText, ImageOff, ImagePlus, Pencil, TriangleAlert } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AssetCode, ConditionBadge, ConditionDot, LoanStatusBadge, StatusBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { buttonClass } from '../../components/ui/button-class'
@@ -171,6 +171,8 @@ function DetailSkeleton() {
 export default function AssetDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  // Dikirim form Tambah aset bila ada file yang gagal diunggah (aset sendiri tetap tersimpan).
+  const failedUploads = (useLocation().state as { failedUploads?: string[] } | null)?.failedUploads ?? []
   const toast = useToast()
   const queryClient = useQueryClient()
   const [othersOpen, setOthersOpen] = useState(false)
@@ -362,6 +364,21 @@ export default function AssetDetailPage() {
           <DropdownMenu label="Aksi lainnya" trigger={<EllipsisVertical size={18} />} items={moreItems} triggerClassName="px-2.5!" />
         </div>
       </div>
+
+      {failedUploads.length > 0 && (
+        <div role="alert" className="flex items-start gap-3 rounded-xl bg-warn-50 px-4 py-3 text-sm text-warn-700">
+          <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p>
+              Aset tersimpan, tetapi {failedUploads.length} file gagal diunggah.{' '}
+              <Link to={`/daftar-aset/${asset.id}/ubah`} className="font-semibold underline">Unggah lagi lewat Ubah data</Link>
+            </p>
+            <ul className="mt-1 list-disc pl-5">
+              {failedUploads.map((name) => <li key={name} className="break-all">{name}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {asset.lost_during_loan && (
         <div className="flex items-start gap-3 rounded-xl bg-bad-50 px-4 py-3 text-sm text-bad-700">

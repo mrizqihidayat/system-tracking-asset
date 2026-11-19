@@ -24,6 +24,8 @@ class AssetListResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
+            'brand' => $this->brand,
+            'model' => $this->model,
             'category_name' => $this->category_name,
             'asset_type_name' => $this->asset_type_name,
             'room_name' => $this->room_name,

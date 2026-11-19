@@ -13,6 +13,7 @@ import { PageHeader } from '../../components/ui/Page'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import AssetFilesManager from './AssetFilesManager'
+import PendingAssetDocs, { type PendingDocs } from './PendingAssetDocs'
 import NewAssetTypeModal from './modals/NewAssetTypeModal'
 import ConditionPhotoField from '../loans/ConditionPhotoField'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
@@ -22,7 +23,7 @@ import { invalidate } from '../../lib/queries/invalidate'
 import { assetQueries } from '../../lib/queries/lists'
 import { useAssetTypes, useBuildings, useDepartments, useRooms } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
-import { CONDITIONS, type Asset, type AssetType, type CodePreview, type Condition } from '../../types/asset'
+import { CONDITIONS, type Asset, type AssetType, type CodePreview, type Condition, type FileType } from '../../types/asset'
 
 interface FormState {
   asset_type_id: number | null
@@ -75,6 +76,8 @@ export default function AssetFormPage() {
   const [loading, setLoading] = useState(editing)
   const [saving, setSaving] = useState(false)
   const [photo, setPhoto] = useState<File | null>(null)
+  const [progress, setProgress] = useState<string | null>(null)
+  const [docs, setDocs] = useState<PendingDocs>({ BAST: null, Garansi: null, Lainnya: [] })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const { data: types, error: typesError } = useAssetTypes()
@@ -223,28 +226,42 @@ export default function AssetFormPage() {
       if (form.condition === 'Rusak Ringan') payload.status = form.status
     }
 
+    // Satu klik = satu pengiriman: tombol nonaktif dan progres tampil sampai pindah halaman.
+    if (saving) return
     setSaving(true)
+    setProgress('Menyimpan aset…')
     try {
       const res = editing
         ? await api.put<{ data: Asset; meta?: { code_changed?: boolean } }>(`/assets/${id}`, payload)
         : await api.post<{ data: Asset }>('/assets', payload)
       const asset = res.data.data
       toast.success(editing ? `Data ${asset.code} disimpan.` : `Aset ${asset.code} ditambahkan.`)
-      if (!editing && photo) {
-        // Aset sudah tersimpan; gagal unggah foto tidak membatalkannya, foto bisa diunggah lagi dari detail aset.
-        try {
-          await uploadAssetFile(asset.id, 'Foto Aset', photo, ASSET_PHOTO_ACCEPT)
-        } catch (uploadError) {
-          toast.error(`Foto aset gagal diunggah: ${uploadErrorMessage(uploadError)} Unggah lagi dari halaman detail.`)
+      // Aset sudah tersimpan; file yang gagal diunggah tidak membatalkannya, namanya ditampilkan di detail aset.
+      const failed: string[] = []
+      if (!editing) {
+        const queue: { type: FileType; file: File; accept?: string }[] = [
+          ...(photo ? [{ type: 'Foto Aset' as const, file: photo, accept: ASSET_PHOTO_ACCEPT }] : []),
+          ...(docs.BAST ? [{ type: 'BAST' as const, file: docs.BAST }] : []),
+          ...(docs.Garansi ? [{ type: 'Garansi' as const, file: docs.Garansi }] : []),
+          ...docs.Lainnya.map((file) => ({ type: 'Lainnya' as const, file })),
+        ]
+        for (const [i, { type, file, accept }] of queue.entries()) {
+          setProgress(`Mengunggah file ${i + 1} dari ${queue.length}…`)
+          try {
+            await uploadAssetFile(asset.id, type, file, accept)
+          } catch (uploadError) {
+            failed.push(`${file.name} (${uploadErrorMessage(uploadError)})`)
+          }
         }
       }
       invalidate.assets(queryClient)
-      navigate(`/daftar-aset/${asset.id}`)
+      navigate(`/daftar-aset/${asset.id}`, { state: failed.length > 0 ? { failedUploads: failed } : undefined })
     } catch (e) {
       setErrors(fieldErrors(e))
       toast.error(errorMessage(e))
     } finally {
       setSaving(false)
+      setProgress(null)
     }
   }
 
@@ -419,11 +436,17 @@ export default function AssetFormPage() {
         </div>
       </Section>
 
+      {!editing && (
+        <Section title="Dokumen">
+          <PendingAssetDocs value={docs} onChange={setDocs} />
+        </Section>
+      )}
+
       <div className="flex flex-col-reverse gap-2 sm:flex-row">
         <Link to={editing ? `/daftar-aset/${id}` : '/daftar-aset'} className={buttonClass('secondary')}>
           Batal
         </Link>
-        <Button type="submit" loading={saving}>{editing ? 'Simpan perubahan' : 'Simpan aset'}</Button>
+        <Button type="submit" disabled={saving}>{saving ? (progress ?? 'Menyimpan…') : editing ? 'Simpan perubahan' : 'Simpan aset'}</Button>
       </div>
     </form>
     {editing && original && <AssetFilesManager assetId={original.id} />}

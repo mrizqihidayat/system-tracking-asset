@@ -106,6 +106,8 @@ export default function AssetListPage() {
       ),
     },
     { header: 'Kategori', cell: (a) => a.category_name ?? '-' },
+    { header: 'Merek', cell: (a) => a.brand ?? '-' },
+    { header: 'Model', cell: (a) => a.model ?? '-' },
     {
       header: 'Lokasi',
       cell: (a) =>

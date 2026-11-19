@@ -88,7 +88,7 @@ class ListPerformanceTest extends TestCase
             ->json('data.0');
 
         $this->assertSame(
-            ['id', 'code', 'name', 'category_name', 'asset_type_name', 'room_name', 'building_name', 'source_name', 'source_is_internal', 'condition', 'status', 'active_loan_due_date'],
+            ['id', 'code', 'name', 'brand', 'model', 'category_name', 'asset_type_name', 'room_name', 'building_name', 'source_name', 'source_is_internal', 'condition', 'status', 'active_loan_due_date'],
             array_keys($row),
         );
         $this->assertNull($row['active_loan_due_date']);

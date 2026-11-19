@@ -95,6 +95,8 @@ export interface Asset {
 
 /** Baris `GET /assets`: hanya kolom tabel; data lengkap dari `GET /assets/{id}`. */
 export interface AssetListItem extends Pick<Asset, 'id' | 'code' | 'name' | 'condition' | 'status'> {
+  brand: string | null
+  model: string | null
   category_name: string | null
   asset_type_name: string | null
   room_name: string | null

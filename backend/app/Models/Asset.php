@@ -228,7 +228,7 @@ class Asset extends Model
     #[Scope]
     protected function forList(Builder $query): void
     {
-        $query->select(['assets.id', 'assets.code', 'assets.name', 'assets.condition', 'assets.status'])->addSelect([
+        $query->select(['assets.id', 'assets.code', 'assets.name', 'assets.brand', 'assets.model', 'assets.condition', 'assets.status'])->addSelect([
             'category_name' => Category::query()
                 ->select('categories.name')
                 ->join('asset_types', 'asset_types.category_id', '=', 'categories.id')
