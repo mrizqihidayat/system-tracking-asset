@@ -315,15 +315,17 @@ export default function AssetFormPage() {
           </FormField>
           {codeHint && <p className="mt-1 text-xs text-slate-500">Kode otomatis: <b>{codeHint}</b></p>}
         </div>
-        <FormField label="Merek" error={errors.brand}>
-          <Input value={form.brand} onChange={(e) => set('brand', e.target.value)} error={errors.brand} maxLength={100} />
-        </FormField>
-        <FormField label="Model" error={errors.model}>
-          <Input value={form.model} onChange={(e) => set('model', e.target.value)} error={errors.model} maxLength={100} />
-        </FormField>
-        <FormField label="Nomor seri" error={errors.serial_number}>
-          <Input value={form.serial_number} onChange={(e) => set('serial_number', e.target.value)} error={errors.serial_number} maxLength={100} />
-        </FormField>
+        <div className="grid gap-4 sm:col-span-2 sm:grid-cols-3">
+          <FormField label="Merek" error={errors.brand}>
+            <Input value={form.brand} onChange={(e) => set('brand', e.target.value)} error={errors.brand} maxLength={100} />
+          </FormField>
+          <FormField label="Model" error={errors.model}>
+            <Input value={form.model} onChange={(e) => set('model', e.target.value)} error={errors.model} maxLength={100} />
+          </FormField>
+          <FormField label="Nomor seri" error={errors.serial_number}>
+            <Input value={form.serial_number} onChange={(e) => set('serial_number', e.target.value)} error={errors.serial_number} maxLength={100} />
+          </FormField>
+        </div>
         <div className="sm:col-span-2">
           <FormField label="Spesifikasi" error={errors.specification}>
             <Textarea value={form.specification} onChange={(e) => set('specification', e.target.value)} error={errors.specification} />
