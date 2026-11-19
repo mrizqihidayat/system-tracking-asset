@@ -8,10 +8,12 @@ import { Muted, PageHeader, Panel } from '../components/ui/Page'
 import { CardSkeleton, ListSkeleton } from '../components/ui/Skeleton'
 import { useToast } from '../components/ui/toast-context'
 import { errorMessage } from '../lib/api'
+import { daysFromTodayWib } from '../lib/date'
 import { downloadReport, REPORT_LABELS, type ReportType } from '../lib/download'
 import { formatDate } from '../lib/format'
 import { useDashboardCards, useDashboardPanels, useDashboardReadiness } from '../lib/queries/dashboard'
 import { useErrorToast } from '../lib/useErrorToast'
+import LoadError from '../components/ui/LoadError'
 import type { Loan } from '../types/loan'
 
 const requestColor = { Diajukan: 'blue', 'Diterima sebagian': 'amber', Diterima: 'green', 'Belum direspons': 'amber', Dikembalikan: 'slate', Dibatalkan: 'red' } as const
@@ -44,7 +46,7 @@ function StatCard({ label, value, to, alert, notes }: { label: string; value: nu
 
 function Tempo({ loan }: { loan: Loan }) {
   if (loan.is_due_today) return <Badge color="amber">Hari ini</Badge>
-  const days = Math.round((new Date(`${loan.due_date}T00:00:00`).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000)
+  const days = daysFromTodayWib(loan.due_date)
   if (loan.is_overdue) return <Badge color="red">{`Terlambat ${Math.abs(days)} hari`}</Badge>
   return <Badge color="blue">{`${days} hari lagi`}</Badge>
 }
@@ -65,10 +67,17 @@ export default function DashboardPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
-  const { data: cards, error: cardsError } = useDashboardCards()
-  const { data: readiness, error: readinessError } = useDashboardReadiness()
-  const { data: panels, error: panelsError } = useDashboardPanels()
-  useErrorToast(cardsError, readinessError, panelsError)
+  const cardsQuery = useDashboardCards()
+  const readinessQuery = useDashboardReadiness()
+  const panelsQuery = useDashboardPanels()
+  const { data: cards } = cardsQuery
+  const { data: readiness } = readinessQuery
+  const { data: panels } = panelsQuery
+  useErrorToast(cardsQuery.error, readinessQuery.error, panelsQuery.error)
+  // Gagal memuat: pesan + Coba lagi di setiap panel, bukan skeleton tanpa akhir (T45, temuan UAT U2).
+  const panelsFallback = panelsQuery.error
+    ? <LoadError onRetry={() => panelsQuery.refetch()} retrying={panelsQuery.isFetching} />
+    : <ListSkeleton />
 
   const exportReport = (type: ReportType) => downloadReport(type).catch((e) => toast.error(errorMessage(e)))
 
@@ -83,7 +92,7 @@ export default function DashboardPage() {
       title="Dashboard"
       actions={
         <>
-          <form onSubmit={submitSearch} className="relative w-full sm:w-64" role="search">
+          <form noValidate onSubmit={submitSearch} className="relative w-full sm:w-64" role="search">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               value={search}
@@ -111,7 +120,9 @@ export default function DashboardPage() {
       {header}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 min-[85rem]:grid-cols-6" aria-busy={!cards || undefined}>
-        {!cards ? Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />) : <>
+        {!cards && cardsQuery.error ? (
+          <LoadError className="col-span-full rounded-xl border border-slate-200 bg-white" onRetry={() => cardsQuery.refetch()} retrying={cardsQuery.isFetching} />
+        ) : !cards ? Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />) : <>
         <StatCard
           label="Total aset"
           value={cards.total_assets.total}
@@ -119,6 +130,8 @@ export default function DashboardPage() {
           notes={[
             { text: `${cards.total_assets.owned_by_shd} milik SHD` },
             { text: `${cards.total_assets.from_other_units} dari departemen lain` },
+            // Total sama dengan Daftar Aset; Tidak Layak Pakai ikut dihitung dan disebut terpisah (T45, UAT U5).
+            ...(cards.total_assets.not_feasible > 0 ? [{ text: `${cards.total_assets.not_feasible} tidak layak pakai` }] : []),
           ]}
         />
         <StatCard
@@ -145,8 +158,9 @@ export default function DashboardPage() {
           to="/kelengkapan-ruangan"
           alert={cards.incomplete_rooms.incomplete > 0}
           notes={[
-            { text: `dari ${cards.incomplete_rooms.total_rooms} ruangan` },
-            { text: `di ${cards.incomplete_rooms.total_buildings} gedung` },
+            // Angka ruangan dan gudang sama dengan yang tampil di Kelengkapan Ruangan (T45, UAT U5).
+            { text: `${cards.incomplete_rooms.incomplete} dari ${cards.incomplete_rooms.total_rooms} ruangan belum lengkap` },
+            ...(cards.incomplete_rooms.storage_rooms > 0 ? [{ text: `${cards.incomplete_rooms.storage_rooms} gudang tidak dinilai` }] : []),
           ]}
         />
         <StatCard
@@ -175,7 +189,7 @@ export default function DashboardPage() {
         <div className="min-w-0 space-y-5">
         <Panel title="Peminjaman jatuh tempo & terlambat" link={{ to: '/peminjaman', label: 'Lihat semua' }} flush>
           {!panels ? (
-            <ListSkeleton />
+            panelsFallback
           ) : panels.loans_due.length === 0 ? (
             <Muted className="px-5 pb-5">Tidak ada peminjaman yang jatuh tempo.</Muted>
           ) : (
@@ -227,7 +241,7 @@ export default function DashboardPage() {
 
         <Panel title="Jadwal penyerahan hari ini" link={{ to: '/peminjaman', label: 'Lihat pemesanan' }} flush>
           {!panels ? (
-            <ListSkeleton />
+            panelsFallback
           ) : panels.handovers_today.length === 0 ? (
             <Muted className="px-5 pb-5">Tidak ada jadwal penyerahan hari ini.</Muted>
           ) : (
@@ -254,7 +268,7 @@ export default function DashboardPage() {
 
         <Panel title="Permintaan ke departemen lain" link={{ to: '/permintaan', label: 'Kelola' }} flush>
           {!panels ? (
-            <ListSkeleton />
+            panelsFallback
           ) : panels.recent_requests.length === 0 ? (
             <Muted className="px-5 pb-5">Belum ada permintaan.</Muted>
           ) : (
@@ -275,7 +289,9 @@ export default function DashboardPage() {
 
         <div className="min-w-0 space-y-5">
           <Panel title="Kelengkapan ruangan" link={{ to: '/kelengkapan-ruangan', label: 'Lihat ruangan' }} flush>
-            {!readiness && <ListSkeleton />}
+            {!readiness && (readinessQuery.error
+              ? <LoadError onRetry={() => readinessQuery.refetch()} retrying={readinessQuery.isFetching} />
+              : <ListSkeleton />)}
             {readiness?.length === 0 && <Muted className="px-5 pb-5">Belum ada gedung.</Muted>}
             <ul className="divide-y divide-slate-100 border-t border-slate-100">
               {readiness?.map((b) => {
@@ -296,6 +312,7 @@ export default function DashboardPage() {
                     <ReadinessBar complete={complete} incomplete={incomplete} />
                     <p className="text-sm text-slate-500">
                       {complete} lengkap · {incomplete} kurang · {b.rooms_count} ruangan
+                      {b.storage_rooms_count > 0 && ` · ${b.storage_rooms_count} gudang tidak dinilai`}
                     </p>
                     {incomplete > 0 && (
                       <ul className="pt-1 text-sm lg:space-y-1">
@@ -320,7 +337,7 @@ export default function DashboardPage() {
 
           <Panel title="Stok menipis" link={{ to: '/stok', label: 'Lihat stok' }} flush>
             {!panels ? (
-              <ListSkeleton />
+              panelsFallback
             ) : panels.low_stock.length === 0 ? (
               <Muted className="px-5 pb-5">Semua stok aman.</Muted>
             ) : (
@@ -342,7 +359,7 @@ export default function DashboardPage() {
 
           <Panel title="Aset perlu servis" link={{ to: '/daftar-aset', label: 'Daftar aset' }} flush>
             {!panels ? (
-              <ListSkeleton />
+              panelsFallback
             ) : panels.assets_need_service.length === 0 ? (
               <Muted className="px-5 pb-5">Tidak ada aset yang perlu servis dalam 14 hari.</Muted>
             ) : (

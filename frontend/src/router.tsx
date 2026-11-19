@@ -15,12 +15,10 @@ import EmailRequiredPage from './pages/EmailRequiredPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import LegacyMasterRedirect from './pages/settings/LegacyMasterRedirect'
 import SettingsPage from './pages/settings/SettingsPage'
-import PlaceholderPage from './pages/PlaceholderPage'
+import NotFoundPage from './pages/NotFoundPage'
 import PublicAssetPage from './pages/scan/PublicAssetPage'
 import ScanCodePage from './pages/scan/ScanCodePage'
 import ScanPage from './pages/scan/ScanPage'
-
-const page = (title: string, task: string) => <PlaceholderPage title={title} task={task} />
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -68,7 +66,7 @@ export const router = createBrowserRouter([
       { path: '/stok', element: <ConsumablesPage /> },
       { path: '/pengaturan', element: <SettingsPage /> },
       { path: '/pengaturan/data-master', element: <LegacyMasterRedirect /> },
-      { path: '*', element: page('Halaman tidak ditemukan', '—') },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ])

@@ -5,15 +5,14 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
 import { openInNewTab } from '../../lib/blob'
+import { ASSET_FILE_ACCEPT as ACCEPT, uploadAssetFile, uploadErrorMessage } from '../../lib/asset-files'
 import { formatSize } from '../../lib/format'
-import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL, compressImage } from '../../lib/image'
+import { MAX_UPLOAD_LABEL } from '../../lib/image'
 import { queryKeys } from '../../lib/queries/keys'
 import { useAssetFiles } from '../../lib/queries/lists'
 import { useErrorToast } from '../../lib/useErrorToast'
 import { Skeleton } from '../../components/ui/Skeleton'
 import type { AssetFile, FileType } from '../../types/asset'
-
-const ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf'
 
 const SLOTS: { type: FileType; label: string }[] = [
   { type: 'Foto Aset', label: 'Foto aset' },
@@ -38,24 +37,13 @@ export default function AssetFilesManager({ assetId }: { assetId: number }) {
 
   const upload = async (type: FileType, file: File | undefined, key: string) => {
     if (!file) return
-    if (!ACCEPT.split(',').includes(file.type)) return toast.error('Tipe file harus JPG, PNG, WebP, atau PDF.')
-
     setBusy(key)
     try {
-      // Foto dikecilkan dulu agar muat di batas server; PDF tidak diubah.
-      const ready = await compressImage(file)
-      if (ready.size > MAX_UPLOAD_BYTES) {
-        toast.error(`Ukuran file maksimal ${MAX_UPLOAD_LABEL}.`)
-        return
-      }
-      const body = new FormData()
-      body.append('file_type', type)
-      body.append('file', ready)
-      const res = await api.post<{ meta?: { replaced?: boolean } }>(`/assets/${assetId}/files`, body)
-      toast.success(res.data.meta?.replaced ? 'File diganti.' : 'File diunggah.')
+      const { replaced } = await uploadAssetFile(assetId, type, file)
+      toast.success(replaced ? 'File diganti.' : 'File diunggah.')
       await load()
     } catch (e) {
-      toast.error(errorMessage(e))
+      toast.error(uploadErrorMessage(e))
     } finally {
       setBusy(null)
     }

@@ -55,6 +55,9 @@ export default function StockCardModal({ item, onClose }: { item: ConsumableItem
         rows={transactions.data?.data ?? []}
         rowKey={(t) => t.id}
         loading={transactions.isPending}
+        error={transactions.error}
+        onRetry={() => transactions.refetch()}
+        retrying={transactions.isFetching}
         fetching={transactions.isPlaceholderData}
         emptyText="Belum ada transaksi."
         meta={transactions.data?.meta}

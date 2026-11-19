@@ -15,13 +15,14 @@ class EmployeeController extends Controller
 
     /**
      * Saran pegawai aktif dari salinan lokal (semua departemen) untuk Nama peminjam & PIC: maks. 10,
-     * hanya nama/departemen/jabatan (NIK tidak dikirim). Mencari nama atau awalan NIK.
+     * hanya nama/departemen/jabatan. Hanya mencari NAMA (T45, temuan UAT K1): mencari NIK memungkinkan
+     * orang mencocokkan NIK dengan nama, padahal NIK adalah password awal akun pegawai SHD.
      */
     public function index(Request $request): JsonResponse
     {
         $search = $request->validate(['search' => ['required', 'string', 'min:2', 'max:100']])['search'];
 
-        $employees = Search::apply(Employee::query()->active(), $search, 'name', fn ($query, string $pattern) => $query->orWhereRaw(Search::likeSql('nik'), [mb_substr($pattern, 1)]))
+        $employees = Search::apply(Employee::query()->active(), $search, 'name')
             ->orderBy('name')
             ->limit(self::LIMIT)
             ->get();

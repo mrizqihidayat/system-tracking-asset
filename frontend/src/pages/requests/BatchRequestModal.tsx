@@ -7,8 +7,8 @@ import { useRequestMethods } from '../../lib/queries/master'
 import { useErrorToast } from '../../lib/useErrorToast'
 import type { SuggestionGroup } from '../../types/supply'
 import ActionModal from '../assets/modals/ActionModal'
+import { todayWib as today } from '../../lib/date'
 
-const today = () => new Date().toLocaleDateString('en-CA')
 const OTHER_METHOD = 'Lainnya'
 
 interface Props {

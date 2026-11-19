@@ -204,10 +204,23 @@ class AccountTest extends TestCase
             $this->assertSame(['name', 'department', 'position'], array_keys($row));
         }
 
-        // Pencarian dengan awalan NIK tetap jalan, tetapi NIK dan data lain tidak ikut dikirim (NIK = password awal).
-        $content = $this->getJson('/api/employees?search=9010000')->assertOk()->assertJsonCount(3, 'data')->getContent();
+        $content = $response->getContent();
         foreach (['nik', '90100001', '90100004', 'email', 'contoh.invalid', 'group_name'] as $private) {
             $this->assertStringNotContainsString($private, $content);
+        }
+    }
+
+    public function test_employee_search_matches_names_only_not_nik(): void
+    {
+        // T45 (UAT K1): NIK = password awal, jadi NIK lengkap maupun awalannya tidak boleh mengembalikan pemiliknya.
+        Employee::factory()->inDepartment('SHD')->create(['nik' => '90100001', 'name' => 'ANDI PRATAMA']);
+        $external = User::factory()->create(['username' => 'sga1']);
+
+        foreach ([$this->staff, $external] as $account) {
+            $this->actingAs($account);
+            $this->getJson('/api/employees?search=90100001')->assertOk()->assertJsonCount(0, 'data');
+            $this->getJson('/api/employees?search=9010')->assertOk()->assertJsonCount(0, 'data');
+            $this->getJson('/api/employees?search=pratama')->assertOk()->assertJsonPath('data.0.name', 'ANDI PRATAMA');
         }
     }
 

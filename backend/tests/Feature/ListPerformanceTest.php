@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Consumable;
 use App\Models\ConsumableCategory;
 use App\Models\Department;
+use App\Models\Loan;
 use App\Models\RequestCatalog;
 use App\Models\Room;
 use App\Models\User;
@@ -87,9 +88,15 @@ class ListPerformanceTest extends TestCase
             ->json('data.0');
 
         $this->assertSame(
-            ['id', 'code', 'name', 'category_name', 'asset_type_name', 'room_name', 'building_name', 'source_name', 'source_is_internal', 'condition', 'status'],
+            ['id', 'code', 'name', 'category_name', 'asset_type_name', 'room_name', 'building_name', 'source_name', 'source_is_internal', 'condition', 'status', 'active_loan_due_date'],
             array_keys($row),
         );
+        $this->assertNull($row['active_loan_due_date']);
+
+        // T45 (UAT A5): aset yang sedang dipinjam membawa rencana kembali untuk alasan "Sedang dipinjam sampai …".
+        $asset->update(['status' => AssetStatus::Dipinjam]);
+        Loan::factory()->create(['asset_id' => $asset->id, 'due_date' => '2026-11-20']);
+        $this->getJson('/api/assets')->assertOk()->assertJsonPath('data.0.active_loan_due_date', '2026-11-20');
 
         $this->getJson("/api/assets/{$asset->id}")
             ->assertOk()

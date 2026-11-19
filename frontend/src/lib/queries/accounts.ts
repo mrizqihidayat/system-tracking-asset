@@ -11,9 +11,11 @@ export type AccountStatus = 'aktif' | 'belum' | 'nonaktif'
  * Tidak ada password di sini; `password_default` hanya penanda (null untuk akun eksternal).
  */
 export interface Account {
+  /** Penanda baris stabil: `akun-{id}` atau `pegawai-{id}` (belum punya akun). */
+  key: string
   id: number | null
   name: string
-  nik: string | null
+  /** Hanya akun eksternal; NIK pegawai tidak dikirim API (T45, temuan UAT K4). */
   username: string | null
   email: string | null
   source: 'api' | 'manual'

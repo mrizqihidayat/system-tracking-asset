@@ -5,8 +5,8 @@ import { api } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import type { Loan } from '../../types/loan'
 import ActionModal from '../assets/modals/ActionModal'
+import { todayWib as today } from '../../lib/date'
 
-const today = () => new Date().toLocaleDateString('en-CA')
 
 interface Props {
   loan: Loan

@@ -8,8 +8,9 @@ import { api, errorMessage, fieldErrors } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import type { Asset } from '../../types/asset'
 import AssetPicker, { type PickedAsset } from './AssetPicker'
+import { unavailableReason } from './asset-availability'
+import { todayWib as today } from '../../lib/date'
 
-const today = () => new Date().toLocaleDateString('en-CA')
 
 const emptyForm = () => ({
   borrower_name: '',
@@ -36,6 +37,8 @@ export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Prop
   const [form, setForm] = useState(emptyForm)
   // Tanggal pinjam setelah hari ini → pemesanan (Direncanakan). Format YYYY-MM-DD bisa dibandingkan sebagai teks.
   const planned = form.borrow_date > today()
+  // Aset yang sudah dipilih lalu tanggalnya diganti (mis. pesan → pinjam sekarang) bisa jadi tidak boleh lagi.
+  const assetProblem = asset ? unavailableReason({ status: asset.status, active_loan_due_date: null }, planned) : null
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -104,17 +107,25 @@ export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Prop
         </>
       }
     >
-      <form id="loan-form" onSubmit={submit} className="space-y-4">
+      <form noValidate id="loan-form" onSubmit={submit} className="space-y-4">
         {message && (
           <div role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
             {message}
           </div>
         )}
 
+        {/* Tanggal pinjam di atas pilihan aset: menentukan aset mana yang bisa dipilih (pinjam sekarang / pesan), T45 UAT A5. */}
+        <FormField label="Tanggal pinjam" error={errors.borrow_date} className="sm:w-1/2 sm:pr-1.5">
+          <Input type="date" value={form.borrow_date} onChange={(e) => set('borrow_date', e.target.value)} error={errors.borrow_date} />
+          {planned && !errors.borrow_date && (
+            <span className="block text-xs text-slate-500">Setelah hari ini: dicatat sebagai Direncanakan, aset tetap Tersedia sampai diserahkan.</span>
+          )}
+        </FormField>
+
         {loadingAsset ? (
           <p role="status" className="text-sm text-slate-500">Memuat aset…</p>
         ) : (
-          <AssetPicker asset={asset} onPick={setAsset} error={errors.asset_id} planned={planned} />
+          <AssetPicker asset={asset} onPick={setAsset} error={errors.asset_id ?? assetProblem ?? undefined} planned={planned} />
         )}
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -147,12 +158,6 @@ export default function LoanFormModal({ initialAssetId, onClose, onSaved }: Prop
         </FormField>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Tanggal pinjam" error={errors.borrow_date}>
-            <Input type="date" value={form.borrow_date} onChange={(e) => set('borrow_date', e.target.value)} error={errors.borrow_date} />
-            {planned && !errors.borrow_date && (
-              <span className="block text-xs text-slate-500">Setelah hari ini: dicatat sebagai Direncanakan, aset tetap Tersedia sampai diserahkan.</span>
-            )}
-          </FormField>
           <FormField label="Rencana kembali" required error={errors.due_date}>
             <Input type="date" value={form.due_date} min={form.borrow_date || undefined} onChange={(e) => set('due_date', e.target.value)} error={errors.due_date} />
           </FormField>

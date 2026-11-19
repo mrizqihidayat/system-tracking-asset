@@ -87,8 +87,9 @@ class DashboardTest extends TestCase
         $this->assertSame([], $data['panels']['loans_due']);
     }
 
-    public function test_total_assets_excludes_not_feasible_and_splits_by_source(): void
+    public function test_total_assets_includes_not_feasible_and_splits_by_source(): void
     {
+        // T45 (UAT U5): total sama dengan Daftar Aset (Tidak Layak Pakai ikut), jumlah Tidak Layak Pakai sebagai keterangan.
         $this->asset();
         $this->asset(['status' => AssetStatus::Perbaikan]);
         $this->asset(['source_department_id' => $this->deptA->id]);
@@ -96,7 +97,7 @@ class DashboardTest extends TestCase
         $this->asset(['source_department_id' => $this->deptA->id, 'status' => AssetStatus::TidakLayakPakai]);
 
         $this->assertSame(
-            ['total' => 3, 'owned_by_shd' => 2, 'from_other_units' => 1, 'not_feasible' => 2],
+            ['total' => 5, 'owned_by_shd' => 3, 'from_other_units' => 2, 'not_feasible' => 2],
             $this->dashboard()['cards']['total_assets'],
         );
     }
@@ -149,12 +150,13 @@ class DashboardTest extends TestCase
 
         // 4 ruangan (1 dari setUp), 2 gedung (1 dari setUp); hanya "Kurang" yang tidak lengkap.
         $this->assertSame(
-            ['incomplete' => 1, 'total_rooms' => 4, 'total_buildings' => 2, 'incomplete_buildings' => 1],
+            ['incomplete' => 1, 'total_rooms' => 4, 'storage_rooms' => 0, 'total_buildings' => 2, 'incomplete_buildings' => 1],
             $data['cards']['incomplete_rooms'],
         );
 
         $panel = collect($data['panels']['room_readiness'])->firstWhere('name', 'IHS');
         $this->assertSame(3, $panel['rooms_count']);
+        $this->assertSame(0, $panel['storage_rooms_count']);
         $this->assertSame(1, $panel['rooms_without_standards']);
         $this->assertSame(1, $panel['incomplete_rooms_count']);
         $this->assertSame(1, $panel['shortage_items']);

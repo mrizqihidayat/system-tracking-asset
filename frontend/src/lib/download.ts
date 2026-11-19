@@ -1,5 +1,6 @@
 import { api } from './api'
 import { unwrapBlobError } from './blob'
+import { todayWib } from './date'
 
 export type ReportType = 'assets' | 'loans' | 'rooms' | 'requests' | 'consumables'
 
@@ -52,7 +53,7 @@ export async function downloadReport(type: ReportType, filters: Record<string, u
       : Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== '' && v !== null && v !== undefined && v !== false))
   try {
     const res = await api.get<Blob>(`/reports/${type}`, { params, responseType: 'blob' })
-    const fallback = `laporan-${SLUGS[type]}-${new Date().toLocaleDateString('en-CA').replaceAll('-', '')}.xlsx`
+    const fallback = `laporan-${SLUGS[type]}-${todayWib().replaceAll('-', '')}.xlsx`
     save(res.data, filenameFrom(res.headers['content-disposition']) ?? fallback)
   } catch (error) {
     return unwrapBlobError(error)

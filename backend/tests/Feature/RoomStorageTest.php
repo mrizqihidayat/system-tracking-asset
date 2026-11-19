@@ -120,7 +120,7 @@ class RoomStorageTest extends TestCase
         $this->assertFalse($rooms['Kelas Kurang']['is_storage']);
 
         $cards = $this->getJson('/api/dashboard/cards')->assertOk()->json('data.incomplete_rooms');
-        $this->assertSame(['incomplete' => 1, 'total_rooms' => 2, 'total_buildings' => 1, 'incomplete_buildings' => 1], $cards);
+        $this->assertSame(['incomplete' => 1, 'total_rooms' => 2, 'storage_rooms' => 2, 'total_buildings' => 1, 'incomplete_buildings' => 1], $cards);
 
         $panel = $this->getJson('/api/dashboard/room-readiness')->assertOk()->json('data.0');
         $this->assertSame(2, $panel['rooms_count']);

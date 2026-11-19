@@ -26,16 +26,22 @@ export default function LoginPage() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setMessage('')
-    setErrors({})
+    // Pesan sendiri di bawah kolom, bukan pesan bawaan browser (T45, temuan UAT U4).
+    const local: Record<string, string> = {}
+    if (!username.trim()) local.username = 'Username wajib diisi.'
+    if (!password) local.password = 'Password wajib diisi.'
+    setErrors(local)
+    if (Object.keys(local).length > 0) return
+    setLoading(true)
     try {
       const res = await api.post<{ token: string; user: AuthUser }>('/login', { username, password })
       setSession(res.data.token, res.data.user)
       navigate(next, { replace: true })
     } catch (error) {
-      setErrors(fieldErrors(error))
-      setMessage(errorMessage(error))
+      const fields = fieldErrors(error)
+      setErrors(fields)
+      if (Object.keys(fields).length === 0) setMessage(errorMessage(error))
     } finally {
       setLoading(false)
     }
@@ -55,7 +61,7 @@ export default function LoginPage() {
       </aside>
 
       <main className="flex items-center justify-center px-4 py-10">
-        <form onSubmit={submit} className="w-full max-w-sm space-y-5">
+        <form noValidate onSubmit={submit} className="w-full max-w-sm space-y-5">
           <div>
             <SiteLogo />
             <h1 className="mt-6 text-2xl font-bold tracking-tight">Selamat Datang Kembali</h1>

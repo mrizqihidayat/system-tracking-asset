@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Baris Daftar Aset & saran aset: hanya kolom tabel (dari scope Asset::forList()). Data lengkap ada
- * di AssetResource lewat GET /assets/{id}.
+ * Baris Daftar Aset & saran aset: kolom tabel (dari scope Asset::forList()) ditambah `active_loan_due_date`
+ * (rencana kembali pinjaman aktif, Y-m-d atau null) untuk alasan di pilihan aset form peminjaman (T45).
+ * Data lengkap ada di AssetResource lewat GET /assets/{id}.
  *
  * @mixin Asset
  */
@@ -31,6 +32,7 @@ class AssetListResource extends JsonResource
             'source_is_internal' => (bool) $this->source_is_internal,
             'condition' => $this->condition,
             'status' => $this->status,
+            'active_loan_due_date' => $this->active_loan_due_date ? substr((string) $this->active_loan_due_date, 0, 10) : null,
         ];
     }
 }

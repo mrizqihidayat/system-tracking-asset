@@ -63,6 +63,8 @@ class DashboardService
                 'name' => $building['name'],
                 'slug' => $building['slug'],
                 'rooms_count' => $rooms->count(),
+                // T45 (UAT U5): gudang disebut terpisah supaya jumlahnya sama dengan pilihan ruangan di Kelengkapan Ruangan.
+                'storage_rooms_count' => collect($building['rooms'])->where('is_storage', true)->count(),
                 'rooms_without_standards' => $rooms->where('total_items', 0)->count(),
                 'incomplete_rooms_count' => $incomplete->count(),
                 'shortage_items' => $rooms->sum('shortage_items'),
@@ -103,7 +105,8 @@ class DashboardService
     }
 
     /**
-     * Tidak Layak Pakai tidak dihitung; jumlahnya terpisah.
+     * Semua aset termasuk Tidak Layak Pakai, sama dengan jumlah di Daftar Aset (T45, temuan UAT U5);
+     * jumlah Tidak Layak Pakai dikirim terpisah sebagai keterangan.
      *
      * @return array{total: int, owned_by_shd: int, from_other_units: int, not_feasible: int}
      */
@@ -114,8 +117,8 @@ class DashboardService
         $row = Asset::query()
             ->join('departments', 'departments.id', '=', 'assets.source_department_id')
             ->toBase()
-            ->selectRaw('sum(case when assets.status <> ? then 1 else 0 end) as total', [$notFeasible])
-            ->selectRaw('sum(case when assets.status <> ? and departments.is_internal then 1 else 0 end) as owned', [$notFeasible])
+            ->selectRaw('count(*) as total')
+            ->selectRaw('sum(case when departments.is_internal then 1 else 0 end) as owned')
             ->selectRaw('sum(case when assets.status = ? then 1 else 0 end) as not_feasible', [$notFeasible])
             ->first();
 
@@ -143,16 +146,21 @@ class DashboardService
     }
 
     /**
+     * `total_rooms` = ruangan yang dinilai (tanpa gudang); `storage_rooms` = gudang (tidak dinilai). Keduanya sama
+     * dengan yang tampil di Kelengkapan Ruangan (T45, temuan UAT U5).
+     *
      * @param  list<array<string, mixed>>  $buildings  ringkasan kesiapan (RoomReadinessService::summary())
-     * @return array{incomplete: int, total_rooms: int, total_buildings: int, incomplete_buildings: int}
+     * @return array{incomplete: int, total_rooms: int, storage_rooms: int, total_buildings: int, incomplete_buildings: int}
      */
     private function incompleteRooms(array $buildings): array
     {
-        $rooms = collect($buildings)->flatMap(fn (array $building) => $building['rooms'])->where('is_storage', false);
+        $allRooms = collect($buildings)->flatMap(fn (array $building) => $building['rooms']);
+        $rooms = $allRooms->where('is_storage', false);
 
         return [
             'incomplete' => $rooms->where('shortage_items', '>', 0)->count(),
             'total_rooms' => $rooms->count(),
+            'storage_rooms' => $allRooms->where('is_storage', true)->count(),
             'total_buildings' => count($buildings),
             'incomplete_buildings' => collect($buildings)->where('incomplete_rooms_count', '>', 0)->count(),
         ];

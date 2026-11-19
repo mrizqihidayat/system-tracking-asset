@@ -249,6 +249,12 @@ class Asset extends Model
             'source_is_internal' => Department::query()
                 ->select('departments.is_internal')
                 ->whereColumn('departments.id', 'assets.source_department_id'),
+            // Rencana kembali pinjaman aktif: alasan "Sedang dipinjam sampai …" di pilihan aset form peminjaman (T45, UAT A5).
+            'active_loan_due_date' => Loan::query()
+                ->select('loans.due_date')
+                ->whereColumn('loans.asset_id', 'assets.id')
+                ->where('loans.status', LoanStatus::Dipinjam->value)
+                ->limit(1),
         ]);
     }
 

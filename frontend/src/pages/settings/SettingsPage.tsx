@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/Page'
+import ScrollTabs from '../../components/ui/ScrollTabs'
 import { getUser } from '../../lib/auth'
 import MasterDataPage from '../master/MasterDataPage'
 import AccountsTab from './AccountsTab'
@@ -37,7 +38,7 @@ export default function SettingsPage() {
       />
 
       {tabs.length > 1 && (
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Bagian pengaturan">
+        <ScrollTabs className="flex gap-1 border-b border-slate-200" label="Bagian pengaturan" activeKey={tab}>
           {tabs.map((t) => (
             <button
               key={t.key}
@@ -51,7 +52,7 @@ export default function SettingsPage() {
               {t.label}
             </button>
           ))}
-        </div>
+        </ScrollTabs>
       )}
 
       {tab === 'tampilan' && <AppearanceTab />}

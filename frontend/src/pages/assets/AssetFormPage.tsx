@@ -14,7 +14,9 @@ import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import AssetFilesManager from './AssetFilesManager'
 import NewAssetTypeModal from './modals/NewAssetTypeModal'
+import ConditionPhotoField from '../loans/ConditionPhotoField'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
+import { ASSET_PHOTO_ACCEPT, uploadAssetFile, uploadErrorMessage } from '../../lib/asset-files'
 import { createBuilding, createRoom } from '../../lib/lookups'
 import { invalidate } from '../../lib/queries/invalidate'
 import { assetQueries } from '../../lib/queries/lists'
@@ -71,6 +73,7 @@ export default function AssetFormPage() {
   const [original, setOriginal] = useState<Asset | null>(null)
   const [loading, setLoading] = useState(editing)
   const [saving, setSaving] = useState(false)
+  const [photo, setPhoto] = useState<File | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const { data: types, error: typesError } = useAssetTypes()
@@ -192,6 +195,7 @@ export default function AssetFormPage() {
     e.preventDefault()
     const local: Record<string, string> = {}
     if (!form.asset_type_id) local.asset_type_id = 'Jenis aset wajib dipilih.'
+    if (!form.name.trim()) local.name = 'Nama aset wajib diisi.'
     if (!form.source_department_id) local.source_department_id = 'Sumber wajib dipilih.'
     if (!form.room_id) local.room_id = 'Ruangan wajib dipilih.'
     setErrors(local)
@@ -223,6 +227,14 @@ export default function AssetFormPage() {
         : await api.post<{ data: Asset }>('/assets', payload)
       const asset = res.data.data
       toast.success(editing ? `Data ${asset.code} disimpan.` : `Aset ${asset.code} ditambahkan.`)
+      if (!editing && photo) {
+        // Aset sudah tersimpan; gagal unggah foto tidak membatalkannya, foto bisa diunggah lagi dari detail aset.
+        try {
+          await uploadAssetFile(asset.id, 'Foto Aset', photo, ASSET_PHOTO_ACCEPT)
+        } catch (uploadError) {
+          toast.error(`Foto aset gagal diunggah: ${uploadErrorMessage(uploadError)} Unggah lagi dari halaman detail.`)
+        }
+      }
       invalidate.assets(queryClient)
       navigate(`/daftar-aset/${asset.id}`)
     } catch (e) {
@@ -263,7 +275,7 @@ export default function AssetFormPage() {
       }
       back={editing ? { to: `/daftar-aset/${id}`, label: 'Detail aset' } : { to: '/daftar-aset', label: 'Daftar Aset' }}
     />
-    <form onSubmit={submit} className="space-y-5">
+    <form onSubmit={submit} noValidate className="space-y-5">
       <Section title="Identitas aset">
         <div className="sm:col-span-2">
           <FormField label="Jenis aset" required error={errors.asset_type_id}>
@@ -311,6 +323,12 @@ export default function AssetFormPage() {
             <Textarea value={form.specification} onChange={(e) => set('specification', e.target.value)} error={errors.specification} />
           </FormField>
         </div>
+        {/* Tambah aset: foto opsional, diunggah setelah aset tersimpan (T45, UAT U1). Saat ubah data, foto lewat bagian Foto & dokumen. */}
+        {!editing && (
+          <div className="sm:col-span-2">
+            <ConditionPhotoField label="Foto aset" file={photo} onChange={setPhoto} required={false} />
+          </div>
+        )}
       </Section>
 
       <Section title="Sumber & lokasi asal">

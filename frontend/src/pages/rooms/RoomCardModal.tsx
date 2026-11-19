@@ -48,6 +48,9 @@ export default function RoomCardModal({ row, roomName, onClose }: { row: RoomCon
         rows={transactions.data?.data ?? []}
         rowKey={(t) => t.id}
         loading={transactions.isPending}
+        error={transactions.error}
+        onRetry={() => transactions.refetch()}
+        retrying={transactions.isFetching}
         fetching={transactions.isPlaceholderData}
         emptyText="Belum ada transaksi. Riwayat dimulai saat perubahan pertama dicatat."
         meta={transactions.data?.meta}

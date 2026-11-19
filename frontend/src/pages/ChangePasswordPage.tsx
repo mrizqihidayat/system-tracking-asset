@@ -96,7 +96,7 @@ export default function ChangePasswordPage() {
       {step !== 'form' && user ? (
         <PasswordOtpFlow step={step} onStep={setStep} user={user} onDone={done} onCancel={() => setStep('form')} />
       ) : (
-        <form onSubmit={submit} className="space-y-5">
+        <form noValidate onSubmit={submit} className="space-y-5">
           {forced && (
             <p className="rounded-lg bg-info-50 px-3 py-2.5 text-sm text-info-700">
               Password Anda baru direset staf SHD. Buat password baru dulu untuk melanjutkan.

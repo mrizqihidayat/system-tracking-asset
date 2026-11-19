@@ -7,11 +7,13 @@ interface FieldProps {
   error?: string
   required?: boolean
   children: ReactNode
+  /** Kelas tambahan pembungkus (mis. lebar setengah). */
+  className?: string
 }
 
-export function FormField({ label, error, required, children }: FieldProps) {
+export function FormField({ label, error, required, children, className = '' }: FieldProps) {
   return (
-    <label className="block space-y-1.5">
+    <label className={`block space-y-1.5 ${className}`}>
       <span className="block text-sm font-medium text-slate-700">
         {label}
         {required && <span className="text-bad-700"> *</span>}

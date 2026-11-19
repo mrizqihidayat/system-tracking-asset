@@ -5,12 +5,8 @@ import { api } from '../../../lib/api'
 import { CONDITIONS, type Asset, type Condition } from '../../../types/asset'
 import ActionModal from './ActionModal'
 import ConditionStatusFields, { type ChoiceStatus } from './ConditionStatusFields'
+import { todayWib as today } from '../../../lib/date'
 
-// Tanggal lokal (bukan UTC) agar "hari ini" tidak mundur sehari di zona WIB.
-const today = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 interface Props {
   asset: Asset

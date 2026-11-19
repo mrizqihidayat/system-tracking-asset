@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { AssetCode, ConditionBadge } from '../../components/ui/Badge'
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
@@ -10,6 +10,7 @@ import ActionModal from '../assets/modals/ActionModal'
 import ConditionStatusFields, { type ChoiceStatus, type HeavyDamageStatus } from '../assets/modals/ConditionStatusFields'
 import ConditionPhotoField from './ConditionPhotoField'
 import RoomSelect from './RoomSelect'
+import { todayWib as today } from '../../lib/date'
 
 interface Props {
   loan: Loan
@@ -17,7 +18,6 @@ interface Props {
   onDone: () => void
 }
 
-const today = () => new Date().toLocaleDateString('en-CA')
 
 function Info({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -40,6 +40,7 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
   const [roomId, setRoomId] = useState<number | null>(loan.asset?.room?.id ?? null)
   const [note, setNote] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
+  const photoField = useRef<HTMLDivElement>(null)
 
   const lost = result === 'hilang'
   const destination = loan.destination_room
@@ -81,6 +82,7 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
       submitLabel="Simpan"
       danger={lost}
       submitDisabled={photoRequired && !photo}
+      submitHint="Foto kondisi wajib untuk barang rusak"
       onClose={onClose}
       onSubmit={submit}
     >
@@ -128,13 +130,19 @@ export default function ReturnLoanModal({ loan, onClose, onDone }: Props) {
                 options={CONDITIONS}
                 condition={condition}
                 status={status}
-                onCondition={setCondition}
+                onCondition={(next) => {
+                  setCondition(next)
+                  // Kolom foto wajib ada di bawah layar: gulir ke sana setelah kondisi rusak dipilih (T45, UAT A3).
+                  if (next !== 'Baik' && !photo) requestAnimationFrame(() => photoField.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
+                }}
                 onStatus={setStatus}
                 heavyDamage={{ status: heavyStatus, onChange: setHeavyStatus }}
                 errors={errors}
                 showAutoStatus={false}
               />
-              <ConditionPhotoField file={photo} onChange={setPhoto} required={photoRequired} error={errors.condition_photo} />
+              <div ref={photoField} className="scroll-mt-4">
+                <ConditionPhotoField file={photo} onChange={setPhoto} required={photoRequired} error={errors.condition_photo} />
+              </div>
               <RoomSelect
                 buildingLabel="Gedung penyimpanan"
                 roomLabel="Ruangan penyimpanan"

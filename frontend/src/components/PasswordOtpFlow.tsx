@@ -155,7 +155,7 @@ export default function PasswordOtpFlow({ step, onStep, user, onDone, onCancel }
 
   if (step === 'code') {
     return (
-      <form onSubmit={submitCode} className="space-y-5">
+      <form noValidate onSubmit={submitCode} className="space-y-5">
         <p className="text-sm text-slate-600">
           Masukkan {OTP_LENGTH} angka yang dikirim ke <span className="font-semibold text-slate-800">{masked}</span>.
           Kode berlaku {minutes} menit.
@@ -181,7 +181,7 @@ export default function PasswordOtpFlow({ step, onStep, user, onDone, onCancel }
   }
 
   return (
-    <form onSubmit={submitPassword} className="space-y-5">
+    <form noValidate onSubmit={submitPassword} className="space-y-5">
       <ErrorBox message={message} />
       <FormField label="Password baru" required error={errors.password}>
         <PasswordInput

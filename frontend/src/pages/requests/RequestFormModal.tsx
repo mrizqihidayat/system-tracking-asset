@@ -12,6 +12,7 @@ import type { RequestCatalog, RequestPrefill, SupplyRequest } from '../../types/
 import ActionModal from '../assets/modals/ActionModal'
 import RoomSelect from '../loans/RoomSelect'
 import CatalogFormModal from './CatalogFormModal'
+import { todayWib as today } from '../../lib/date'
 
 interface Props {
   catalog: RequestCatalog[]
@@ -22,7 +23,6 @@ interface Props {
   onDone: () => void
 }
 
-const today = () => new Date().toLocaleDateString('en-CA')
 const MANUAL = 'manual'
 const OTHER_METHOD = 'Lainnya'
 

@@ -95,9 +95,9 @@ Nama file saat diunduh mengikuti tipe isi sebenarnya: `evil.html` berisi PDF diu
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| GET | `/api/employees` | Saran pegawai aktif dari salinan lokal (maks. 10): nama, departemen, jabatan (tanpa NIK); tidak memanggil API pegawai | Token | Ya: Nama peminjam & PIC (`components/EmployeeCombobox.tsx`) |
+| GET | `/api/employees` | Saran pegawai aktif dari salinan lokal (maks. 10): nama, departemen, jabatan (tanpa NIK, dan hanya dicari berdasarkan nama, T45); tidak memanggil API pegawai | Token | Ya: Nama peminjam & PIC (`components/EmployeeCombobox.tsx`) |
 | GET | `/api/employees/sync-status` | Sinkron terakhir salinan pegawai & departemen (hanya baca; tidak ada endpoint sinkronisasi) | Token | Ya: Data Master > Departemen (`pages/master/DepartmentsTab.tsx`) |
-| GET | `/api/accounts` | Daftar akses: akun (termasuk nonaktif) + pegawai SHD yang belum pernah masuk; `search`, `type`, `status`, paginasi | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
+| GET | `/api/accounts` | Daftar akses: akun (termasuk nonaktif) + pegawai SHD yang belum pernah masuk; `search` (nama atau username, tanpa NIK), `type`, `status`, paginasi; baris tanpa `nik`, dengan `key` stabil (T45) | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
 | GET | `/api/accounts/{id}/events` | 10 aktivitas terakhir akun (aksi, pelaku, waktu) | Token, akun pegawai SHD | Ya: Pengaturan > Akun, Lihat riwayat (`pages/settings/AccountsTab.tsx`) |
 | POST | `/api/accounts` | Tambah akun eksternal (`name`, `department` teks bebas, `note` opsional, `username`, `email`, `password`) | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
 | PUT | `/api/accounts/{id}/password` | Ubah password akun eksternal | Token, akun pegawai SHD | Ya: Pengaturan > Akun (`pages/settings/AccountsTab.tsx`) |
@@ -192,7 +192,7 @@ Departemen dibentuk dari API pegawai (`php artisan employees:sync`), jadi tidak 
 
 | Method | Endpoint | Fungsi | Akses | Dipakai frontend |
 |---|---|---|---|---|
-| GET | `/api/assets` | Daftar aset, filter dan pencarian | Token | Ya: Daftar Aset, pilih aset di form pinjam (`lib/queries/lists.ts`, `pages/loans/AssetPicker.tsx`) |
+| GET | `/api/assets` | Daftar aset, filter dan pencarian; baris memuat `active_loan_due_date` (T45) | Token | Ya: Daftar Aset, pilih aset di form pinjam (`lib/queries/lists.ts`, `pages/loans/AssetPicker.tsx`) |
 | POST | `/api/assets` | Tambah aset | Token | Ya: Form aset (`pages/assets/AssetFormPage.tsx`) |
 | GET | `/api/assets/{id}` | Detail aset dan aksi yang tersedia | Token | Ya: Detail aset, form ubah, form pinjam (`lib/queries/lists.ts`, `pages/loans/LoanForm.tsx`) |
 | GET | `/api/assets/{id}/delete-impact` | Dampak penghapusan aset | Token | Ya: Popup hapus (`pages/assets/modals/DeleteAssetModal.tsx`) |

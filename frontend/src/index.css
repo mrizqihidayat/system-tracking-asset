@@ -60,6 +60,15 @@
   }
   body {
     @apply bg-canvas font-sans text-slate-900 antialiased;
+    /* T45 (temuan UAT U6): teks panjang tanpa spasi (tautan, nomor seri) dipotong otomatis di kartu, tabel, dan detail,
+       supaya tidak keluar kartu atau membuat halaman bisa digeser ke samping. Kata biasa tetap pindah baris di spasi. */
+    overflow-wrap: anywhere;
+  }
+  /* Sel tabel: `anywhere` ikut mengecilkan lebar minimum kolom sehingga kata biasa terpotong ("Rahmawa-ti"); `break-word`
+     hanya memotong kata yang memang tidak muat, dan tabel lebar sudah punya area geser sendiri. */
+  td,
+  th {
+    overflow-wrap: break-word;
   }
   ::selection {
     @apply bg-brand-100 text-brand-900;

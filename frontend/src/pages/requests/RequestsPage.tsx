@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DepartmentCombobox from '../../components/DepartmentCombobox'
+import DateRangeFilter from '../../components/DateRangeFilter'
 import ExportButton from '../../components/ExportButton'
 import { Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -184,6 +185,8 @@ export default function RequestsPage() {
   const status = list.get('status')
   const providerId = list.get('provider_department_id')
   const search = list.searchText
+  const from = list.get('from')
+  const to = list.get('to')
 
   // Query sudah dipakai untuk isian awal modal → bersihkan dari URL (filter tabel tetap).
   // provider_department_id dari Stok hanya dipakai bila datang bersama barang (consumable_id/item_name).
@@ -354,6 +357,8 @@ export default function RequestsPage() {
                 ...(status ? { display_status: status } : {}),
                 ...(providerId ? { provider_department_id: providerId } : {}),
                 search: search.trim(),
+                from,
+                to,
               })}
             />
             <Button onClick={() => setModal({ kind: 'request', request: null })}>
@@ -393,15 +398,15 @@ export default function RequestsPage() {
                 </button>
               </p>
             )}
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
               <Input
-                className="col-span-2 sm:w-60"
+                className="col-span-2 sm:w-48"
                 value={search}
                 onChange={(e) => list.setSearchText(e.target.value)}
                 placeholder="Cari item atau kegiatan"
                 aria-label="Cari permintaan"
               />
-              <div className="min-w-0 sm:w-48">
+              <div className="min-w-0 sm:w-40">
                 <DepartmentCombobox
                   value={providerId ? Number(providerId) : null}
                   onChange={(id) => list.setFilter('provider_department_id', id ? String(id) : '')}
@@ -409,16 +414,27 @@ export default function RequestsPage() {
                   placeholder="Semua penyedia"
                 />
               </div>
-              <Select clearable className="min-w-0 sm:w-56" value={status} onChange={(e) => list.setFilter('status', e.target.value)} aria-label="Status">
+              <Select clearable className="min-w-0 sm:w-44" value={status} onChange={(e) => list.setFilter('status', e.target.value)} aria-label="Status">
                 <option value="">Semua status</option>
                 {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
               </Select>
+              <div className="col-span-2 sm:col-span-1">
+                <DateRangeFilter
+                  from={from}
+                  to={to}
+                  dateLabel="Tanggal permintaan"
+                  onChange={(nextFrom, nextTo) => list.setFilter('from', nextFrom, { to: nextTo || null })}
+                />
+              </div>
             </div>
             <DataTable
               columns={historyColumns}
               rows={history?.data ?? []}
               rowKey={(r) => r.id}
               loading={historyQuery.isPending}
+              error={historyQuery.error}
+              onRetry={() => historyQuery.refetch()}
+              retrying={historyQuery.isFetching}
               fetching={historyQuery.isPlaceholderData}
               emptyText="Belum ada permintaan."
               meta={history?.meta}
@@ -461,6 +477,9 @@ export default function RequestsPage() {
               rows={catalogRows.slice((catalogPageNow - 1) * CATALOG_PER_PAGE, catalogPageNow * CATALOG_PER_PAGE)}
               rowKey={(c) => c.id}
               loading={catalogQuery.isPending}
+              error={catalogQuery.error}
+              onRetry={() => catalogQuery.refetch()}
+              retrying={catalogQuery.isFetching}
               emptyText={catalog.length === 0 ? 'Katalog masih kosong.' : 'Tidak ada item yang cocok.'}
               meta={catalogRows.length > CATALOG_PER_PAGE ? { current_page: catalogPageNow, last_page: catalogLastPage, per_page: CATALOG_PER_PAGE, total: catalogRows.length } : undefined}
               unit="item"

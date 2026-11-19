@@ -7,6 +7,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { Badge, ConditionBadge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import { buttonClass } from '../../components/ui/button-class'
+import LoadError from '../../components/ui/LoadError'
 import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu from '../../components/ui/DropdownMenu'
 import { PageHeader } from '../../components/ui/Page'
@@ -219,7 +220,7 @@ const storedStockColumns: Column<RoomStoredStock>[] = [
 ]
 
 /** Tampilan gudang: hanya Aset tersimpan & Stok tersimpan, tanpa standar dan cek. */
-function StorageRoomView({ checklist, loading }: { checklist: Checklist | null; loading: boolean }) {
+function StorageRoomView({ checklist, loading, error, onRetry }: { checklist: Checklist | null; loading: boolean; error?: unknown; onRetry?: () => void }) {
   return (
     <div className="grid items-start gap-4 lg:grid-cols-2">
       <section className="min-w-0 space-y-2">
@@ -230,6 +231,8 @@ function StorageRoomView({ checklist, loading }: { checklist: Checklist | null; 
           rows={loading ? [] : (checklist?.data.assets ?? [])}
           rowKey={(g) => g.asset_type.id}
           loading={loading}
+          error={error}
+          onRetry={onRetry}
           emptyText="Belum ada aset tersimpan di gudang ini."
         />
       </section>
@@ -242,6 +245,8 @@ function StorageRoomView({ checklist, loading }: { checklist: Checklist | null; 
           rows={loading ? [] : (checklist?.data.stored_stock ?? [])}
           rowKey={(s) => s.id}
           loading={loading}
+          error={error}
+          onRetry={onRetry}
           emptyText="Belum ada stok tersimpan di gudang ini."
         />
       </section>
@@ -320,6 +325,9 @@ export default function RoomsPage() {
   }
 
   const totalRooms = buildings.reduce((n, b) => n + b.rooms_count, 0)
+  // Sama dengan kartu Dashboard "N dari {dinilai} ruangan belum lengkap · {gudang} gudang tidak dinilai" (T45, UAT U5).
+  const storageRooms = buildings.reduce((n, b) => n + b.rooms.filter((r) => r.is_storage).length, 0)
+  const roomCountText = `${totalRooms} ruangan di ${buildings.length} gedung${storageRooms > 0 ? ` (${totalRooms - storageRooms} dinilai, ${storageRooms} gudang)` : ''}`
   const shortages = assetRows.filter((g) => g.result === 'Kurang').length + consumableRows.filter((s) => s.result === 'Kurang').length
   const roomLabel = room && building ? `${room.name} · ${building.name}` : ''
   const isStorage = !!room?.is_storage
@@ -426,7 +434,7 @@ export default function RoomsPage() {
           ) : s.can_request && roomId ? (
             <Link to={requestUrl(roomId, s)} className={buttonClass('secondary', 'flex-1')}>Ajukan permintaan</Link>
           ) : null}
-          <Button variant="secondary" className="flex-1" onClick={() => setAdjusting(s)}>Ubah jumlah</Button>
+          <Button variant="secondary" className="flex-1" onClick={() => setAdjusting(s)}>Catat perubahan</Button>
         </div>
       }
     >
@@ -590,7 +598,7 @@ export default function RoomsPage() {
     <div className="space-y-3">
       <PageHeader
         title="Kelengkapan Ruangan"
-        description={`Aset dan barang habis pakai per ruangan · ${totalRooms} ruangan di ${buildings.length} gedung`}
+        description={`Aset dan barang habis pakai per ruangan · ${roomCountText}`}
         actions={
           <>
             {/* Status cek ruangan terpilih (hanya berubah lewat Tandai sudah dicek). */}
@@ -617,6 +625,10 @@ export default function RoomsPage() {
           </>
         }
       />
+
+      {readiness.error && !readiness.data && (
+        <LoadError className="rounded-xl border border-slate-200 bg-white" onRetry={() => readiness.refetch()} retrying={readiness.isFetching} />
+      )}
 
       <section className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-4 max-sm:hidden">
         <div className={selectorRow}>
@@ -719,7 +731,7 @@ export default function RoomsPage() {
         </>
       )}
 
-      {room && isStorage && <StorageRoomView checklist={checklist} loading={!checklistReady} />}
+      {room && isStorage && <StorageRoomView checklist={checklist} loading={!checklistReady} error={checklistQuery.error} onRetry={() => checklistQuery.refetch()} />}
 
       {room && !isStorage && (
         <>
@@ -740,6 +752,9 @@ export default function RoomsPage() {
               rows={assetRows}
               rowKey={(g) => g.asset_type.id}
               loading={!checklistReady}
+              error={checklistQuery.error}
+              onRetry={() => checklistQuery.refetch()}
+              retrying={checklistQuery.isFetching}
               emptyText="Belum ada aset di ruangan ini."
             />
           </section>
@@ -761,6 +776,9 @@ export default function RoomsPage() {
               rows={consumableRows}
               rowKey={(s) => s.id}
               loading={!checklistReady}
+              error={checklistQuery.error}
+              onRetry={() => checklistQuery.refetch()}
+              retrying={checklistQuery.isFetching}
               emptyText="Belum ada barang habis pakai. Klik “Tambah barang” untuk menambah."
             />
           </section>
@@ -868,9 +886,10 @@ export default function RoomsPage() {
           title={`Tambah ruangan • ${building.name}`}
           label="Nama ruangan"
           placeholder="Misal: Lt. 8 – Ruang A"
+          withStorage
           onClose={() => setModal(null)}
-          onSubmit={async (name) => {
-            const r = await createRoom(building.id, name)
+          onSubmit={async (name, isStorage) => {
+            const r = await createRoom(building.id, name, isStorage)
             await reloadReadiness()
             setModal(null)
             navigate(`${BASE}/${building.slug}/${r.slug}`)

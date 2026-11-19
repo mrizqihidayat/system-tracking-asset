@@ -118,7 +118,7 @@ export default function ForgotPasswordPage() {
   if (step === 'email') {
     return (
       <AuthShell title="Lupa password" description="Tulis email akun Anda. Kami akan mengirim kode 6 angka ke email itu.">
-        <form onSubmit={submitEmail} className="space-y-5">
+        <form noValidate onSubmit={submitEmail} className="space-y-5">
           <ErrorBox message={message} />
           <FormField label="Email" required error={errors.email}>
             <Input
@@ -153,7 +153,7 @@ export default function ForgotPasswordPage() {
           </>
         }
       >
-        <form onSubmit={submitOtp} className="space-y-5">
+        <form noValidate onSubmit={submitOtp} className="space-y-5">
           <ErrorBox message={message} />
           <FormField label="Kode dari email" required error={errors.otp}>
             <Input
@@ -187,7 +187,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthShell title="Buat password baru" description="Kode benar. Tulis password baru untuk akun Anda.">
-      <form onSubmit={submitPassword} className="space-y-5">
+      <form noValidate onSubmit={submitPassword} className="space-y-5">
         <ErrorBox message={message} />
         <FormField label="Password baru" required error={errors.password}>
           <PasswordInput

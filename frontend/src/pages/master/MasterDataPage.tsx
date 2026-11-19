@@ -4,6 +4,7 @@ import { useCallback, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AssetCode, Badge } from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import ScrollTabs from '../../components/ui/ScrollTabs'
 import { LoadingLabel, Skeleton } from '../../components/ui/Skeleton'
 import { skeletonWidth } from '../../components/ui/skeleton-width'
 import { invalidate } from '../../lib/queries/invalidate'
@@ -255,7 +256,7 @@ export default function MasterDataPage() {
     <div className="space-y-4">
       <p className="text-sm text-slate-500">Data yang masih digunakan tidak dapat dihapus.</p>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Bagian data master">
+      <ScrollTabs className="flex gap-2 pb-1" label="Bagian data master" activeKey={tab}>
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -269,7 +270,7 @@ export default function MasterDataPage() {
             {t.label}
           </button>
         ))}
-      </div>
+      </ScrollTabs>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">{body}</section>
 

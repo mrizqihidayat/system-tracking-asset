@@ -100,6 +100,8 @@ export interface AssetListItem extends Pick<Asset, 'id' | 'code' | 'name' | 'con
   building_name: string | null
   source_name: string | null
   source_is_internal: boolean
+  /** Rencana kembali pinjaman aktif (YYYY-MM-DD) untuk alasan "Sedang dipinjam sampai …" (T45). */
+  active_loan_due_date: string | null
 }
 
 export interface AssetEvent {

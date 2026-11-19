@@ -72,7 +72,8 @@ export default function AssetListPage() {
     {
       header: 'Pilih',
       className: 'w-10',
-      mobile: 'badge',
+      // HP: kotak centang di pojok kanan atas kartu, posisi sama di semua kartu; lencana status di sebelah kirinya (T45, UAT M1).
+      mobile: 'corner',
       headerContent: (
         <input
           type="checkbox"
@@ -86,8 +87,11 @@ export default function AssetListPage() {
           title={allOnPage ? 'Batal pilih semua di halaman ini' : 'Pilih semua di halaman ini'}
         />
       ),
+      // Tampilan kotak tetap 16 px; label berpadding + margin negatif memperluas area sentuh menjadi 44 px di HP tanpa menggeser tata letak.
       cell: (a) => (
-        <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggle(a.id)} aria-label={`Pilih ${a.code}`} />
+        <label className="-m-3.5 inline-flex cursor-pointer p-3.5 lg:m-0 lg:p-0">
+          <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggle(a.id)} aria-label={`Pilih ${a.code}`} />
+        </label>
       ),
     },
     { header: 'Kode', mobile: 'title', sortKey: 'code', cell: (a) => <AssetCode code={a.code} /> },
@@ -244,6 +248,9 @@ export default function AssetListPage() {
         rows={rows}
         rowKey={(a) => a.id}
         loading={assets.isPending}
+        error={assets.error}
+        onRetry={() => assets.refetch()}
+        retrying={assets.isFetching}
         fetching={assets.isPlaceholderData}
         unit="aset"
         emptyText={assets.isError ? 'Gagal memuat daftar aset. Coba lagi.' : hasFilter ? 'Tidak ada aset yang cocok dengan filter.' : 'Belum ada aset.'}

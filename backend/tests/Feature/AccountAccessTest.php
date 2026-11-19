@@ -128,7 +128,9 @@ class AccountAccessTest extends TestCase
         $this->getJson('/api/accounts?type=bersama')->assertJsonCount(2, 'data');
         $this->getJson('/api/accounts?type=pegawai')->assertJsonCount(2, 'data');
         $this->getJson('/api/accounts?status=belum')->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Belum Masuk');
-        $this->getJson('/api/accounts?search=9010004')->assertJsonCount(1, 'data');
+        // T45 (UAT K4): cari nama atau username saja, NIK tidak bisa dipakai mencari.
+        $this->getJson('/api/accounts?search=9010004')->assertJsonCount(0, 'data');
+        $this->getJson('/api/accounts?search=belum')->assertJsonCount(1, 'data');
         $this->getJson('/api/accounts?search=ZETA')->assertJsonCount(1, 'data');
         $this->getJson('/api/accounts?per_page=2&page=2')->assertJsonCount(2, 'data')->assertJsonPath('meta.total', 4)->assertJsonPath('meta.last_page', 2);
         $this->getJson('/api/accounts?status=salah')->assertUnprocessable();
@@ -141,6 +143,24 @@ class AccountAccessTest extends TestCase
         $this->assertStringNotContainsString('password"', $response->getContent());
         $this->assertStringNotContainsString('$2y$', $response->getContent());
         $response->assertJsonMissingPath('data.0.password');
+    }
+
+    public function test_response_never_contains_nik_but_keeps_stable_row_keys(): void
+    {
+        // T45 (UAT K4): NIK = password awal, jadi tidak dikirim, baik untuk akun maupun pegawai yang belum masuk.
+        Employee::factory()->inDepartment('SHD')->create(['nik' => '90100060', 'name' => 'Belum Pernah Masuk']);
+        User::factory()->create(['name' => 'Akun Eksternal SGA', 'username' => 'sga.eksternal']);
+
+        $response = $this->getJson('/api/accounts')->assertOk();
+
+        $this->assertStringNotContainsString('90100003', $response->getContent());
+        $this->assertStringNotContainsString('90100060', $response->getContent());
+        foreach ($response->json('data') as $row) {
+            $this->assertArrayNotHasKey('nik', $row);
+            $this->assertMatchesRegularExpression('/^(akun|pegawai)-\d+$/', $row['key']);
+        }
+        $this->assertSame('sga.eksternal', $this->row('Akun Eksternal SGA')['username']);
+        $this->assertStringStartsWith('pegawai-', $this->row('Belum Pernah Masuk')['key']);
     }
 
     public function test_cannot_deactivate_or_reset_own_account(): void

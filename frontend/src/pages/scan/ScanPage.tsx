@@ -56,7 +56,7 @@ export default function ScanPage() {
         )}
       </div>
 
-      <form onSubmit={submitManual} className="mx-auto w-full max-w-xl space-y-3 rounded-xl border border-slate-200 bg-white p-5 lg:mx-0">
+      <form noValidate onSubmit={submitManual} className="mx-auto w-full max-w-xl space-y-3 rounded-xl border border-slate-200 bg-white p-5 lg:mx-0">
         <div>
           <h2 className="font-semibold">Ketik kode aset</h2>
           <p className="mt-0.5 text-sm text-slate-500">Kode saat ini atau kode lama, mis. SHD-PRJ-001.</p>

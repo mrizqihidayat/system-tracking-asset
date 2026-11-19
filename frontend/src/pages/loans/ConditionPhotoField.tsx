@@ -12,13 +12,15 @@ interface Props {
   required: boolean
   /** Pesan dari server (422/413). */
   error?: string
+  /** Label kolom (bawaan "Foto kondisi"; dipakai juga untuk "Foto aset" di form Tambah aset, T45). */
+  label?: string
 }
 
 /**
  * Foto kondisi saat Terima kembali (T36): satu foto, dari galeri atau kamera HP, dengan pratinjau.
  * Disimpan per peminjaman dan menjadi foto kondisi terakhir aset.
  */
-export default function ConditionPhotoField({ file, onChange, required, error }: Props) {
+export default function ConditionPhotoField({ file, onChange, required, error, label = 'Foto kondisi' }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const [localError, setLocalError] = useState('')
   // URL pratinjau diturunkan dari file (tanpa setState di effect) dan dilepas saat file berganti.
@@ -40,7 +42,7 @@ export default function ConditionPhotoField({ file, onChange, required, error }:
   const shownError = localError || error
 
   return (
-    <FormField label={required ? 'Foto kondisi' : 'Foto kondisi (opsional)'} required={required} error={shownError}>
+    <FormField label={required ? label : `${label} (opsional)`} required={required} error={shownError}>
       <div>
         <input
           ref={input}
@@ -56,7 +58,7 @@ export default function ConditionPhotoField({ file, onChange, required, error }:
         />
         {file && preview ? (
           <div className="flex items-center gap-3 rounded-lg border border-slate-200 p-2">
-            <img src={preview} alt="Pratinjau foto kondisi" className="size-16 shrink-0 rounded-md object-cover" />
+            <img src={preview} alt={`Pratinjau ${label.toLowerCase()}`} className="size-16 shrink-0 rounded-md object-cover" />
             <div className="min-w-0 flex-1 text-sm">
               <p className="truncate font-medium">{file.name}</p>
               <button type="button" className="tap text-xs font-semibold text-brand-700 hover:underline" onClick={() => input.current?.click()}>

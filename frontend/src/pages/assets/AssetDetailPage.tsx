@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CalendarClock, ChevronDown, ChevronRight, EllipsisVertical, FileText, ImageOff, Pencil, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarClock, ChevronDown, ChevronRight, EllipsisVertical, FileText, ImageOff, ImagePlus, Pencil, TriangleAlert } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -12,6 +12,7 @@ import DataTable, { type Column } from '../../components/ui/DataTable'
 import DropdownMenu, { type MenuItem } from '../../components/ui/DropdownMenu'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
+import { ASSET_PHOTO_ACCEPT, uploadAssetFile, uploadErrorMessage } from '../../lib/asset-files'
 import { openInNewTab } from '../../lib/blob'
 import { formatDate, formatDateTime, formatSize } from '../../lib/format'
 import { invalidate } from '../../lib/queries/invalidate'
@@ -50,15 +51,48 @@ function Field({ label, children, wide }: { label: string; children: ReactNode; 
 const boxClass =
   'flex aspect-square flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border text-center text-xs'
 
-function PhotoBox({ label, file, onOpen }: { label: string; file?: AssetFile; onOpen: (f: AssetFile) => void }) {
+interface PhotoBoxProps {
+  label: string
+  file?: AssetFile
+  onOpen: (f: AssetFile) => void
+  /** Teks saat kosong (bawaan "Belum ada {label}"). */
+  emptyText?: string
+  /** Kotak kosong bisa diklik untuk langsung mengunggah (hanya Foto aset, T45 temuan UAT U1). */
+  onUpload?: (file: File) => void
+  uploading?: boolean
+}
+
+function PhotoBox({ label, file, onOpen, emptyText, onUpload, uploading }: PhotoBoxProps) {
   const isImage = file?.mime_type.startsWith('image/') ?? false
   const src = useBlobUrl(file && isImage ? file.download_url : null)
 
+  if (!file && onUpload) {
+    return (
+      <label className={`${boxClass} cursor-pointer border-dashed border-brand-200 bg-brand-50/40 p-2 text-brand-700 transition-colors hover:border-brand-600 hover:bg-brand-50 has-focus-visible:outline-2 has-focus-visible:outline-brand-600`}>
+        <ImagePlus size={22} aria-hidden />
+        <span className="font-semibold">{uploading ? 'Mengunggah…' : `Unggah ${label.toLowerCase()}`}</span>
+        <input
+          type="file"
+          accept={ASSET_PHOTO_ACCEPT}
+          className="sr-only"
+          disabled={uploading}
+          aria-label={`Unggah ${label.toLowerCase()}`}
+          onChange={(e) => {
+            const picked = e.target.files?.[0]
+            e.target.value = ''
+            if (picked) onUpload(picked)
+          }}
+        />
+      </label>
+    )
+  }
+
   if (!file) {
+    // Tidak bisa diklik: isinya diisi alur lain (mis. foto kondisi dari Terima kembali).
     return (
       <div className={`${boxClass} border-dashed border-slate-300 bg-slate-50 p-2 text-slate-500`}>
-        <ImageOff size={22} className="text-slate-400" />
-        Belum ada {label.toLowerCase()}
+        <ImageOff size={22} className="text-slate-400" aria-hidden />
+        {emptyText ?? `Belum ada ${label.toLowerCase()}`}
       </div>
     )
   }
@@ -142,6 +176,7 @@ export default function AssetDetailPage() {
   const [othersOpen, setOthersOpen] = useState(false)
   const [modal, setModal] = useState<ModalState>(null)
   const [offerLoan, setOfferLoan] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   const detail = useAssetDetail(id)
   const filesQuery = useAssetFiles(id ?? '')
@@ -176,6 +211,18 @@ export default function AssetDetailPage() {
   }
 
   const fileOf = (type: FileType) => files.find((f) => f.file_type === type)
+  const uploadAssetPhoto = async (picked: File) => {
+    setUploadingPhoto(true)
+    try {
+      await uploadAssetFile(asset.id, 'Foto Aset', picked, ASSET_PHOTO_ACCEPT)
+      toast.success('Foto aset diunggah.')
+      await queryClient.invalidateQueries({ queryKey: queryKeys.assets.files(asset.id) })
+    } catch (e) {
+      toast.error(uploadErrorMessage(e))
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
   const others = files.filter((f) => f.file_type === 'Lainnya')
   const loc = asset.current_location
   const currentRoom = loc?.on_loan && loc.room ? loc.room : asset.room
@@ -376,8 +423,13 @@ export default function AssetDetailPage() {
 
         <Panel title="Foto & dokumen">
           <div className="grid grid-cols-3 gap-3">
-            <PhotoBox label="Foto aset" file={fileOf('Foto Aset')} onOpen={viewFile} />
-            <PhotoBox label="Foto kondisi terakhir" file={fileOf('Foto Kondisi')} onOpen={viewFile} />
+            <PhotoBox label="Foto aset" file={fileOf('Foto Aset')} onOpen={viewFile} onUpload={uploadAssetPhoto} uploading={uploadingPhoto} />
+            <PhotoBox
+              label="Foto kondisi terakhir"
+              file={fileOf('Foto Kondisi')}
+              onOpen={viewFile}
+              emptyText="Belum ada, foto diambil saat aset dikembalikan"
+            />
             <QrBox assetId={asset.id} onOpen={viewLabel} />
           </div>
           <ul className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
@@ -416,6 +468,9 @@ export default function AssetDetailPage() {
           rows={loansQuery.data?.data ?? []}
           rowKey={(l) => l.id}
           loading={loansQuery.isPending}
+          error={loansQuery.error}
+          onRetry={() => loansQuery.refetch()}
+          retrying={loansQuery.isFetching}
           fetching={loansQuery.isPlaceholderData}
           emptyText="Aset ini belum pernah dipinjam."
           meta={loansQuery.data?.meta}
@@ -432,6 +487,9 @@ export default function AssetDetailPage() {
           rows={events}
           rowKey={(e) => e.id}
           loading={eventsQuery.isPending}
+          error={eventsQuery.error}
+          onRetry={() => eventsQuery.refetch()}
+          retrying={eventsQuery.isFetching}
           emptyText="Belum ada riwayat."
           dense
         />

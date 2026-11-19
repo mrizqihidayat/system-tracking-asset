@@ -51,7 +51,7 @@ export default function EmailRequiredPage() {
       title="Isi email Anda"
       description="Email dipakai untuk mengirim kode saat Anda lupa password. Cukup diisi sekali."
     >
-      <form onSubmit={submit} className="space-y-5">
+      <form noValidate onSubmit={submit} className="space-y-5">
         <p className="text-sm text-slate-500">{`${user?.name ?? ''} · ${user ? loginId(user) : ''}`}</p>
         <ErrorBox message={message} />
         <FormField label="Email" required error={error}>

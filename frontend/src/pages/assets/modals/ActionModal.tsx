@@ -8,6 +8,8 @@ interface Props {
   submitLabel: string
   danger?: boolean
   submitDisabled?: boolean
+  /** Alasan tombol simpan nonaktif, tampil di dekat tombol selama nonaktif (T45, temuan UAT A3). */
+  submitHint?: string
   onClose: () => void
   /** Lempar error (axios) agar pesan dan error per field tampil; selesai tanpa error = sukses. */
   onSubmit: () => Promise<void>
@@ -15,7 +17,7 @@ interface Props {
 }
 
 /** Kerangka modal aksi aset: form, tombol, loading, pesan error server, dan error 422 per field. */
-export default function ActionModal({ title, submitLabel, danger, submitDisabled, onClose, onSubmit, children }: Props) {
+export default function ActionModal({ title, submitLabel, danger, submitDisabled, submitHint, onClose, onSubmit, children }: Props) {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -48,10 +50,14 @@ export default function ActionModal({ title, submitLabel, danger, submitDisabled
           <Button type="submit" form={formId} variant={danger ? 'danger' : 'primary'} loading={saving} disabled={submitDisabled}>
             {submitLabel}
           </Button>
+          {/* HP: tampil di atas tombol (footer tersusun terbalik); laptop: di kiri tombol. */}
+          {submitDisabled && submitHint && (
+            <p role="status" className="self-center text-sm font-medium text-bad-700 sm:order-first sm:mr-auto">{submitHint}</p>
+          )}
         </>
       }
     >
-      <form id={formId} onSubmit={submit} className="space-y-3">
+      <form noValidate id={formId} onSubmit={submit} className="space-y-3">
         {message && (
           <div role="alert" className="rounded-lg bg-bad-50 px-3 py-2.5 text-sm text-bad-700">
             {message}

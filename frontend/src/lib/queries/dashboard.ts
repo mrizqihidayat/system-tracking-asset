@@ -5,10 +5,12 @@ import { api } from '../api'
 import { queryKeys } from './keys'
 
 export interface DashboardCards {
+  /** `total` = semua aset, sama dengan Daftar Aset (Tidak Layak Pakai ikut, jumlahnya di `not_feasible`). */
   total_assets: { total: number; owned_by_shd: number; from_other_units: number; not_feasible: number }
   active_loans: { total: number; due_today: number; overdue: number }
   needs_repair: { assets_in_repair: number; light_damage: number; heavy_damage: number }
-  incomplete_rooms: { incomplete: number; total_rooms: number; total_buildings: number }
+  /** `total_rooms` = ruangan dinilai (tanpa gudang), `storage_rooms` = gudang (tidak dinilai). */
+  incomplete_rooms: { incomplete: number; total_rooms: number; storage_rooms: number; total_buildings: number }
   needs_service: { total: number; overdue: number; upcoming: number }
   low_stock: { total: number; menipis: number; habis: number }
 }
@@ -17,7 +19,10 @@ export interface DashboardReadiness {
   id: number
   name: string
   slug: string
+  /** Ruangan dinilai (tanpa gudang). */
   rooms_count: number
+  /** Gudang di gedung ini (tidak dinilai); rooms_count + storage_rooms_count = ruangan di Kelengkapan Ruangan. */
+  storage_rooms_count: number
   incomplete_rooms_count: number
   rooms_without_standards: number
   incomplete_rooms: { id: number; name: string; slug: string; shortage_items: number; unchecked_items: number }[]

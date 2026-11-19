@@ -145,7 +145,7 @@ function AppearanceForm({ response }: { response: SettingsResponse }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5">
+    <form noValidate onSubmit={submit} className="space-y-5">
       <Card title="Warna web" help="Pilih salah satu paket warna, atau tentukan sendiri. Lihat contohnya dulu; aplikasi baru berubah setelah Anda menekan Simpan.">
         <ErrorBox message={message} />
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" role="group" aria-label="Paket warna">
@@ -290,7 +290,7 @@ function ContentForm({ response }: { response: SettingsResponse }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5">
+    <form noValidate onSubmit={submit} className="space-y-5">
       <Card title="Logo dan ikon" help="Gambar langsung tersimpan setelah dipilih. Jenis file: PNG, JPG, atau WebP, paling besar 1 MB.">
         <ImageField type="logo" label="Logo" help="Tampil di halaman masuk dan di email kode lupa password." url={response.data.logo_url} fallback={defaultLogo} />
         <ImageField type="favicon" label="Ikon tab browser" help="Gambar kecil di tab browser. Sebaiknya persegi, mis. 64 × 64." url={response.data.favicon_url} fallback="/icon.png" />

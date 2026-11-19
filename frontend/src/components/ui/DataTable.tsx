@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { PaginationMeta } from '../../types/api'
+import LoadError from './LoadError'
 import { ListSkeletonItems, LoadingLabel, TableSkeletonRows } from './Skeleton'
 
 /** Tombol halaman: ikon saja, kecil, tanpa bingkai (40 px di HP/tablet agar mudah disentuh). */
@@ -20,8 +21,10 @@ export interface Column<T> {
    * `title` = baris judul kartu (kiri atas), `badge` = pojok kanan atas,
    * `stat` = strip ringkas (label kecil di atas nilai, berjajar), `footer` = baris bawah tanpa label
    * (tidak tampil bila sel `null`), `hidden` = tidak ditampilkan, kosong = baris "label: nilai".
+   * `corner` = paling kanan baris judul, setelah `badge`, sehingga posisinya sama di semua kartu
+   * (mis. kotak centang pilih, T45 temuan UAT M1).
    */
-  mobile?: 'title' | 'badge' | 'stat' | 'footer' | 'hidden'
+  mobile?: 'title' | 'badge' | 'corner' | 'stat' | 'footer' | 'hidden'
   /** Kelas pembungkus sel footer di kartu (mis. `w-full` agar tombol memenuhi lebar kartu). */
   footerClassName?: string
   /** Hanya di kartu (< lg), bukan kolom tabel lebar (mis. menu ⋮ pengganti ikon aksi). */
@@ -52,6 +55,12 @@ interface Props<T> {
   onSortChange?: (sort: string) => void
   /** Isi kartu khusus HP (< sm). Bila diisi, kartu dari kolom hanya tampil mulai sm (tablet). */
   phoneCard?: (row: T) => ReactNode
+  /** Galat muat (mis. `query.error`): tanpa data → "Data gagal dimuat" + Coba lagi, bukan skeleton atau teks kosong (T45, UAT U2). */
+  error?: unknown
+  /** Muat ulang setelah gagal (mis. `query.refetch`). */
+  onRetry?: () => void
+  /** Sedang mencoba lagi (mis. `query.isFetching`): tombol Coba lagi menampilkan status memproses. */
+  retrying?: boolean
 }
 
 /** Klik berulang: naik → turun → urutan bawaan. */
@@ -87,18 +96,20 @@ function CardFooter({ cells }: { cells: { node: ReactNode; className?: string }[
 
 export default function DataTable<T>({
   columns, rows, rowKey, loading, fetching, emptyText = 'Belum ada data.', meta, unit = 'data', onPageChange,
-  sort, onSortChange, dense, fixedHeight, phoneCard,
+  sort, onSortChange, dense, fixedHeight, phoneCard, error, onRetry, retrying,
 }: Props<T>) {
   const headPad = dense ? 'py-2' : 'py-2.5'
   const cellPad = dense ? 'py-2' : 'py-3'
   // Setinggi dua baris teks: baris yang isinya turun ke baris kedua (mis. "Alat Pelatihan") tidak lebih tinggi dari yang lain.
   const rowHeight = fixedHeight ? (dense ? 'h-15' : 'h-17') : ''
   const fillerCount = fixedHeight && meta && rows.length > 0 ? Math.max(0, meta.per_page - rows.length) : 0
-  const skeleton = loading && rows.length === 0
-  const empty = !skeleton && rows.length === 0 ? emptyText : null
+  const failed = Boolean(error) && rows.length === 0
+  const skeleton = loading && rows.length === 0 && !failed
+  const empty = !skeleton && !failed && rows.length === 0 ? emptyText : null
   const tableColumns = columns.filter((c) => !c.cardOnly)
   const titleCols = columns.filter((c) => c.mobile === 'title')
   const badgeCols = columns.filter((c) => c.mobile === 'badge')
+  const cornerCols = columns.filter((c) => c.mobile === 'corner')
   const statCols = columns.filter((c) => c.mobile === 'stat')
   const footerCols = columns.filter((c) => c.mobile === 'footer')
   const detailCols = columns.filter((c) => !c.mobile)
@@ -130,7 +141,9 @@ export default function DataTable<T>({
             </tr>
           </thead>
           <tbody className={`divide-y divide-slate-100 ${dim}`}>
-            {skeleton ? (
+            {failed ? (
+              <tr><td colSpan={tableColumns.length}><LoadError onRetry={onRetry} retrying={retrying} /></td></tr>
+            ) : skeleton ? (
               <TableSkeletonRows columns={tableColumns.length} />
             ) : empty ? (
               <tr><td colSpan={tableColumns.length} className="px-4 py-10 text-center text-slate-500">{empty}</td></tr>
@@ -155,8 +168,10 @@ export default function DataTable<T>({
       </div>
 
       {/* HP: satu kolom; tablet (md–lg): grid 2 kolom dengan garis pemisah antar kartu. */}
-      <ul className={`divide-slate-100 lg:hidden ${skeleton || empty ? 'divide-y' : 'max-md:divide-y md:grid md:grid-cols-2'} ${dim}`}>
-        {skeleton ? (
+      <ul className={`divide-slate-100 lg:hidden ${skeleton || empty || failed ? 'divide-y' : 'max-md:divide-y md:grid md:grid-cols-2'} ${dim}`}>
+        {failed ? (
+          <li><LoadError onRetry={onRetry} retrying={retrying} /></li>
+        ) : skeleton ? (
           <ListSkeletonItems />
         ) : empty ? (
           <li className="px-4 py-10 text-center text-sm text-slate-500">{empty}</li>
@@ -164,14 +179,15 @@ export default function DataTable<T>({
           rows.map((row) => {
             const body = (
               <>
-                {(titleCols.length > 0 || badgeCols.length > 0) && (
+                {(titleCols.length > 0 || badgeCols.length > 0 || cornerCols.length > 0) && (
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                       {titleCols.map((c, i) => <div key={i}>{c.cell(row)}</div>)}
                     </div>
-                    {badgeCols.length > 0 && (
+                    {(badgeCols.length > 0 || cornerCols.length > 0) && (
                       <div className="flex shrink-0 items-center gap-2">
                         {badgeCols.map((c, i) => <div key={i}>{c.cell(row)}</div>)}
+                        {cornerCols.map((c, i) => <div key={`corner-${i}`}>{c.cell(row)}</div>)}
                       </div>
                     )}
                   </div>

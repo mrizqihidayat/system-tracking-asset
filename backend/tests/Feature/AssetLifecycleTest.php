@@ -150,13 +150,13 @@ class AssetLifecycleTest extends TestCase
         $this->assertSame('Perbaikan', $asset->fresh()->status->value);
         $this->assertSame('Lapor Rusak', last($this->eventTypes($asset)));
 
-        // 8. Tidak layak pakai: keluar dari total aset, aksi tinggal pindah lokasi, tidak bisa dipinjam
+        // 8. Tidak layak pakai: tetap dihitung di total aset (sama dengan Daftar Aset, T45) dengan keterangan, aksi tinggal pindah lokasi, tidak bisa dipinjam
         $this->postJson("/api/assets/{$id}/report", ['type' => 'tidak_layak_pakai', 'note' => 'Tidak ekonomis diperbaiki'])
             ->assertOk()
             ->assertJsonPath('data.status', 'Tidak Layak Pakai');
 
         $this->assertSame('Tidak Layak Pakai', last($this->eventTypes($asset)));
-        $this->assertSame(['total' => 0, 'owned_by_shd' => 0, 'from_other_units' => 0, 'not_feasible' => 1], $this->dashboard()['total_assets']);
+        $this->assertSame(['total' => 1, 'owned_by_shd' => 1, 'from_other_units' => 0, 'not_feasible' => 1], $this->dashboard()['total_assets']);
         $this->getJson('/api/assets/scan/SHD-PRJ-001')->assertOk()->assertJsonPath('meta.actions', ['pindah_lokasi']);
         $this->postJson('/api/loans', [
             'asset_id' => $id, 'borrower_name' => 'Citra', 'borrower_unit' => 'SGA', 'purpose' => 'x', 'due_date' => today()->addDay()->toDateString(),

@@ -11,8 +11,9 @@ import { useAnchoredPanel } from '../../components/ui/useAnchoredPanel'
 import { api, errorMessage } from '../../lib/api'
 import { Scanner } from '../../lib/qr-scanner'
 import type { Paginated } from '../../types/api'
-import type { Asset, AssetListItem, Status } from '../../types/asset'
+import type { Asset, AssetListItem } from '../../types/asset'
 import { useScanLookup } from '../scan/useScanLookup'
+import { BOOKABLE, unavailableReason } from './asset-availability'
 
 /** Saran memakai baris daftar, Enter/Scan memakai data lengkap; form hanya butuh field bersama ini. */
 export type PickedAsset = Pick<Asset, 'id' | 'code' | 'name' | 'condition' | 'status'>
@@ -30,11 +31,9 @@ const PAGE_SIZE = 100
 /** Tinggi satu saran (kode + nama + lokasi), untuk menilai apakah daftar muat di bawah kolom. */
 const OPTION_HEIGHT = 60
 
-/** Status aset yang boleh dipesan untuk tanggal mendatang (dicek ulang backend; saat Serahkan aset wajib Tersedia). */
-const BOOKABLE: readonly Status[] = ['Tersedia', 'Dipinjam', 'Perbaikan']
-
 /**
- * "Aset dipinjam": ketik kode (saran aset Tersedia muncul di bawahnya) atau scan QR; hanya aset yang boleh dipinjam yang diterima.
+ * "Aset dipinjam": ketik kode (saran muncul di bawahnya) atau scan QR; hanya aset yang boleh dipinjam yang diterima.
+ * Aset yang tidak bisa dipilih tetap tampil, tidak bisa diklik, dan diberi alasan (T45, temuan UAT A5).
  * `planned` (tanggal pinjam di masa depan): aset Dipinjam/Perbaikan juga boleh dipilih untuk pemesanan.
  */
 export default function AssetPicker({ asset, onPick, error, planned = false }: Props) {
@@ -50,7 +49,7 @@ export default function AssetPicker({ asset, onPick, error, planned = false }: P
 
   const query = text.trim()
 
-  // Saran: semua aset Tersedia yang cocok (nama/kode/S-N/kode lama). Ketikan baru membatalkan request sebelumnya.
+  // Saran: semua aset yang cocok (nama/kode/S-N/kode lama), yang bisa dipilih lebih dulu. Ketikan baru membatalkan request sebelumnya.
   useEffect(() => {
     if (query.length < MIN_CHARS) return
     const controller = new AbortController()
@@ -59,13 +58,14 @@ export default function AssetPicker({ asset, onPick, error, planned = false }: P
         const items: AssetListItem[] = []
         for (let page = 1, lastPage = 1; page <= lastPage; page++) {
           const res = await api.get<Paginated<AssetListItem>>('/assets', {
-            params: { search: query, status: planned ? undefined : 'Tersedia', per_page: PAGE_SIZE, page },
+            params: { search: query, per_page: PAGE_SIZE, page },
             signal: controller.signal,
           })
-          items.push(...(planned ? res.data.data.filter((a) => BOOKABLE.includes(a.status)) : res.data.data))
+          items.push(...res.data.data)
           lastPage = res.data.meta.last_page
         }
-        setSuggestions({ query, items })
+        const available = (a: AssetListItem) => (unavailableReason(a, planned) === null ? 0 : 1)
+        setSuggestions({ query, items: [...items].sort((a, b) => available(a) - available(b)) })
         setActive(-1)
       } catch {
         // saran opsional; Enter/Scan tetap menampilkan error
@@ -79,6 +79,8 @@ export default function AssetPicker({ asset, onPick, error, planned = false }: P
 
   const items = query.length >= MIN_CHARS && suggestions?.query === query ? suggestions.items : []
   const showList = open && query.length >= MIN_CHARS && suggestions?.query === query
+  // Panah atas/bawah hanya berhenti di aset yang bisa dipilih.
+  const selectable = items.flatMap((a, i) => (unavailableReason(a, planned) === null ? [i] : []))
 
   // Daftar dirender ke body (fixed) agar tidak terpotong area scroll popup; posisinya mengikuti kolom.
   const close = useCallback(() => setOpen(false), [])
@@ -109,13 +111,13 @@ export default function AssetPicker({ asset, onPick, error, planned = false }: P
   }
 
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'ArrowDown' && items.length) {
+    if (e.key === 'ArrowDown' && selectable.length) {
       e.preventDefault()
       setOpen(true)
-      setActive((i) => (i + 1) % items.length)
-    } else if (e.key === 'ArrowUp' && items.length) {
+      setActive((i) => selectable.find((s) => s > i) ?? selectable[0])
+    } else if (e.key === 'ArrowUp' && selectable.length) {
       e.preventDefault()
-      setActive((i) => (i <= 0 ? items.length - 1 : i - 1))
+      setActive((i) => [...selectable].reverse().find((s) => s < i) ?? selectable[selectable.length - 1])
     } else if (e.key === 'Escape') {
       if (showList) {
         // Hanya menutup daftar, bukan popup di belakangnya.
@@ -173,25 +175,39 @@ export default function AssetPicker({ asset, onPick, error, planned = false }: P
                 className={`fixed z-50 ${dropdownPanelClass}`}
               >
                 {items.length === 0 ? (
-                  <li className="px-3 py-2.5 text-slate-500">Tidak ada aset tersedia yang cocok.</li>
+                  <li className="px-3 py-2.5 text-slate-500">Tidak ada aset yang cocok.</li>
                 ) : (
-                  items.map((a, i) => (
-                    <li key={a.id} id={`asset-suggestion-${i}`} role="option" aria-selected={i === active}>
-                      <button
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onMouseEnter={() => setActive(i)}
-                        onClick={() => pick(a)}
-                        className={`flex flex-col items-start gap-0.5 ${dropdownOptionClass(i === active)}`}
-                      >
-                        <span className="flex min-w-0 max-w-full items-center gap-2">
-                          <AssetCode code={a.code} />
-                          <span className="truncate font-medium">{a.name}</span>
-                        </span>
-                        {roomLabel(a) && <span className="text-xs text-slate-500">{roomLabel(a)}</span>}
-                      </button>
-                    </li>
-                  ))
+                  items.map((a, i) => {
+                    const reason = unavailableReason(a, planned)
+                    return (
+                      <li key={a.id} id={`asset-suggestion-${i}`} role="option" aria-selected={i === active} aria-disabled={reason !== null || undefined}>
+                        {reason ? (
+                          // Tidak bisa dipilih: tetap tampil dengan alasannya supaya staf tahu kenapa.
+                          <div className="flex w-full cursor-not-allowed flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left">
+                            <span className="flex min-w-0 max-w-full items-center gap-2 opacity-70">
+                              <AssetCode code={a.code} />
+                              <span className="truncate font-medium text-slate-600">{a.name}</span>
+                            </span>
+                            <span className="text-xs font-medium text-bad-700">{reason}</span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onMouseEnter={() => setActive(i)}
+                            onClick={() => pick(a)}
+                            className={`flex flex-col items-start gap-0.5 ${dropdownOptionClass(i === active)}`}
+                          >
+                            <span className="flex min-w-0 max-w-full items-center gap-2">
+                              <AssetCode code={a.code} />
+                              <span className="truncate font-medium">{a.name}</span>
+                            </span>
+                            {roomLabel(a) && <span className="text-xs text-slate-500">{roomLabel(a)}</span>}
+                          </button>
+                        )}
+                      </li>
+                    )
+                  })
                 )}
               </ul>,
               document.body,

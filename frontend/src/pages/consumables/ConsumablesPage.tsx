@@ -229,6 +229,9 @@ export default function ConsumablesPage() {
         rows={result?.data ?? []}
         rowKey={(c) => c.id}
         loading={consumables.isPending}
+        error={consumables.error}
+        onRetry={() => consumables.refetch()}
+        retrying={consumables.isFetching}
         fetching={consumables.isPlaceholderData}
         emptyText="Belum ada barang habis pakai."
         meta={result?.meta}

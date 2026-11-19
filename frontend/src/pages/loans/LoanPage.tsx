@@ -2,6 +2,7 @@ import { EllipsisVertical, Plus, Search } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import DateRangeFilter from '../../components/DateRangeFilter'
 import ExportButton from '../../components/ExportButton'
 import { AssetCode, Badge, ConditionDot, LoanStatusBadge } from '../../components/ui/Badge'
 import { PageHeader } from '../../components/ui/Page'
@@ -11,6 +12,7 @@ import DropdownMenu from '../../components/ui/DropdownMenu'
 import { Input, Select } from '../../components/ui/FormField'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage } from '../../lib/api'
+import { daysFromTodayWib } from '../../lib/date'
 import { formatDate } from '../../lib/format'
 import { invalidate } from '../../lib/queries/invalidate'
 import { listConfigs } from '../../lib/queries/list-configs'
@@ -28,7 +30,7 @@ type ModalState = { kind: 'return' | 'cancel' | 'handover'; loan: Loan } | { kin
 /** Jadwal pemesanan: "Belum diserahkan" (tanggal lewat) / "Hari ini" / "N hari lagi" dari tanggal rencana. */
 function Schedule({ loan }: { loan: Loan }) {
   if (loan.is_unhanded) return <Badge color="red">Belum diserahkan</Badge>
-  const days = Math.round((new Date(`${loan.borrow_date}T00:00:00`).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000)
+  const days = daysFromTodayWib(loan.borrow_date)
   if (days <= 0) return <Badge color="amber">Hari ini</Badge>
   return <span className="whitespace-nowrap text-slate-600">{days} hari lagi</span>
 }
@@ -36,7 +38,7 @@ function Schedule({ loan }: { loan: Loan }) {
 /** "Hari ini" / "N hari lagi" / "Terlambat N hari" dari rencana kembali. */
 function Tempo({ loan }: { loan: Loan }) {
   if (loan.is_due_today) return <Badge color="amber">Hari ini</Badge>
-  const days = Math.round((new Date(`${loan.due_date}T00:00:00`).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000)
+  const days = daysFromTodayWib(loan.due_date)
   if (loan.is_overdue) return <Badge color="red">{`Terlambat ${Math.abs(days)} hari`}</Badge>
   return <span className="whitespace-nowrap text-slate-600">{days} hari lagi</span>
 }
@@ -113,6 +115,8 @@ export default function LoanPage() {
 
   const status = historyList.get('status')
   const search = historyList.searchText
+  const from = historyList.get('from')
+  const to = historyList.get('to')
 
   // ?return_loan_id=<id> (dari hasil scan): buka modal terima kembali. Tabel berhalaman, jadi datanya diambil sendiri.
   useEffect(() => {
@@ -312,7 +316,7 @@ export default function LoanPage() {
         description="Dicatat admin atas nama peminjam. Approval atasan di luar sistem, nomornya dicatat di sini."
         actions={
           <>
-            <ExportButton type="loans" filters={() => ({ status, search: search.trim() })} />
+            <ExportButton type="loans" filters={() => ({ status, search: search.trim(), from, to })} />
             <Button onClick={openBorrow}>
               <Plus size={16} /> Catat peminjaman
             </Button>
@@ -335,6 +339,9 @@ export default function LoanPage() {
             rows={planned.data?.data ?? []}
             rowKey={(l) => l.id}
             loading={planned.isPending}
+            error={planned.error}
+            onRetry={() => planned.refetch()}
+            retrying={planned.isFetching}
             fetching={planned.isPlaceholderData}
             emptyText="Tidak ada pemesanan."
             meta={planned.data?.meta}
@@ -356,6 +363,9 @@ export default function LoanPage() {
           rows={active.data?.data ?? []}
           rowKey={(l) => l.id}
           loading={active.isPending}
+          error={active.error}
+          onRetry={() => active.refetch()}
+          retrying={active.isFetching}
           fetching={active.isPlaceholderData}
           emptyText="Tidak ada aset yang sedang dipinjam."
           meta={active.data?.meta}
@@ -386,6 +396,12 @@ export default function LoanPage() {
             <option>Dibatalkan</option>
             <option>Hilang</option>
           </Select>
+          <DateRangeFilter
+            from={from}
+            to={to}
+            dateLabel="Tanggal pinjam"
+            onChange={(nextFrom, nextTo) => historyList.setFilter('from', nextFrom, { to: nextTo || null })}
+          />
         </div>
         <DataTable
           phoneCard={historyPhoneCard}
@@ -393,6 +409,9 @@ export default function LoanPage() {
           rows={history.data?.data ?? []}
           rowKey={(l) => l.id}
           loading={history.isPending}
+          error={history.error}
+          onRetry={() => history.refetch()}
+          retrying={history.isFetching}
           fetching={history.isPlaceholderData}
           emptyText="Belum ada peminjaman."
           meta={history.data?.meta}

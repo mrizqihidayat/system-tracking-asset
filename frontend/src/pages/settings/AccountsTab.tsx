@@ -13,7 +13,7 @@ import PasswordInput from '../../components/ui/PasswordInput'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/toast-context'
 import { api, errorMessage, fieldErrors } from '../../lib/api'
-import { getUser, loginId } from '../../lib/auth'
+import { getUser } from '../../lib/auth'
 import { formatDateTime } from '../../lib/format'
 import { passwordErrors } from '../../lib/password'
 import { useAccountEvents, useAccounts, type Account, type AccountStatus } from '../../lib/queries/accounts'
@@ -92,7 +92,8 @@ export default function AccountsTab() {
             <span className={`font-semibold ${a.status === 'nonaktif' ? 'text-slate-500' : ''}`}>{a.name}</span>
             {a.id !== null && a.id === me?.id && <Badge color="blue">Anda</Badge>}
           </span>
-          <span className="block font-mono text-xs text-slate-500">{loginId(a)}</span>
+          {/* NIK tidak ditampilkan (password awal pegawai, T45 UAT K4); akun eksternal tetap menampilkan username untuk masuk. */}
+          {a.source === 'manual' && a.username && <span className="block font-mono text-xs text-slate-500">{a.username}</span>}
         </>
       ),
     },
@@ -151,7 +152,7 @@ export default function AccountsTab() {
             className="col-span-2 sm:w-60"
             value={list.searchText}
             onChange={(e) => list.setSearchText(e.target.value)}
-            placeholder="Cari nama atau NIK"
+            placeholder="Cari nama atau username"
             aria-label="Cari akun"
           />
           <Select clearable className="min-w-0 sm:w-44" value={list.get('type')} onChange={(e) => list.setFilter('type', e.target.value)} aria-label="Jenis">
@@ -172,8 +173,11 @@ export default function AccountsTab() {
         <DataTable
           columns={columns}
           rows={result?.data ?? []}
-          rowKey={(a) => a.id ?? `nik-${a.nik}`}
+          rowKey={(a) => a.key}
           loading={accounts.isPending}
+          error={accounts.error}
+          onRetry={() => accounts.refetch()}
+          retrying={accounts.isFetching}
           fetching={accounts.isPlaceholderData}
           emptyText={list.hasFilter ? 'Tidak ada akun yang cocok.' : 'Belum ada akun.'}
           meta={result?.meta}
@@ -224,7 +228,7 @@ const CONFIRM = {
   reset: {
     title: 'Reset password',
     label: 'Reset password',
-    text: (a: Account) => `${a.name} (NIK ${a.nik}) akan keluar dari semua perangkat. Password kembali ke NIK, dan saat masuk berikutnya ia wajib membuat password baru.`,
+    text: (a: Account) => `${a.name} akan keluar dari semua perangkat. Password kembali ke NIK, dan saat masuk berikutnya ia wajib membuat password baru.`,
     request: (a: Account) => api.post(`/accounts/${a.id}/reset`),
     done: 'Password direset.',
   },
@@ -370,7 +374,7 @@ function SharedAccountModal({ onClose, onDone }: { onClose: () => void; onDone: 
         </>
       }
     >
-      <form id="shared-account-form" onSubmit={submit} className="space-y-4">
+      <form noValidate id="shared-account-form" onSubmit={submit} className="space-y-4">
         <p className="text-sm text-slate-500">Untuk pengguna yang tidak terdaftar di SIMHC, mis. satu akun untuk satu departemen. Riwayat mencatat nama akun ini, bukan orangnya.</p>
         <ErrorBox message={message} />
         <FormField label="Nama" required error={errors.name}>
@@ -425,7 +429,7 @@ function EmailModal({ account, onClose, onDone }: { account: Account; onClose: (
         </>
       }
     >
-      <form id="account-email-form" onSubmit={submit} className="space-y-4">
+      <form noValidate id="account-email-form" onSubmit={submit} className="space-y-4">
         <p className="text-sm text-slate-500">Kode lupa password untuk akun ini dikirim ke email berikut. Pastikan email milik pemakai akun.</p>
         <ErrorBox message={message} />
         <FormField label="Email" required error={errors.email}>
@@ -460,7 +464,7 @@ function SharedPasswordModal({ account, onClose, onDone }: { account: Account; o
         </>
       }
     >
-      <form id="shared-password-form" onSubmit={submit} className="space-y-4">
+      <form noValidate id="shared-password-form" onSubmit={submit} className="space-y-4">
         <p className="text-sm text-slate-500">
           Username <span className="font-mono">{account.username}</span>. Perangkat yang memakai akun ini akan keluar, dan saat masuk berikutnya pemakainya wajib membuat password baru.
         </p>

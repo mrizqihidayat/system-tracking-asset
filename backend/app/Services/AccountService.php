@@ -68,9 +68,10 @@ class AccountService
     {
         $search = mb_strtolower(trim((string) ($filters['search'] ?? '')));
 
+        // Cari nama atau username saja: NIK tidak dicari dan tidak dikirim (T45, temuan UAT K4).
         return $rows
             ->when($search !== '', fn (Collection $rows) => $rows->filter(
-                fn (array $row) => str_contains(mb_strtolower($row['name'].' '.$row['nik'].' '.$row['username']), $search),
+                fn (array $row) => str_contains(mb_strtolower($row['name'].' '.$row['username']), $search),
             ))
             ->when($filters['type'] ?? null, fn (Collection $rows, string $type) => $rows->where('source', $type === 'pegawai' ? User::SOURCE_API : User::SOURCE_MANUAL))
             ->when($filters['status'] ?? null, fn (Collection $rows, string $status) => $rows->where('status', $status));
@@ -87,6 +88,7 @@ class AccountService
         $employeeInactive = $user->isApi() && $synced && ! $employee?->isActiveIn($shd);
 
         return [
+            'key' => 'akun-'.$user->id,
             'id' => $user->id,
             'name' => $user->name,
             'nik' => $user->nik,
@@ -112,6 +114,7 @@ class AccountService
     private function pendingRow(Employee $employee): array
     {
         return [
+            'key' => 'pegawai-'.$employee->id,
             'id' => null,
             'name' => $employee->name,
             'nik' => $employee->nik,
