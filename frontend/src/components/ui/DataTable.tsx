@@ -48,7 +48,7 @@ interface Props<T> {
   onPageChange?: (page: number) => void
   /** Baris lebih rapat (judul, isi, dan footer). */
   dense?: boolean
-  /** Tinggi tabel tetap (tabel lebar): baris kosong ditambahkan sampai `meta.per_page`, tiap baris setinggi dua baris teks. */
+  /** Tabel lebar: tiap baris setinggi dua baris teks agar baris yang teksnya turun tidak lebih tinggi dari yang lain. Tidak ada baris kosong tambahan. */
   fixedHeight?: boolean
   /** Urutan aktif: `kunci` naik, `-kunci` turun, kosong = bawaan. */
   sort?: string
@@ -102,7 +102,6 @@ export default function DataTable<T>({
   const cellPad = dense ? 'py-2' : 'py-3'
   // Setinggi dua baris teks: baris yang isinya turun ke baris kedua (mis. "Alat Pelatihan") tidak lebih tinggi dari yang lain.
   const rowHeight = fixedHeight ? (dense ? 'h-15' : 'h-17') : ''
-  const fillerCount = fixedHeight && meta && rows.length > 0 ? Math.max(0, meta.per_page - rows.length) : 0
   const failed = Boolean(error) && rows.length === 0
   const skeleton = loading && rows.length === 0 && !failed
   const empty = !skeleton && !failed && rows.length === 0 ? emptyText : null
@@ -154,11 +153,6 @@ export default function DataTable<T>({
                     {tableColumns.map((c, i) => (
                       <td key={`${c.header}-${i}`} className={`px-4 ${cellPad} align-middle ${c.className ?? ''}`}>{c.cell(row)}</td>
                     ))}
-                  </tr>
-                ))}
-                {Array.from({ length: fillerCount }, (_, i) => (
-                  <tr key={`filler-${i}`} className={rowHeight} aria-hidden>
-                    <td colSpan={tableColumns.length} />
                   </tr>
                 ))}
               </>
